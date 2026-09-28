@@ -122,7 +122,10 @@ async function render(entry) {
     page.evaluate((d) => {
       const { clock } = globalThis.stage;
       clock.advance(d);
-      if ("speed" in clock) clock.speed = clock.speed;
+      if ("speed" in clock) {
+        const { speed } = clock;
+        clock.speed = speed;
+      }
     }, ms);
   const clockNow = () => page.evaluate(() => globalThis.stage.clock.now());
 

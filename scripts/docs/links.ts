@@ -8,8 +8,8 @@
  *   - package.json's repository URLs match config.ts;
  *   - media (config.ts: MEDIA, the `readme-media` branch) are linked as <name>-<hash8>.<ext>, with a
  *     name and format from docs/media.json and the hash from docs/media.lock.json (scripts/media
- *     keeps them current); the files are checked against origin/readme-media when that ref is
- *     fetched. Nothing links docs/images/ (frozen: only old npm READMEs use it).
+ *     keeps them current), and each file must exist on the branch (fetched first; offline, the
+ *     local ref is used if there is one). Nothing links docs/images/ (frozen: only old npm READMEs use it).
  * Other external URLs are listed but not fetched (CI stays offline).
  *
  *   bun scripts/docs/links.ts          (mise run docs:links)
@@ -42,7 +42,17 @@ function fromRepoUrl(url: string): string | undefined {
 
 const mediaSpec: { media: { name: string; formats: string[] }[] } = await Bun.file(join(ROOT, "docs/media.json")).json();
 const mediaLock: Record<string, { hash: string }> = await Bun.file(join(ROOT, "docs/media.lock.json")).json();
+// the media files must exist on the branch: fetch its head (the one network access here; a stale
+// local ref would report files the media workflow has just pushed as missing)
+const fetched = await $`git fetch --quiet --depth=1 origin +refs/heads/${MEDIA_BRANCH}:refs/remotes/origin/${MEDIA_BRANCH}`
+  .cwd(ROOT)
+  .quiet()
+  .nothrow();
 const mediaBranch = (await $`git cat-file -e refs/remotes/origin/${MEDIA_BRANCH}`.cwd(ROOT).quiet().nothrow()).exitCode === 0;
+if (fetched.exitCode !== 0)
+  console.log(
+    `! couldn't fetch origin/${MEDIA_BRANCH}: media files are checked ${mediaBranch ? "against the local ref" : "for their names only"}`,
+  );
 
 let count = 0;
 for (const file of await markdownFiles(DOC_GLOBS)) {

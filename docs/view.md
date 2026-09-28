@@ -67,6 +67,7 @@ from the page, it disposes the session it created.
 | `direction` | `auto` | `right` (left to right), `down` (top to bottom), or `auto` (`down` when the element is 760 px wide or less) |
 | `max-states` | `150` | fold the largest compound states until at most this many boxes are drawn |
 | `fit` | absent | scale the diagram all the way down to the element's width instead of scrolling. Without it, a diagram wider than the element is still scaled down, but not below `--scxml-min-scale` (0.65), and the rest scrolls |
+| `event-data` | | JSON object from event names to the data a click on that event's label sends, e.g. `{"login": {"user": "ada"}}`. Host code can also set `detail.data` in an `scxml-send` listener |
 | `announce` | `all` | what the live region reads out: `all` (steps and sent events), `sends`, or `off` |
 | `warnings` | `show` | `off` hides the list of authoring warnings above the diagram |
 
@@ -172,6 +173,7 @@ The element uses the shared `--scxml-*` tokens and exposes these parts:
 | `expand`, `collapse` | | fold buttons |
 | `empty` | | the hint shown while there's nothing to show |
 | `notice` | | the "large chart" notice |
+| `send-status` | | what became of an event sent by clicking a label, when it changed nothing or raised an error |
 | `error` | | the error panel |
 | `warnings`, `warning` | | the authoring-warnings list and each item |
 | `controls`, `play`, `step`, `speeds`, `clock` | | the playback bar (with a `PlaybackClock`) |

@@ -19,7 +19,7 @@ let current: { session: SCXMLSession; stop: () => void; clock: PlaybackClock } |
 async function run(id: string) {
   const sample = sampleById(id);
   if (!sample) return;
-  const speed = current?.clock.speed ?? 0.5;
+  const speed = current?.clock.speed ?? 0.25; // slow enough to follow what the machines do
   current?.stop();
   current?.session.dispose();
   current?.clock.dispose();

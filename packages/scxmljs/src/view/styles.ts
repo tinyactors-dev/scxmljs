@@ -86,6 +86,7 @@ button.label:disabled, button.chip:disabled { cursor: default; }
 /* ── notices, errors, controls ─────────────────────────── */
 .notice { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 7px 12px; font: 12px var(--x-sans); color: var(--x-fg2); background: var(--x-s2); border-bottom: 1px solid var(--x-b1); }
 .notice[hidden], .controls[hidden], .error[hidden], .warnings[hidden] { display: none; }
+.send-status { color: var(--x-fg1); border-left: 3px solid var(--x-wait); }
 .warnings { padding: 6px 12px; font: 12px var(--x-sans); color: var(--x-fg2); background: var(--x-wait-bg); border-bottom: 1px solid var(--x-b1); }
 .warnings summary { cursor: pointer; color: var(--x-wait); font-weight: 500; }
 .warnings ul { margin: 6px 0 2px; padding-left: 18px; display: grid; gap: 4px; }

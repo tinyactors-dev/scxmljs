@@ -71,6 +71,10 @@ export interface ViewStrings {
   announceStep: (event: string | undefined, entered: string[]) => string;
   /** Live-region text when a label sends an event. */
   announceSent: (name: string) => string;
+  /** A clicked event took no transition. */
+  sentNothing: (name: string) => string;
+  /** Evaluating a clicked event raised an error (e.g. a condition that throws). */
+  sentError: (name: string, message: string) => string;
 }
 
 const plural = new Intl.PluralRules("en");
@@ -111,4 +115,6 @@ export const defaultViewStrings: ViewStrings = {
   clockTime: (t) => `t = ${t}`,
   announceStep: (event, entered) => `${event ?? "Started"}: ${entered.length ? `now in ${entered.join(", ")}` : "no change"}`,
   announceSent: (name) => `Sent ${name}`,
+  sentNothing: (name) => `${name} changed nothing: no active state takes it right now, or its condition was false.`,
+  sentError: (name, message) => `${name} raised an error, so nothing changed: ${message}`,
 };

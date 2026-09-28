@@ -18,6 +18,14 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+### Added
+
+- `<scxml-view>`: the `event-data` attribute gives label clicks event data (a JSON object from
+  event names to data), and `scxml-send` listeners can set `detail.data`.
+- `<scxml-view>`: when a clicked event changes nothing, or raises an error (for example a
+  condition that throws, which counts as false), a `send-status` bar says so, and the live
+  region announces it. Before, the click looked like it did nothing.
+
 ## [0.1.0] - 2026-09-28
 
 The first release.

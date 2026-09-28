@@ -22,7 +22,9 @@
  * for `<data>`), `direction` ("auto" | "right" | "down"), `max-states` (fold
  * large charts beyond this many boxes, default 150), `announce`
  * ("all" | "sends" | "off"), `fit` (scale down to the element's width),
- * `warnings` ("off" hides the list of authoring warnings — see `model.warnings`).
+ * `warnings` ("off" hides the list of authoring warnings — see `model.warnings`),
+ * `event-data` (JSON object from event names to the data a label click sends,
+ * e.g. `{"login": {"user": "ada"}}`).
  *
  * Properties: `session` (a host-created session; the element then creates,
  * starts and disposes nothing), `options` (extra SessionOptions for sessions
@@ -69,12 +71,18 @@ export interface ViewErrorDetail {
   /** the underlying error (an `SCXMLValidationError`, `SCXMLParseError`, `ViewSourceError`, fetch error…) */
   error: unknown;
 }
-/** `scxml-send`: a transition label is about to send its event. Cancelable (`preventDefault()` stops it). */
+/**
+ * `scxml-send`: a transition label is about to send its event. Cancelable
+ * (`preventDefault()` stops it). Listeners may set `data`: it's sent as the
+ * event's data (it starts as the value from the `event-data` attribute).
+ */
 export interface ViewSendDetail {
   /** the session the event goes to */
   session: SCXMLSession;
   /** the event name */
   name: string;
+  /** the event data to send; writable */
+  data?: unknown;
 }
 
 /** SessionOptions for sessions the element creates (its own clock comes from the `clock` property). */
@@ -134,6 +142,7 @@ export class ScxmlView extends ElementBase {
     speeds: HTMLElement;
     clock: HTMLElement;
     notice: HTMLElement;
+    sendStatus: HTMLElement;
     warnings: HTMLDetailsElement;
     error: HTMLElement;
     canvas: HTMLElement;
@@ -527,6 +536,66 @@ export class ScxmlView extends ElementBase {
     this.#announcer.say(text, urgent);
   }
 
+  /**
+   * Data for events sent by clicking a label: the `event-data` attribute is a
+   * JSON object from event names to data, e.g. `event-data='{"login": {"user": "ada"}}'`.
+   */
+  #eventData(name: string): unknown {
+    const raw = this.getAttribute("event-data");
+    if (!raw) return undefined;
+    try {
+      const map = JSON.parse(raw) as Record<string, unknown>;
+      return map && typeof map === "object" ? map[name] : undefined;
+    } catch {
+      console.warn(`scxml-view: the event-data attribute is not valid JSON: ${raw}`);
+      return undefined;
+    }
+  }
+
+  #sendStatusTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * After a label click: if the event takes no transition, or evaluating it
+   * raises an error (a condition that throws counts as false, spec §5.9.1),
+   * say so — otherwise the click looks like it did nothing at all.
+   */
+  #watchOutcome(session: SCXMLSession, name: string) {
+    const status = this.#el.sendStatus;
+    status.hidden = true;
+    clearTimeout(this.#sendStatusTimer);
+    let took = false;
+    let error: string | undefined;
+    const onMicro = (e: Event) => {
+      const m = e as Event & { event?: { name: string } };
+      if (m.event?.name === name) took = true;
+    };
+    const onError = (e: Event) => {
+      error ??= (e as Event & { message?: string }).message;
+    };
+    const stop = () => {
+      session.removeEventListener("microstep", onMicro);
+      session.removeEventListener("error", onError);
+      session.removeEventListener("macrostep", onMacro);
+    };
+    const onMacro = (e: Event) => {
+      const m = e as Event & { event?: { name: string } };
+      if (m.event?.name !== name) return;
+      stop();
+      if (took && !error) return;
+      const t = this.#strings;
+      const text = error ? t.sentError(name, error) : t.sentNothing(name);
+      status.textContent = text;
+      status.hidden = false;
+      if (this.announce !== "off") this.#say(text, true);
+      // a message, not state: real time is fine for hiding it
+      this.#sendStatusTimer = setTimeout(() => (status.hidden = true), 6000);
+    };
+    session.addEventListener("microstep", onMicro);
+    session.addEventListener("error", onError);
+    session.addEventListener("macrostep", onMacro);
+    session.signal.addEventListener("abort", stop, { once: true });
+  }
+
   #emit<T>(type: string, detail: T, cancelable = false): boolean {
     return this.dispatchEvent(new CustomEvent<T>(type, { detail, bubbles: true, composed: true, cancelable }));
   }
@@ -543,15 +612,17 @@ export class ScxmlView extends ElementBase {
     step.addEventListener("click", () => this.#step());
     const controls = h("div", { class: "controls", part: "controls", hidden: "" }, play, step, speeds, clock);
     const notice = h("div", { class: "notice", part: "notice", hidden: "" });
+    // what became of an event sent by clicking a label, when it wasn't the obvious (a transition fired)
+    const sendStatus = h("div", { class: "notice send-status", part: "send-status", hidden: "" });
     const warnings = h("details", { class: "warnings", part: "warnings", hidden: "" }) as HTMLDetailsElement;
     const error = h("div", { class: "error", part: "error", role: "alert", hidden: "" });
     const diagram = h("div", { class: "diagram", role: "group" });
     // focusable: a scroll container must be keyboard-scrollable, and it takes the playback shortcuts
     const canvas = h("div", { class: "canvas", part: "canvas", tabindex: "0" }, diagram);
     const live = h("div", { class: "sr-only", role: "status", "aria-live": "polite", "aria-atomic": "true" });
-    const frame = h("div", { class: "frame", part: "frame" }, controls, notice, warnings, error, canvas, live);
+    const frame = h("div", { class: "frame", part: "frame" }, controls, notice, sendStatus, warnings, error, canvas, live);
     this.#shadow.append(frame);
-    this.#el = { frame, controls, play, step, speeds, clock, notice, warnings, error, canvas, diagram, live };
+    this.#el = { frame, controls, play, step, speeds, clock, notice, sendStatus, warnings, error, canvas, diagram, live };
     this.addEventListener("keydown", (e) => {
       const clockNow = this.#playback();
       const target = e.composedPath()[0] as HTMLElement;
@@ -830,8 +901,10 @@ export class ScxmlView extends ElementBase {
       el.addEventListener("click", () => {
         const session = this.#session;
         if (!session || !name) return;
-        if (!this.#emit<ViewSendDetail>("scxml-send", { session, name }, true)) return;
-        session.send(name);
+        const detail: ViewSendDetail = { session, name, data: this.#eventData(name) };
+        if (!this.#emit<ViewSendDetail>("scxml-send", detail, true)) return;
+        this.#watchOutcome(session, name);
+        session.send(name, detail.data);
         if (this.announce !== "off") this.#say(t.announceSent(name), true);
       });
     return el;

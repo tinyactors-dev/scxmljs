@@ -162,6 +162,49 @@ describe("<scxml-view>", () => {
     el.remove();
   });
 
+  test("clicked events: data from event-data or scxml-send, and feedback when nothing changes", async () => {
+    // the docs' login chart: its guard reads _event.data.user, so a bare click can't sign in
+    const LOGIN = await Bun.file(new URL("../../../docs/examples/login.scxml", import.meta.url)).text();
+    const status = (root: ShadowRoot) => root.querySelector<HTMLElement>(".send-status")!;
+
+    // no data: the guard throws (counts as false) and the element says why nothing happened
+    const a = await mount({ trusted: "" }, LOGIN);
+    (labelFor(a.root, "login") as HTMLButtonElement).click();
+    await frame();
+    expect(a.el.session!.isActive("signed-out")).toBe(true);
+    expect(status(a.root).hidden).toBe(false);
+    expect(status(a.root).textContent).toContain("login raised an error, so nothing changed");
+    expect(status(a.root).getAttribute("part")).toBe("send-status");
+    a.el.remove();
+
+    // event-data supplies the data for clicks, per event name
+    const b = await mount({ trusted: "", "event-data": JSON.stringify({ login: { user: "ada" } }) }, LOGIN);
+    (labelFor(b.root, "login") as HTMLButtonElement).click();
+    await frame();
+    expect(b.el.session!.isActive("signed-in")).toBe(true);
+    expect(b.el.session!.snapshot().user).toBe("ada");
+    expect(status(b.root).hidden).toBe(true);
+    (labelFor(b.root, "logout") as HTMLButtonElement).click();
+    await frame();
+
+    // a guard that is merely false: "changed nothing"
+    b.el.setAttribute("event-data", JSON.stringify({ login: { user: "" } }));
+    (labelFor(b.root, "login") as HTMLButtonElement).click();
+    await frame();
+    expect(b.el.session!.isActive("signed-out")).toBe(true);
+    expect(status(b.root).textContent).toContain("login changed nothing");
+
+    // scxml-send listeners can set the data themselves
+    b.el.addEventListener("scxml-send", (e) => {
+      (e as CustomEvent<ViewSendDetail>).detail.data = { user: "grace" };
+    });
+    (labelFor(b.root, "login") as HTMLButtonElement).click();
+    await frame();
+    expect(b.el.session!.snapshot().user).toBe("grace");
+    expect(status(b.root).hidden).toBe(true);
+    b.el.remove();
+  });
+
   test('interactive="false" draws labels as text; autostart="false" doesn\'t run', async () => {
     const { el, root } = await mount({ trusted: "", interactive: "false", autostart: "false" }, LIGHT);
     expect(labels(root).every((l) => l.tagName === "SPAN")).toBe(true);

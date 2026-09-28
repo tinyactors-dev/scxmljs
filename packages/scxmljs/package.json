@@ -1,6 +1,6 @@
 {
   "name": "@tinyactors/scxmljs",
-  "version": "0.1.0",
+  "version": "0.2.0-dev.0",
   "description": "A correctness-first SCXML 1.0 interpreter (ECMAScript data model) for the browser and Node, with custom elements for interactive statechart diagrams.",
   "keywords": [
     "scxml",

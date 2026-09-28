@@ -29,6 +29,14 @@ const scenarios: [string, (page: Page) => Promise<void>][] = [
   ["explorer, System level", async (page) => page.locator("#wide [part~=levels] button", { hasText: "System" }).click()],
   ["explorer, state detail", async (page) => page.locator("#wide [part~=tree-row]", { hasText: "stopped" }).click()],
   [
+    "explorer, list with an opened row",
+    async (page) => {
+      await page.locator("#wide [part~=focus-pane]").getByRole("button", { name: "List", exact: true }).click();
+      await page.locator("#wide").getByRole("button", { name: "stopped, atomic, active" }).click();
+      await page.locator("#wide [part~=row-detail]").waitFor();
+    },
+  ],
+  [
     "explorer, running (parallel lanes)",
     async (page) => page.evaluate(() => (window as any).__session.send("play")).then(() => page.locator("#wide [part~=step]").click()),
   ],

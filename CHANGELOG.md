@@ -25,6 +25,25 @@ private `--x-*` properties are not public API and can change in any release.
 - `<scxml-view>`: when a clicked event changes nothing, or raises an error (for example a
   condition that throws, which counts as false), a `send-status` bar says so, and the live
   region announces it. Before, the click looked like it did nothing.
+- `<scxml-explorer>`: list rows answer "what is this state, what happens in it, how do I get
+  out": entry actions and invokes, transitions as "event → target" with a condition mark, send
+  buttons while the state is active, a "last visited" mark, and a click that opens the row in
+  place. New parts: `list-row` modifiers `active` `visited` `open`, `visited`, `row-actions`,
+  `row-exits`, `row-event` (`fired`), `row-detail`, `open-detail`; `card` and `lane-row` get
+  `visited`, `edge-label` gets `fired`. New `strings`: `onEntry`, `eventless`, `guard`,
+  `justTaken`, `lastVisited`, `openDetail`, `lastStep`.
+
+### Changed
+
+- `<scxml-explorer>` is quieter: one header bar (the playback controls moved into it), no
+  status badges or redundant counts, sentence-case labels, hairlines instead of boxes, and colour
+  only for meaning (running colour: active; waiting colour: what the last step did). The System
+  level hides the tree and shows the service inspector.
+- `<scxml-explorer>` parts: `speeds` is now a `<select>` (it was a group of buttons); `last-step`
+  moved from the playback bar to under the title; `send` is now the event's name itself (there's
+  no separate Send button); `event-data` is a `<details>` disclosure. The playback bar's queue
+  readout is the `clock` part's tooltip. The English `focusSummary` no longer lists all
+  descendants and `traffic` gives a message total.
 
 ## [0.1.0] - 2026-09-28
 

@@ -75,7 +75,8 @@ transition label is a button that sends its event.
 ![A media player chart drawn by <scxml-view>: the "playing" and "audible" states are active](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/main/docs/images/view-light.webp)
 
 **Explore a running system** with `<scxml-explorer>`: a tree of states, a focus on one level of
-the chart, the events the machine accepts right now, and playback controls.
+the chart (each state with what it does, how it leaves, and buttons to send its events while
+it's active), the events the machine accepts right now, and playback controls.
 
 <!-- doctest: check -->
 ```ts
@@ -127,7 +128,7 @@ The [getting-started guide](https://github.com/tinyactors-dev/scxmljs/blob/main/
 | `@tinyactors/scxmljs` | the interpreter, **sandboxed**: chart code runs in QuickJS (WebAssembly) | 20 KB, then 290 KB loaded on demand |
 | `@tinyactors/scxmljs/trusted` | the same API, **trusted**: chart code runs in the host's own JavaScript engine | 17 KB |
 | `@tinyactors/scxmljs/view` | `<scxml-view>`: a whole chart, drawn and running, zero-JS | 33 KB, plus the engine it loads |
-| `@tinyactors/scxmljs/explorer` | `<scxml-explorer>` and its view-model: explore a running system | 25 KB |
+| `@tinyactors/scxmljs/explorer` | `<scxml-explorer>` and its view-model: explore a running system | 26 KB |
 | `@tinyactors/scxmljs/themes/tinyactors.css` | an optional theme stylesheet | 0.3 KB |
 
 Sizes are for a browser bundle of each entry on its own (`mise run size` in the repository).

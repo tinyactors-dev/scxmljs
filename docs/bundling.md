@@ -35,7 +35,7 @@ Sizes, minified and gzipped, for a browser bundle of each entry point alone:
 | `@tinyactors/scxmljs` | 20 KB, plus 290 KB of QuickJS loaded on first use |
 | `@tinyactors/scxmljs/trusted` | 17 KB |
 | `@tinyactors/scxmljs/view` | 33 KB, plus the engine it loads |
-| `@tinyactors/scxmljs/explorer` | 25 KB |
+| `@tinyactors/scxmljs/explorer` | 26 KB |
 
 ## From a CDN, with an import map
 

@@ -46,12 +46,26 @@ test.describe("<scxml-explorer> (built package, import map)", () => {
 
   test("sending from the events pane queues on the paused clock; Step delivers it", async ({ page }) => {
     const x = explorer(page);
-    await x.getByRole("button", { name: "Send play" }).click();
+    await x.getByRole("button", { name: "Send play", exact: true }).click();
     expect(await page.evaluate(() => (window as any).__session.activeStateIds())).toEqual(["stopped"]);
     await x.locator("[part~=step]").click();
     await expect
       .poll(() => page.evaluate(() => (window as any).__session.activeStateIds()))
       .toEqual(["playing", "audio", "normal", "video", "sd"]);
+  });
+
+  test("a list row sends the events of its active leaf; Step delivers them", async ({ page }) => {
+    const x = explorer(page);
+    await x.locator("[part~=focus-pane]").getByRole("button", { name: "List", exact: true }).click();
+    const row = x.locator("[part~=list-row]", { has: page.getByRole("button", { name: "stopped, atomic, active" }) });
+    await row.getByRole("button", { name: "Send play → playing" }).click();
+    await x.locator("[part~=step]").click();
+    await expect.poll(() => page.evaluate(() => (window as any).__session.isActive("playing"))).toBe(true);
+    // following moved the focus into "playing"; back to the top level: the row of the state just
+    // left says so, and marks the transition taken
+    await x.locator("[part~=tree-row]", { hasText: "stopped" }).click();
+    await x.getByRole("button", { name: "stopped, atomic, last visited" }).click(); // opens it in place
+    await expect(x.locator("[part~=list-row][part~=visited] [part~=row-event][part~=fired]")).toContainText("play");
   });
 
   test("levels: System shows the machine", async ({ page }) => {

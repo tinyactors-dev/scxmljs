@@ -107,7 +107,7 @@ export interface ExplorerStrings {
   layoutDiagram: string;
   /** Focus layout switch: list. English: "List". */
   layoutList: string;
-  /** Subtitle of the focus: kind, direct children, all descendants. */
+  /** Subtitle of the focus: kind, direct children, all descendants (the English default leaves the last out). */
   focusSummary: (kind: string, children: number, inside: number) => string;
   /** Link to the parent state. */
   up: (parent: string) => string;
@@ -155,6 +155,20 @@ export interface ExplorerStrings {
   showAll: (n: number) => string;
   /** Open a lane that has more states than shown. */
   openLane: (n: number) => string;
+  /** Label before a list row's entry actions and invokes. English: "on entry". */
+  onEntry: string;
+  /** A transition without an event. English: "always". */
+  eventless: string;
+  /** Tooltip and screen-reader text of a transition's condition. English: "if <cond>". */
+  guard: (cond: string) => string;
+  /** Marks a transition taken in the last step. English: "just taken". */
+  justTaken: string;
+  /** Marks the state the machine was in before the last step. English: "last visited". */
+  lastVisited: string;
+  /** Opens the detail of a state from its expanded list row. English: "Details →". */
+  openDetail: string;
+  /** Accessible name of the last-step line. English: "Last step". */
+  lastStep: string;
 
   // ── system ──
   /** Title of the System level. English: "System". */
@@ -175,7 +189,7 @@ export interface ExplorerStrings {
   status: (status: "idle" | "running" | "done") => string;
   /** Tooltip of a service's traffic counts. */
   trafficHint: string;
-  /** Traffic counts on a service card. */
+  /** Traffic on a service card: messages to it and from it (the English default gives the total). */
   traffic: (out: number, inn: number) => string;
   /** Detail pane prompt before a service is selected. English: "Select a service or a machine.". */
   selectService: string;
@@ -344,7 +358,7 @@ export const defaultStrings: ExplorerStrings = {
   layoutAuto: "Auto",
   layoutDiagram: "Diagram",
   layoutList: "List",
-  focusSummary: (kind, n, inside) => `${kind} · ${count(n, "state", "states")} · ${inside} inside`,
+  focusSummary: (kind, n) => `${kind} · ${count(n, "state", "states")}`,
   up: (p) => `↑ ${p}`,
   leavesTo: "Leaves to",
   enteredFrom: "Entered from",
@@ -368,6 +382,13 @@ export const defaultStrings: ExplorerStrings = {
   findAmongStates: (n) => `Find among ${count(n, "state", "states")}…`,
   showAll: (n) => `Show all ${n}`,
   openLane: (n) => `+${n} more — open lane`,
+  onEntry: "on entry",
+  eventless: "always",
+  guard: (cond) => `if ${cond}`,
+  justTaken: "just taken",
+  lastVisited: "last visited",
+  openDetail: "Details →",
+  lastStep: "Last step",
 
   system: "System",
   systemSummary: (m, s, msg) =>
@@ -379,7 +400,7 @@ export const defaultStrings: ExplorerStrings = {
   talksTo: (names) => `talks to ${names}`,
   status: (s) => s,
   trafficHint: "requests / replies and events",
-  traffic: (out, inn) => `${out} ↗ ${inn} ↙`,
+  traffic: (out, inn) => count(out + inn, "message", "messages"),
   selectService: "Select a service or a machine.",
   talksWith: "Talks with",
   recentTraffic: "Recent traffic",

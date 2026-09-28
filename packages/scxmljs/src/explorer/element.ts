@@ -77,7 +77,8 @@ const DIAGRAM_MAX_CHILDREN = 9;
 const LIST_PAGE = 40;
 const DOORS_SHOWN = 6;
 
-const KIND_ICON: Record<string, string> = { atomic: "○", compound: "▣", parallel: "∥", final: "◎", history: "H", scxml: "◇" };
+/** Only the kinds that behave differently get a mark; plain states and containers go without. */
+const KIND_MARK: Record<string, string> = { parallel: "∥", final: "◎", history: "H" };
 const kindOf = (s: StateNode): StateKindName => (s.kind === "state" ? (s.children.length ? "compound" : "atomic") : s.kind);
 
 /** What the live region announces: every step and sent event, only sent events, or nothing. */
@@ -185,6 +186,11 @@ export class ScxmlExplorer extends ElementBase {
   #eventScope: EventScopeFilter = "inherited";
   #groupOpen = new Map<string, boolean>();
   #machineFilter = "";
+  /** leaf rows of the focus list opened in place */
+  #openRows = new Set<StateNode>();
+  /** the viewed machine's transitions taken in its last step, and the leaves it left then */
+  #fired = new Set<TransitionNode>();
+  #visited = new Set<StateNode>();
   #strings: ExplorerStrings = defaultStrings;
   /** layout breakpoint, measured on the host (container queries decide the CSS) */
   #narrow = false;
@@ -237,10 +243,10 @@ export class ScxmlExplorer extends ElementBase {
     playback: HTMLElement;
     playToggle: HTMLButtonElement;
     stepButton: HTMLButtonElement;
-    speeds: HTMLElement;
+    speeds: HTMLSelectElement;
     clockTime: HTMLElement;
-    clockQueue: HTMLElement;
     lastStep: HTMLElement;
+    shell: HTMLElement;
   };
 
   constructor() {
@@ -465,12 +471,27 @@ export class ScxmlExplorer extends ElementBase {
     this.#selected = undefined;
     this.#focusFilter = "";
     this.#focusShowAll = false;
+    this.#openRows.clear();
+    this.#fired = new Set();
+    this.#visited = new Set();
     if (!this.#expanded.has(key))
       this.#expanded.set(
         key,
         activeExpansion(session.model, (s) => session.isActiveNode(s)),
       );
+    // what the last step did: the transitions taken, and the leaves it left
+    let taken: TransitionNode[] = [];
+    let leaves = session.configuration.filter(isAtomic);
+    const onMicro = (e: Event) => taken.push(...(e as unknown as { transitions: TransitionNode[] }).transitions);
     const onMacro = () => {
+      const now = session.configuration.filter(isAtomic);
+      if (taken.length) {
+        this.#fired = new Set(taken);
+        const left = leaves.filter((s) => !now.includes(s));
+        if (left.length) this.#visited = new Set(left);
+      }
+      taken = [];
+      leaves = now;
       // the first real configuration expands the active path once, whether or not we follow
       if (!this.#seeded.has(key) && session.configuration.length) {
         this.#seeded.add(key);
@@ -480,9 +501,11 @@ export class ScxmlExplorer extends ElementBase {
       if (this.#follow) this.#applyFollow();
       this.#schedule();
     };
+    session.addEventListener("microstep", onMicro);
     session.addEventListener("macrostep", onMacro);
     session.addEventListener("done", onMacro);
     this.#sessionListeners = () => {
+      session.removeEventListener("microstep", onMicro);
       session.removeEventListener("macrostep", onMacro);
       session.removeEventListener("done", onMacro);
     };
@@ -523,6 +546,7 @@ export class ScxmlExplorer extends ElementBase {
       this.#focusFilter = "";
       this.#focusShowAll = false;
       this.#doorsShowAll = { exits: false, entries: false };
+      if (this.#focus !== this.#lastFocus) this.#openRows.clear();
       this.#tab = "focus";
       const exp = this.#expanded.get(this.#machineKey);
       if (exp) for (const a of pathTo(s)) if (a.children.length) exp.add(a);
@@ -615,7 +639,8 @@ export class ScxmlExplorer extends ElementBase {
       {},
       h("div", { class: "search" }, eventSearch),
       scopes,
-      h("label", { class: "data-field", part: "event-data" }, dataLabel, eventData),
+      // event data is rarely needed: behind a disclosure
+      h("details", { class: "data-field", part: "event-data" }, h("summary", {}, dataLabel), eventData),
     );
     const inspectorBody = h("div", { class: "pane-scroll" });
     const inspector = h(
@@ -626,25 +651,19 @@ export class ScxmlExplorer extends ElementBase {
       inspectorBody,
     );
 
-    // playback: pause / step / speed for a PlaybackClock
+    // playback: pause / step / speed for a PlaybackClock, in the header bar
     const playToggle = h("button", { class: "play", part: "play", type: "button" }) as HTMLButtonElement;
     playToggle.addEventListener("click", () => this.#clock?.toggle());
     const stepButton = h("button", { class: "step", part: "step", type: "button" }) as HTMLButtonElement;
     stepButton.addEventListener("click", () => this.#step());
-    const speeds = h("div", { class: "mode speeds", part: "speeds", role: "group" });
+    const speeds = h("select", { class: "speeds", part: "speeds" }) as HTMLSelectElement;
+    speeds.addEventListener("change", () => {
+      if (this.#clock) this.#clock.speed = Number(speeds.value);
+    });
     const clockTime = h("span", { class: "clock-time", part: "clock" });
-    const clockQueue = h("span", { class: "clock-queue" });
-    const lastStep = h("span", { class: "last-step", part: "last-step" });
-    const playback = h(
-      "div",
-      { class: "playback", part: "playback", hidden: "" },
-      playToggle,
-      stepButton,
-      speeds,
-      clockTime,
-      clockQueue,
-      lastStep,
-    );
+    const playback = h("div", { class: "playback", part: "playback", hidden: "" }, playToggle, stepButton, speeds, clockTime);
+    // what the last step did: shown under the title of the center pane
+    const lastStep = h("p", { class: "last-step", part: "last-step" });
     this.addEventListener("keydown", (e) => {
       const target = e.composedPath()[0] as HTMLElement;
       if (!this.#clock || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName)) return;
@@ -666,8 +685,7 @@ export class ScxmlExplorer extends ElementBase {
     const shell = h(
       "div",
       { class: "shell" },
-      h("div", { class: "top", part: "top" }, levels, crumbs, h("slot", { name: "toolbar" }), follow),
-      playback,
+      h("div", { class: "top", part: "top" }, levels, crumbs, h("slot", { name: "toolbar" }), playback, follow),
       h("div", { class: "body" }, treePane, center, inspector, strip, tabs),
       live,
     );
@@ -701,8 +719,8 @@ export class ScxmlExplorer extends ElementBase {
       stepButton,
       speeds,
       clockTime,
-      clockQueue,
       lastStep,
+      shell,
     };
     this.#applyShellStrings();
   }
@@ -732,7 +750,8 @@ export class ScxmlExplorer extends ElementBase {
     e.stepButton.textContent = t.step;
     e.stepButton.title = t.stepHint;
     e.speeds.setAttribute("aria-label", t.speedLabel);
-    e.clockTime.title = t.virtualTime;
+    e.speeds.title = t.speedLabel;
+    e.lastStep.setAttribute("aria-label", t.lastStep);
     e.strip.setAttribute("aria-label", t.acceptedEventsLabel);
   }
 
@@ -760,24 +779,34 @@ export class ScxmlExplorer extends ElementBase {
     const clock = this.#clock;
     if (!clock) return;
     const t = this.#strings;
-    const { playToggle, stepButton, speeds, clockTime, clockQueue, lastStep } = this.#el;
+    const { playToggle, stepButton, speeds, clockTime } = this.#el;
     playToggle.textContent = clock.playing ? t.pause : t.play;
     playToggle.setAttribute("aria-pressed", String(!clock.playing));
     stepButton.disabled = clock.pending === 0;
-    if (speeds.childElementCount !== SPEEDS.length)
-      speeds.replaceChildren(...SPEEDS.map(([v, text]) => button(text, () => (clock.speed = v), { "data-speed": String(v) })));
-    for (const b of speeds.children) b.setAttribute("aria-pressed", String(Number((b as HTMLElement).dataset.speed) === clock.speed));
+    const speed = String(clock.speed);
+    if (!speeds.options.length) for (const [v, text] of SPEEDS) speeds.append(html("option", { value: String(v) }, text));
+    if (![...speeds.options].some((o) => o.value === speed)) speeds.append(html("option", { value: speed }, `${speed}×`));
+    speeds.value = speed;
     clockTime.textContent = t.clockTime(formatTime(clock.now()));
+    // what's pending is a detail: in the tooltip
     const next = clock.nextTimerAt;
-    const queue = [];
+    const queue = [t.virtualTime];
     if (clock.ready) queue.push(t.queued(clock.ready));
     if (next !== undefined) queue.push(t.nextTimer(formatTime(Math.max(0, next - clock.now()))));
-    clockQueue.textContent = queue.join(" · ") || t.idle;
+    if (queue.length === 1) queue.push(t.idle);
+    clockTime.title = queue.join(" · ");
+  }
+
+  /** The last step of any machine: "machine: event · source → target". */
+  #renderLastStep() {
+    const t = this.#strings;
+    const el = this.#el.lastStep;
     const ls = this.#tracker?.lastStep;
-    lastStep.textContent = ls
+    el.hidden = !ls;
+    el.textContent = ls
       ? `${ls.machine}: ${ls.event ?? t.start}${ls.moves.length ? ` · ${ls.moves.slice(0, 2).join(" · ")}${ls.moves.length > 2 ? ` +${ls.moves.length - 2}` : ""}` : ` · ${t.noTransition}`}`
       : "";
-    lastStep.title = ls ? [ls.event ?? t.start, ...ls.moves].join("\n") : "";
+    el.title = ls ? [ls.event ?? t.start, ...ls.moves].join("\n") : "";
   }
 
   // ─────────────────────────────── render ───────────────────────────────
@@ -802,6 +831,8 @@ export class ScxmlExplorer extends ElementBase {
       this.#emit<ExplorerFocusDetail>("scxml-focus", { session: m.session, state: this.#focus });
     }
     this.#renderPlayback();
+    this.#renderLastStep();
+    this.#el.shell.dataset.level = this.#level;
     this.#renderTop(m);
     this.#renderTree();
     if (this.#level === "system") this.#renderSystem();
@@ -885,7 +916,8 @@ export class ScxmlExplorer extends ElementBase {
     });
     const rows = this.#treeRows;
     const total = session.model.states.filter((s) => s.kind !== "scxml" && s.kind !== "history").length;
-    this.#el.treeCount.textContent = this.#treeFilter ? t.matchesOf(rows.filter((r) => r.match).length, total) : String(total);
+    // a count only while it says something: how many states match the filter
+    this.#el.treeCount.textContent = this.#treeFilter ? t.matchesOf(rows.filter((r) => r.match).length, total) : "";
     // the roving tabindex: while the tree has keyboard focus the cursor stays where the user put it;
     // otherwise it tracks the selected / focused state, so tabbing in lands on "where we are"
     const hadFocus = (this.#shadow.activeElement as HTMLElement | null)?.getAttribute("role") === "treeitem";
@@ -932,10 +964,8 @@ export class ScxmlExplorer extends ElementBase {
           title: r.node.id,
         },
         twisty,
-        h("span", { class: "kind", "aria-hidden": "true" }, KIND_ICON[kindOf(r.node)]!),
         h("span", { class: "name" }, label(r.node)),
-        r.childCount ? h("span", { class: "count", "aria-hidden": "true" }, String(r.childCount)) : "",
-        leafActive ? h("span", { class: "dot", "aria-hidden": "true" }) : "",
+        kindMark(r.node),
         // status in words, not only colour and weight
         leafActive ? srText(`, ${t.active}`) : r.onActivePath ? srText(`, ${t.containsActive}`) : "",
       );
@@ -1093,12 +1123,13 @@ export class ScxmlExplorer extends ElementBase {
               }),
             ),
           );
+    // the status in words only when it isn't the normal case (an active focus)
     const status =
       session.status === "done"
-        ? h("span", { class: "badge done" }, t.terminated)
+        ? h("span", { class: "status" }, t.terminated)
         : isActive(focus) || focus.kind === "scxml"
-          ? h("span", { class: "badge run" }, t.active)
-          : h("span", { class: "badge muted" }, t.inactive);
+          ? srText(t.active)
+          : h("span", { class: "status" }, t.inactive);
     const header = [
       h("h2", { class: "title", part: "title" }, label(focus)),
       h(
@@ -1107,15 +1138,16 @@ export class ScxmlExplorer extends ElementBase {
         h("span", {}, t.focusSummary(t.kind(kindOf(focus)), scope.children.length, descendantCount(focus))),
         status,
         focus.parent ? button(t.up(label(focus.parent)), () => this.#focusOn(focus.parent!), { class: "drill" }) : "",
-        h("span", { style: "flex:1" }),
+        h("span", { class: "spacer" }),
         modeSwitch,
       ),
+      this.#el.lastStep,
     ];
 
     let body: Node;
     if (mode === "lanes") body = this.#lanes(scope.children, isActive);
     else if (mode === "diagram") body = this.#diagram(scope.children, scope.edges);
-    else body = this.#list(scope.children, scope.edges);
+    else body = this.#list(scope.children, scope.edges, session);
 
     const doors = (kind: "exits" | "entries") => {
       const all = kind === "exits" ? scope.exits : scope.entries;
@@ -1123,12 +1155,7 @@ export class ScxmlExplorer extends ElementBase {
       const showAll = this.#doorsShowAll[kind];
       const shown = showAll ? all : all.slice(0, DOORS_SHOWN);
       return [
-        h(
-          "div",
-          { class: "section-title" },
-          kind === "exits" ? t.leavesTo : t.enteredFrom,
-          h("span", { class: "count" }, String(all.length)),
-        ),
+        h("div", { class: "section-title" }, kind === "exits" ? t.leavesTo : t.enteredFrom),
         h(
           "div",
           { class: "doors", part: "doors" },
@@ -1136,6 +1163,7 @@ export class ScxmlExplorer extends ElementBase {
             const live = kind === "exits" && (d.child === focus ? isActive(focus) : isActive(d.child));
             const where = kind === "exits" ? label(d.other) : `${label(d.other)} → ${label(d.child)}`;
             const context = `${t.inState(d.other.parent ? label(d.other.parent) : t.machine)}${kind === "exits" && d.child !== focus ? ` · ${t.fromState(label(d.child))}` : ""}`;
+            const events = d.events.slice(0, 3).join(", ") + (d.events.length > 3 ? ` +${d.events.length - 3}` : "");
             const el = h(
               "div",
               {
@@ -1143,12 +1171,12 @@ export class ScxmlExplorer extends ElementBase {
                 part: parts("door", kind === "exits" ? "exit" : "entry", live && "live"),
                 role: "link",
                 tabindex: "0",
-                title: t.transitions(d.transitions.length),
+                title: `${t.transitions(d.transitions.length)}: ${d.events.join(", ")}`,
                 "aria-label": `${kind === "exits" ? t.leavesTo : t.enteredFrom}: ${where}, ${context}; ${d.events.join(", ")}`,
               },
-              h("span", { class: "arrow", "aria-hidden": "true" }, kind === "exits" ? "⇥" : "⇤"),
-              h("span", { class: "where" }, where, h("small", {}, `  ${context}`)),
-              h("span", { class: "events" }, ...chips(d.events, 3, () => {})),
+              h("span", { class: "where" }, where),
+              h("span", { class: "context" }, context),
+              h("span", { class: "events" }, events),
             );
             activate(el, () => this.#focusOn(d.other));
             return el;
@@ -1157,18 +1185,29 @@ export class ScxmlExplorer extends ElementBase {
             ? button(
                 showAll ? t.showFewer : t.more(all.length - DOORS_SHOWN),
                 () => this.#update(() => (this.#doorsShowAll[kind] = !showAll)),
-                {
-                  class: "more",
-                },
+                { class: "more" },
               )
             : "",
         ),
       ];
     };
 
+    // re-rendering replaces the rows: keep keyboard focus on the same control of the same state
+    const had = this.#shadow.activeElement as HTMLElement | null;
+    const hadRow = had && out.contains(had) ? had.closest<HTMLElement>("[data-state]") : null;
+    const hadKey = had?.dataset.key ?? (had?.classList.contains("select") ? "select" : undefined);
     const scroll = out.scrollTop;
     out.replaceChildren(...header, body, ...doors("exits"), ...doors("entries"));
     out.scrollTop = scroll;
+    if (hadRow && hadKey) {
+      const row = out.querySelector(`[data-state="${CSS.escape(hadRow.dataset.state!)}"]`);
+      (
+        row?.querySelector<HTMLElement>(hadKey === "select" ? ".select" : `[data-key="${hadKey}"]`) ??
+        row?.querySelector<HTMLElement>(".select")
+      )?.focus({
+        preventScroll: true,
+      });
+    }
     this.#diagramObserver?.disconnect();
     if (mode === "diagram") {
       const draw = () => this.#drawEdges(scope.edges, isActive);
@@ -1188,8 +1227,8 @@ export class ScxmlExplorer extends ElementBase {
     }
   }
 
-  /** In the diagram, arrows carry the events: cards only show how many there are. */
-  #card(c: ChildSummary, opts: { compact?: boolean; eventsOnArrows?: boolean } = {}) {
+  /** A diagram card: the name, and a drill-in for containers. The arrows carry the events. */
+  #card(c: ChildSummary) {
     const h = html;
     const t = this.#strings;
     const s = c.node;
@@ -1202,6 +1241,7 @@ export class ScxmlExplorer extends ElementBase {
             (x) => x.getAttribute("type") && x.getAttribute("type") !== "scxml",
           ),
         ));
+    const visited = !c.onActivePath && this.#wasVisited(s);
     const cls = [
       "card",
       c.onActivePath ? "path" : "",
@@ -1209,16 +1249,22 @@ export class ScxmlExplorer extends ElementBase {
       waiting ? "waiting" : "",
       s.kind === "final" ? "final" : "",
       s === this.#selected ? "selected" : "",
+      visited ? "visited" : "",
     ];
-    const status = waiting ? t.waiting : c.onActivePath ? t.active : "";
-    // a group, not a button: it holds its own controls (drill, event chips), and interactive
-    // elements must not nest. The state's name is the card's primary button.
+    const status = waiting ? t.waiting : c.onActivePath ? t.active : visited ? t.lastVisited : "";
+    // a group, not a button: it holds its own controls (drill), and interactive elements must
+    // not nest. The state's name is the card's primary button.
     const name = [label(s), t.kind(kindOf(s)), status, c.initial && t.initial].filter(Boolean).join(", ");
     const select = h(
       "button",
       { type: "button", class: "name select", "aria-label": name, "aria-pressed": String(s === this.#selected) },
       label(s),
     );
+    const meta = [
+      waiting ? h("span", { class: "status" }, t.waiting) : "",
+      c.descendants ? button(t.inside(c.descendants), (e) => this.#drillInto(e, s), { class: "drill" }) : "",
+      c.invokes ? h("span", {}, t.invokes(c.invokes)) : "",
+    ].filter(Boolean);
     const card = h(
       "div",
       {
@@ -1229,51 +1275,28 @@ export class ScxmlExplorer extends ElementBase {
         "aria-label": name,
       },
       c.initial ? h("span", { class: "initial-mark", title: t.initial }) : "",
-      h(
-        "div",
-        { class: "card-head" },
-        h("span", { class: "kind", "aria-hidden": "true" }, KIND_ICON[kindOf(s)]!),
-        select,
-        waiting ? h("span", { class: "badge wait" }, t.waiting) : c.onActivePath ? h("span", { class: "badge run" }, t.active) : "",
-      ),
-      opts.compact
-        ? ""
-        : h(
-            "div",
-            { class: "meta" },
-            c.descendants ? button(t.inside(c.descendants), (e) => this.#drillInto(e, s), { class: "drill" }) : "",
-            c.invokes ? h("span", {}, t.invokes(c.invokes)) : "",
-            c.internal ? h("span", { title: t.staysInside }, `↺ ${c.internal}`) : "",
-            opts.eventsOnArrows && c.events.length ? h("span", { title: c.events.join("\n") }, t.events(c.events.length)) : "",
-          ),
-      opts.compact || opts.eventsOnArrows || !c.events.length
-        ? ""
-        : h("div", { class: "events" }, ...chips(c.events, 3, (ev) => this.#sendDescriptor(ev))),
+      h("div", { class: "card-head" }, select, kindMark(s)),
+      meta.length ? h("div", { class: "meta" }, ...meta) : "",
       h("slot", { name: `state:${s.id}` }),
     );
     this.#operable(card, s, select);
     return card;
   }
 
+  /** Was this state (or one inside it) left in the viewed machine's last step? */
+  #wasVisited(s: StateNode): boolean {
+    for (const v of this.#visited) if (pathTo(v).includes(s)) return true;
+    return false;
+  }
+
   /**
-   * Click / keyboard behaviour shared by cards, list rows and lane rows:
-   * click and Space select, Enter drills into a container (or selects a leaf),
-   * double-click drills in.
+   * Click / keyboard behaviour of diagram cards: click and Space select,
+   * Enter drills into a container (or selects a leaf), double-click drills in.
    */
   #operable(el: HTMLElement, s: StateNode, keys: HTMLElement = el) {
     el.addEventListener("click", () => this.#select(s));
     el.addEventListener("dblclick", () => isContainer(s) && this.#focusOn(s));
-    keys.addEventListener("keydown", (e) => {
-      if (e.target !== keys) return; // keys on other buttons inside belong to them
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (isContainer(s)) this.#focusOn(s);
-        else this.#select(s);
-      } else if (e.key === " ") {
-        e.preventDefault();
-        this.#select(s);
-      }
-    });
+    onKeys(keys, (e) => (e.key === "Enter" && isContainer(s) ? this.#focusOn(s) : this.#select(s)));
   }
 
   #diagram(children: ChildSummary[], edges: FocusEdge[]) {
@@ -1303,7 +1326,7 @@ export class ScxmlExplorer extends ElementBase {
     const diagram = h(
       "div",
       { class: "diagram", part: "diagram" },
-      ...columns.filter(Boolean).map((col) => h("div", { class: "rank" }, ...col.map((c) => this.#card(c, { eventsOnArrows: true })))),
+      ...columns.filter(Boolean).map((col) => h("div", { class: "rank" }, ...col.map((c) => this.#card(c)))),
     );
     this.#diagramEl = diagram;
     this.#rank = rank;
@@ -1333,7 +1356,7 @@ export class ScxmlExplorer extends ElementBase {
     const ordered = [...edges].sort(
       (a, b) => Number(isActive(b.from)) - Number(isActive(a.from)) || a.from.order - b.from.order || a.to.order - b.to.order,
     );
-    const requests: (LabelRequest & { edge: FocusEdge; live: boolean })[] = [];
+    const requests: (LabelRequest & { edge: FocusEdge; live: boolean; fired: boolean })[] = [];
     let backIndex = 0;
     for (const e of ordered) {
       const a = rect(e.from);
@@ -1365,14 +1388,16 @@ export class ScxmlExplorer extends ElementBase {
         my = low - drop / 4;
       }
       const live = isActive(e.from);
+      // the arrow the last step went along
+      const fired = e.transitions.some((x) => this.#fired.has(x));
       const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
       p.setAttribute("d", dPath);
-      p.setAttribute("class", `${live ? "live" : ""}${forward ? "" : " back"}`);
+      p.setAttribute("class", `${live ? "live" : ""}${fired ? " fired" : ""}${forward ? "" : " back"}`);
       p.setAttribute("marker-end", "url(#x-head)");
       svg.append(p);
       const text = e.events.length === 1 ? e.events[0]! : `${e.events[0]} +${e.events.length - 1}`;
       // label size: measured by the browser below; this estimate is only for layouts that can't measure
-      requests.push({ cx: mx, cy: my, w: Math.min(120, 14 + text.length * 6.6), h: 18, edge: e, live });
+      requests.push({ cx: mx, cy: my, w: Math.min(120, 14 + text.length * 6.6), h: 18, edge: e, live, fired });
     }
     svg.setAttribute("width", String(d.scrollWidth));
     svg.setAttribute("height", String(d.scrollHeight + 80));
@@ -1383,9 +1408,9 @@ export class ScxmlExplorer extends ElementBase {
       const lab = html(
         "span",
         {
-          class: `edge-label${r.live ? " live" : ""}`,
-          part: parts("edge-label", r.live && "live"),
-          title: e.events.join("\n"),
+          class: `edge-label${r.live ? " live" : ""}${r.fired ? " fired" : ""}`,
+          part: parts("edge-label", r.live && "live", r.fired && "fired"),
+          title: `${e.events.join("\n")}${r.fired ? `\n(${this.#strings.justTaken})` : ""}`,
           tabindex: "-1",
         },
         html("span", { class: "full" }, text),
@@ -1414,7 +1439,7 @@ export class ScxmlExplorer extends ElementBase {
     d.style.paddingBottom = edges.some((e) => (this.#rank.get(e.to) ?? 0) <= (this.#rank.get(e.from) ?? 0)) ? "72px" : "10px";
   }
 
-  #list(children: ChildSummary[], edges: FocusEdge[]) {
+  #list(children: ChildSummary[], edges: FocusEdge[], session: Session) {
     const h = html;
     const t = this.#strings;
     const q = this.#focusFilter.trim().toLowerCase();
@@ -1430,55 +1455,17 @@ export class ScxmlExplorer extends ElementBase {
       [t.groupOneStep, matches.filter((c) => !activeChildren.has(c.node) && neighbours.has(c.node))],
       [t.groupElse, matches.filter((c) => !activeChildren.has(c.node) && !neighbours.has(c.node))],
     ];
-    const outgoing = new Map<StateNode, FocusEdge[]>();
-    for (const e of edges) {
-      const list = outgoing.get(e.from) ?? [];
-      list.push(e);
-      outgoing.set(e.from, list);
-    }
 
     let budget = this.#focusShowAll ? Infinity : LIST_PAGE;
     const rows: Node[] = [];
     for (const [title, list] of groups) {
       if (!list.length) continue;
-      rows.push(h("div", { class: "list-group", role: "presentation" }, t.groupCount(title, list.length)));
+      // a count only where it helps: a long tail of other states
+      const heading = title === t.groupElse && list.length > 12 ? t.groupCount(title, list.length) : title;
+      rows.push(h("div", { class: "list-group", role: "presentation" }, heading));
       for (const c of list) {
         if (budget-- <= 0) break;
-        const s = c.node;
-        const outs = outgoing.get(s) ?? [];
-        const rowName = [label(s), t.kind(kindOf(s)), c.onActivePath && t.active].filter(Boolean).join(", ");
-        const select = h("button", { type: "button", class: "name select", "aria-label": rowName }, label(s));
-        const row = h(
-          "div",
-          {
-            class: `list-row${c.onActivePath ? " path" : ""}`,
-            part: parts("list-row", c.onActivePath && "path"),
-            "data-state": s.id,
-            role: "group",
-            "aria-label": rowName,
-          },
-          h("span", { class: "kind", "aria-hidden": "true" }, KIND_ICON[kindOf(s)]!),
-          select,
-          h(
-            "span",
-            { class: "meta" },
-            c.onActivePath ? h("span", { class: "badge run" }, t.active) : "",
-            c.descendants
-              ? button(`${c.descendants} →`, (e) => this.#drillInto(e, s), { class: "drill", title: t.statesInside(c.descendants) })
-              : "",
-          ),
-          outs.length || c.events.length
-            ? h(
-                "span",
-                { class: "sub" },
-                ...outs.slice(0, 3).map((e) => h("span", { class: "chip muted", title: e.events.join("\n") }, `→ ${label(e.to)}`)),
-                outs.length > 3 ? h("span", { class: "count" }, t.moreTargets(outs.length - 3)) : "",
-                c.events.length ? h("span", { class: "count" }, `· ${t.events(c.events.length)}`) : "",
-              )
-            : "",
-        );
-        this.#operable(row, s, select);
-        rows.push(row);
+        rows.push(this.#listRow(c, session));
       }
     }
     const hidden = matches.length - Math.min(matches.length, this.#focusShowAll ? Infinity : LIST_PAGE);
@@ -1497,7 +1484,7 @@ export class ScxmlExplorer extends ElementBase {
               this.#renderNow();
               (this.#el.centerScroll.querySelector('.search input[type="search"]') as HTMLInputElement | null)?.focus();
             });
-            return h("div", { class: "search", style: "padding:0 0 10px" }, input);
+            return h("div", { class: "search", style: "padding:0 0 8px" }, input);
           })()
         : "";
     return h(
@@ -1508,10 +1495,159 @@ export class ScxmlExplorer extends ElementBase {
       hidden > 0
         ? button(t.showAll(matches.length), () => this.#update(() => (this.#focusShowAll = true)), {
             class: "more",
-            style: "margin-top:6px",
+            style: "margin-top:8px",
           })
         : "",
     );
+  }
+
+  /**
+   * One state of the focus list. A leaf answers what it is, what it does and how to leave it:
+   * its entry actions, and its transitions as "event → target" (buttons that send the event
+   * while it's active). Clicking a leaf opens it in place; clicking a container drills in.
+   */
+  #listRow(c: ChildSummary, session: Session): HTMLElement {
+    const h = html;
+    const t = this.#strings;
+    const s = c.node;
+    const leaf = !isContainer(s);
+    const open = leaf && this.#openRows.has(s);
+    const visited = !c.onActivePath && this.#wasVisited(s);
+    const live = c.active && session.status === "running";
+    const rowName = [label(s), t.kind(kindOf(s)), c.onActivePath && t.active, visited && t.lastVisited].filter(Boolean).join(", ");
+    const select = h(
+      "button",
+      { type: "button", class: "name select", "aria-label": rowName, ...(leaf ? { "aria-expanded": String(open) } : {}) },
+      label(s),
+    );
+    const does = [
+      ...s.invokes.map((i) =>
+        `invoke ${i.element.getAttribute("id") ?? i.element.getAttribute("src") ?? i.element.getAttribute("type") ?? ""}`.trim(),
+      ),
+      ...s.onentry.flatMap((b) => Array.from(b.children, describeAction)),
+    ];
+    const txs = s.transitions;
+    const cls = ["list-row", c.onActivePath && "path", c.active && leaf && "active", visited && "visited", open && "open"];
+    const row = h(
+      "div",
+      {
+        class: cls.filter(Boolean).join(" "),
+        part: parts("list-row", ...cls.slice(1)),
+        "data-state": s.id,
+        role: "group",
+        "aria-label": rowName,
+      },
+      h(
+        "div",
+        { class: "row-head" },
+        select,
+        kindMark(s),
+        visited ? h("span", { class: "visited-mark", part: "visited", "aria-hidden": "true" }, t.lastVisited) : "",
+        c.descendants
+          ? button(t.inside(c.descendants), (e) => this.#drillInto(e, s), { class: "drill", title: t.statesInside(c.descendants) })
+          : "",
+      ),
+      does.length && !open
+        ? h(
+            "div",
+            { class: "does", part: "row-actions", title: does.join("\n") },
+            h("span", { class: "label" }, t.onEntry),
+            ` ${does.slice(0, 2).join(" · ")}${does.length > 2 ? ` +${does.length - 2}` : ""}`,
+          )
+        : "",
+      txs.length
+        ? h(
+            "div",
+            { class: `exits${open ? " all" : ""}`, part: "row-exits", role: "list", "aria-label": t.transitionsTitle },
+            ...(open ? txs : txs.slice(0, 3)).map((tr) => this.#txItem(tr, live, open)),
+            !open && txs.length > 3 ? h("span", { class: "count", role: "listitem" }, t.more(txs.length - 3)) : "",
+          )
+        : "",
+      open ? this.#rowDetail(s, session) : "",
+    );
+    const go = leaf ? () => this.#update(() => (open ? this.#openRows.delete(s) : this.#openRows.add(s))) : () => this.#focusOn(s);
+    // clicks inside the opened part (text, its own buttons) don't close the row
+    row.addEventListener("click", (e) => !(e.target as Element).closest?.(".row-detail") && go());
+    onKeys(select, go);
+    return row;
+  }
+
+  /** "event → target", with a mark for a condition; a button that sends the event when `live`. */
+  #txItem(tr: TransitionNode, live: boolean, full: boolean): HTMLElement {
+    const h = html;
+    const t = this.#strings;
+    const ev = tr.events.join(" ") || t.eventless;
+    const to = tr.targets.map(label).join(", ") || t.stays;
+    const fired = this.#fired.has(tr);
+    const name = live && tr.events.length === 1 ? sendableName(tr.events[0]!) : undefined;
+    const attrs = {
+      class: `tx${fired ? " fired" : ""}${tr.events.length ? "" : " auto"}`,
+      part: parts("row-event", fired && "fired"),
+      "data-key": String(tr.order),
+      title: `${ev}${tr.cond ? ` [${tr.cond}]` : ""} → ${to}${fired ? ` · ${t.justTaken}` : ""}`,
+    };
+    const content = [
+      h("span", { class: "ev" }, ev),
+      tr.cond ? h("span", { class: "guard", title: t.guard(tr.cond) }, full ? t.guard(tr.cond) : t.columnIf) : "",
+      h("span", { class: "to" }, `→ ${to}`),
+      fired ? srText(`, ${t.justTaken}`) : "",
+    ];
+    if (!name) return h("span", { ...attrs, role: "listitem" }, ...content);
+    const b = h("button", { ...attrs, type: "button", "aria-label": `${t.sendEvent(name)} → ${to}` }, ...content);
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.#send(name);
+    });
+    return h("span", { role: "listitem", class: "tx-item" }, b);
+  }
+
+  /** The opened part of a leaf row: every action, invoke and way in, and a link to the full detail. */
+  #rowDetail(s: StateNode, session: Session): HTMLElement {
+    const h = html;
+    const t = this.#strings;
+    const incoming = session.model.states.flatMap((x) => x.transitions.filter((tr) => tr.targets.includes(s)));
+    const sources = [...new Set(incoming.map((tr) => label(tr.source)))];
+    const items = this.#actionItems(s);
+    return h(
+      "div",
+      { class: "row-detail", part: "row-detail" },
+      items.length ? h("ul", { class: "actions" }, ...items) : "",
+      sources.length
+        ? h(
+            "p",
+            { class: "from" },
+            h("span", { class: "label" }, t.enteredFrom),
+            ` ${sources.slice(0, 6).join(", ")}${sources.length > 6 ? ` +${sources.length - 6}` : ""}`,
+          )
+        : "",
+      button(
+        t.openDetail,
+        (e) => {
+          e.stopPropagation();
+          this.#select(s);
+        },
+        { class: "drill", part: "open-detail" },
+      ),
+    );
+  }
+
+  /** Entry and exit actions, then invokes, as list items. */
+  #actionItems(s: StateNode): HTMLElement[] {
+    const t = this.#strings;
+    const actions = (blocks: Element[], tag: string) =>
+      blocks.flatMap((b) => Array.from(b.children, (a) => html("li", {}, html("b", {}, tag), describeAction(a))));
+    return [
+      ...actions(s.onentry, t.entry),
+      ...actions(s.onexit, t.exit),
+      ...s.invokes.map((i) =>
+        html(
+          "li",
+          {},
+          html("b", {}, i.element.getAttribute("type") ?? "scxml"),
+          i.element.getAttribute("id") ?? i.element.getAttribute("src") ?? t.inline,
+        ),
+      ),
+    ];
   }
 
   #lanes(regions: ChildSummary[], isActive: (s: StateNode) => boolean) {
@@ -1528,37 +1664,24 @@ export class ScxmlExplorer extends ElementBase {
           title: r.node.id,
           "aria-label": [label(r.node), r.onActivePath && t.active].filter(Boolean).join(", "),
         });
-        const lane = h(
+        return h(
           "section",
           { class: `lane${r.onActivePath ? " path" : ""}`, part: parts("lane", r.onActivePath && "path"), "data-state": r.node.id },
-          h(
-            "div",
-            { class: "lane-head" },
-            h("span", { class: "kind", "aria-hidden": "true" }, KIND_ICON[kindOf(r.node)]!),
-            name,
-            r.onActivePath ? h("span", { class: "badge run" }, t.active) : "",
-            h("span", { class: "count" }, String(r.node.children.length)),
-          ),
+          h("div", { class: "lane-head" }, name, kindMark(r.node)),
           ...kids.slice(0, PER_LANE).map((k) => {
             const on = isActive(k);
+            const visited = !on && this.#wasVisited(k);
             const row = h(
               "div",
               {
-                class: `lane-row${on ? " active" : ""}`,
-                part: parts("lane-row", on && "active"),
+                class: `lane-row${on ? " active" : ""}${visited ? " visited" : ""}`,
+                part: parts("lane-row", on && "active", visited && "visited"),
                 role: "button",
                 tabindex: "0",
-                "aria-label": [label(k), t.kind(kindOf(k)), on && t.active].filter(Boolean).join(", "),
+                "aria-label": [label(k), t.kind(kindOf(k)), on && t.active, visited && t.lastVisited].filter(Boolean).join(", "),
               },
-              h("span", { class: "kind", "aria-hidden": "true" }, KIND_ICON[kindOf(k)]!),
               h("span", { class: "name" }, label(k)),
-              on
-                ? h("span", {
-                    class: "dot",
-                    "aria-hidden": "true",
-                    style: "width:7px;height:7px;border-radius:50%;background:var(--x-run)",
-                  })
-                : "",
+              kindMark(k),
             );
             // containers open as the focus, leaves are selected
             activate(row, () => (isContainer(k) ? this.#focusOn(k) : this.#select(k)));
@@ -1566,7 +1689,6 @@ export class ScxmlExplorer extends ElementBase {
           }),
           kids.length > PER_LANE ? button(t.openLane(kids.length - PER_LANE), () => this.#focusOn(r.node), { class: "more" }) : "",
         );
-        return lane;
       }),
     );
   }
@@ -1611,12 +1733,12 @@ export class ScxmlExplorer extends ElementBase {
             .filter(Boolean)
             .join("\n"),
         },
+        // running is the normal case: only other statuses are spelled out
         h(
           "div",
           { class: "card-head" },
-          h("span", { class: "kind", "aria-hidden": "true" }, m.depth ? "⇲" : "◇"),
           h("span", { class: "name" }, m.name),
-          h("span", { class: `badge ${m.status === "running" ? "run" : m.status === "done" ? "done" : "muted"}` }, statusText),
+          m.status === "running" ? "" : h("span", { class: "status" }, statusText),
         ),
         m.activeLeaves.length
           ? h(
@@ -1627,7 +1749,6 @@ export class ScxmlExplorer extends ElementBase {
             )
           : "",
         !compact && m.invokeid ? h("div", { class: "from" }, tr.invokedAs(m.invokeid, m.invokedFrom)) : "",
-        !compact && talk.length ? h("div", { class: "talks" }, ...chips(talk, 3, () => {}, true)) : "",
       );
       activate(card, () =>
         this.#navigate(() => {
@@ -1657,15 +1778,14 @@ export class ScxmlExplorer extends ElementBase {
           tabindex: "0",
           "aria-pressed": String(selected),
           "aria-label": `${svc.label}, ${tr.traffic(out, inn)}`,
+          title: `${svc.key}\n${tr.trafficHint}: ${out} / ${inn}`,
         },
         h(
           "div",
           { class: "card-head" },
-          h("span", { class: "kind", "aria-hidden": "true" }, "⇄"),
           h("span", { class: "name" }, svc.label),
-          h("span", { class: "count", title: tr.trafficHint }, tr.traffic(out, inn)),
+          out + inn ? h("span", { class: "status" }, tr.traffic(out, inn)) : "",
         ),
-        h("div", { class: "type" }, svc.key),
         h("slot", { name: `service:${svc.label}` }),
       );
       activate(card, () => {
@@ -1696,19 +1816,8 @@ export class ScxmlExplorer extends ElementBase {
     const sys = h(
       "div",
       { class: "system", part: "system" },
-      h(
-        "div",
-        { class: "col" },
-        h("div", { class: "col-title" }, tr.machines, h("span", { class: "count" }, String(machines.length))),
-        filter,
-        ...shownMachines.map(machineCard),
-      ),
-      h(
-        "div",
-        { class: "col" },
-        h("div", { class: "col-title" }, tr.services, h("span", { class: "count" }, String(services.length))),
-        ...services.map(serviceCard),
-      ),
+      h("div", { class: "col" }, h("div", { class: "col-title" }, tr.machines), filter, ...shownMachines.map(machineCard)),
+      h("div", { class: "col" }, h("div", { class: "col-title" }, tr.services), ...services.map(serviceCard)),
     );
     const out = this.#el.centerScroll;
     const scroll = out.scrollTop;
@@ -1723,6 +1832,7 @@ export class ScxmlExplorer extends ElementBase {
           [...t.links.values()].reduce((n, l) => n + total(l), 0),
         ),
       ),
+      this.#el.lastStep,
       sys,
     );
     out.scrollTop = scroll;
@@ -1732,7 +1842,7 @@ export class ScxmlExplorer extends ElementBase {
     const layoutKey = JSON.stringify([
       compact,
       q,
-      shownMachines.map((m) => [m.key, m.activeLeaves.length > 0, !compact && !!m.invokeid, !compact && talkOf(m).length > 0]),
+      shownMachines.map((m) => [m.key, m.activeLeaves.length > 0, !compact && !!m.invokeid]),
       services.map((svc) => svc.key),
       [...t.links.values()].map((l) => `${l.from}>${l.to}:${l.kind}`),
     ]);
@@ -1776,7 +1886,7 @@ export class ScxmlExplorer extends ElementBase {
         p.setAttribute("d", `M${x1},${y1} L${x1},${y2} L${x2},${y2}`);
         p.setAttribute("class", "invoke");
       } else {
-        // machine ↔ machine messages: the invoke line and the cards' "talks to" chips already say it
+        // machine ↔ machine messages: the invoke line (and the cards' tooltips) already say it
         if (!this.#tracker.services.has(l.to) && !this.#tracker.services.has(l.from)) continue;
         const [m, svc] = this.#tracker.services.has(l.to) ? [a, b] : [b, a];
         const x1 = m.right - base.left;
@@ -1809,31 +1919,38 @@ export class ScxmlExplorer extends ElementBase {
       inherited: all.filter((e) => e.scope !== "elsewhere").length,
       all: all.length,
     };
+    // the System level has services to inspect, not a machine's accepted events
+    const system = this.#level === "system";
+    const which = system ? "detail" : this.#inspector;
     this.#el.inspectorSwitch.replaceChildren(
-      button(t.accepts(counts.inherited), () => this.#showInspector("events"), {
-        "aria-pressed": String(this.#inspector === "events"),
-      }),
-      button(this.#level === "system" ? t.serviceTab : t.stateTab, () => this.#showInspector("detail"), {
-        "aria-pressed": String(this.#inspector === "detail"),
-      }),
+      ...(system
+        ? [h("span", { class: "pane-title" }, t.serviceTab)]
+        : [
+            button(t.accepts(counts.inherited), () => this.#showInspector("events"), { "aria-pressed": String(which === "events") }),
+            button(t.stateTab, () => this.#showInspector("detail"), { "aria-pressed": String(which === "detail") }),
+          ]),
     );
-    this.#el.eventsHead.style.display = this.#inspector === "events" ? "" : "none";
+    this.#el.eventsHead.style.display = which === "events" ? "" : "none";
+    // a scope that adds nothing to the one before it is left out; with only one left, the switch is
+    const scopes = (
+      [
+        ["here", counts.here, t.scopeHere],
+        ["inherited", counts.inherited, t.scopeInherited],
+        ["all", counts.all, t.scopeAll],
+      ] as const
+    ).filter(([, n], i, list) => i === 0 || n !== list[i - 1]![1]);
+    this.#el.scopes.hidden = scopes.length < 2;
+    const current = counts[this.#eventScope];
     this.#el.scopes.replaceChildren(
-      ...(
-        [
-          ["here", t.scopeHere(counts.here)],
-          ["inherited", t.scopeInherited(counts.inherited)],
-          ["all", t.scopeAll(counts.all)],
-        ] as const
-      ).map(([k, text]) =>
-        button(text, () => this.#update(() => (this.#eventScope = k)), { "aria-pressed": String(this.#eventScope === k) }),
+      ...scopes.map(([k, n, text]) =>
+        button(text(n), () => this.#update(() => (this.#eventScope = k)), { "aria-pressed": String(n === current) }),
       ),
     );
 
     const body = this.#el.inspectorBody;
     const scroll = body.scrollTop;
-    if (this.#inspector === "events") body.replaceChildren(this.#eventsList(all));
-    else if (this.#level === "system") body.replaceChildren(this.#serviceDetail());
+    if (which === "events") body.replaceChildren(this.#eventsList(all));
+    else if (system) body.replaceChildren(this.#serviceDetail());
     else body.replaceChildren(this.#stateDetail(this.#selected ?? focus, session));
     body.scrollTop = scroll;
 
@@ -1904,8 +2021,9 @@ export class ScxmlExplorer extends ElementBase {
     const t = this.#strings;
     const x = e.transitions[0]!;
     const name = sendableName(e.descriptor);
-    const send = button(t.send, () => name && this.#send(name), {
-      class: "send",
+    // the event's name is its send button
+    const send = button(e.descriptor, () => name && this.#send(name), {
+      class: "ev send",
       part: "send",
       title: name ? t.sendEvent(name) : t.cannotSendWildcard,
       "aria-label": name ? t.sendEvent(name) : `${e.descriptor}: ${t.cannotSendWildcard}`,
@@ -1914,7 +2032,6 @@ export class ScxmlExplorer extends ElementBase {
     return h(
       "div",
       { class: `ev-row scope-${e.scope}`, part: parts("event-row", e.scope) },
-      h("span", { class: "ev", title: e.descriptor }, e.descriptor),
       send,
       h(
         "span",
@@ -1924,12 +2041,13 @@ export class ScxmlExplorer extends ElementBase {
             .map((y) => `${label(y.source)}${y.guarded ? ` [${y.transition.cond}]` : ""} → ${y.targets.map(label).join(" ") || t.internal}`)
             .join("\n"),
         },
-        // the scope in words, not only the colour of the event name
-        e.scope !== "here" ? h("span", { class: "scope-tag" }, e.scope === "inherited" ? t.inherited : t.elsewhere) : "",
         `${label(x.source)} `,
-        x.guarded ? h("span", { class: "guard" }, `[${truncate(x.transition.cond ?? "", 28)}] `) : "",
+        x.guarded ? h("span", { class: "guard" }, `${t.guard(truncate(x.transition.cond ?? "", 28))} `) : "",
         `→ ${x.targets.map(label).join(", ") || t.stays}`,
         e.transitions.length > 1 ? ` · +${e.transitions.length - 1}` : "",
+        // the scope in words, not only the colour of the event name
+        e.scope !== "here" ? " · " : "",
+        e.scope !== "here" ? h("span", { class: "scope-tag" }, e.scope === "inherited" ? t.inherited : t.elsewhere) : "",
       ),
       h("slot", { name: `event:${e.descriptor}` }),
     );
@@ -1967,8 +2085,6 @@ export class ScxmlExplorer extends ElementBase {
     const t = this.#strings;
     const TX_PAGE = 30;
     const incoming = session.model.states.flatMap((x) => x.transitions.filter((tr) => tr.targets.includes(s)));
-    const actions = (blocks: Element[], tag: string) =>
-      blocks.flatMap((b) => Array.from(b.children).map((a) => h("li", {}, h("b", {}, tag), describeAction(a))));
     const kv = (k: string, v: string | Node) => [h("dt", {}, k), h("dd", {}, v)];
     const txRows = s.transitions
       .slice(0, TX_PAGE)
@@ -1988,12 +2104,12 @@ export class ScxmlExplorer extends ElementBase {
     return h(
       "div",
       { class: "detail", part: "detail" },
-      h("h2", { class: "title", style: "font-size:20px" }, label(s)),
+      h("h2", { class: "title small" }, label(s)),
       h(
         "p",
         { class: "subtitle" },
         pathTo(s).slice(1, -1).map(label).join(" › ") || t.topLevel,
-        session.isActiveNode(s) ? h("span", { class: "badge run" }, t.active) : "",
+        session.isActiveNode(s) ? h("span", { class: "status active" }, t.active) : "",
       ),
       h(
         "dl",
@@ -2021,38 +2137,14 @@ export class ScxmlExplorer extends ElementBase {
           ),
         ];
       })(),
-      s.onentry.length || s.onexit.length
-        ? h(
-            "div",
-            {},
-            h("div", { class: "section-title" }, t.actions),
-            h("ul", { class: "actions" }, ...actions(s.onentry, t.entry), ...actions(s.onexit, t.exit)),
-          )
-        : "",
-      s.invokes.length
-        ? h(
-            "div",
-            {},
-            h("div", { class: "section-title" }, t.invokesTitle),
-            h(
-              "ul",
-              { class: "actions" },
-              ...s.invokes.map((i) =>
-                h(
-                  "li",
-                  {},
-                  h("b", {}, i.element.getAttribute("type") ?? "scxml"),
-                  i.element.getAttribute("id") ?? i.element.getAttribute("src") ?? t.inline,
-                ),
-              ),
-            ),
-          )
+      s.onentry.length || s.onexit.length || s.invokes.length
+        ? h("div", {}, h("div", { class: "section-title" }, t.actions), h("ul", { class: "actions" }, ...this.#actionItems(s)))
         : "",
       s.transitions.length
         ? h(
             "div",
             {},
-            h("div", { class: "section-title" }, t.transitionsTitle, h("span", { class: "count" }, String(s.transitions.length))),
+            h("div", { class: "section-title" }, t.transitionsTitle),
             h(
               "table",
               { class: "tx" },
@@ -2076,7 +2168,7 @@ export class ScxmlExplorer extends ElementBase {
         ? h(
             "div",
             {},
-            h("div", { class: "section-title" }, t.enteredFrom, h("span", { class: "count" }, String(incoming.length))),
+            h("div", { class: "section-title" }, t.enteredFrom),
             h(
               "div",
               { class: "talks" },
@@ -2109,7 +2201,7 @@ export class ScxmlExplorer extends ElementBase {
     return h(
       "div",
       { class: "detail", part: "detail" },
-      h("h2", { class: "title", style: "font-size:20px" }, svc.label),
+      h("h2", { class: "title small" }, svc.label),
       h("p", { class: "subtitle" }, svc.key),
       h("div", { class: "section-title" }, tr.talksWith),
       h(
@@ -2182,7 +2274,7 @@ export class ScxmlExplorer extends ElementBase {
           () => {
             this.#tab = t;
             if (t === "system") this.#level = "system";
-            if (t === "focus") this.#level = "machine";
+            if (t === "focus" || t === "events") this.#level = "machine";
             if (t === "events" || t === "detail") this.#inspector = t;
             this.#renderNow();
           },
@@ -2200,11 +2292,22 @@ const explorerSheet = lazySheet(EXPLORER_CSS);
 /** Make a focusable element behave like a button: click, Enter and Space all run `fn`. */
 function activate(el: HTMLElement, fn: () => void) {
   el.addEventListener("click", fn);
+  onKeys(el, fn);
+}
+
+/** Enter and Space on `el` itself (not on controls inside it) run `fn` instead of its default. */
+function onKeys(el: HTMLElement, fn: (e: KeyboardEvent) => void) {
   el.addEventListener("keydown", (e) => {
     if (e.target !== el || (e.key !== "Enter" && e.key !== " ")) return;
     e.preventDefault();
-    fn();
+    fn(e);
   });
+}
+
+/** The mark of a parallel, final or history state; screen readers get the kind from the row's name. */
+function kindMark(s: StateNode): HTMLElement | "" {
+  const mark = KIND_MARK[kindOf(s)];
+  return mark ? html("span", { class: "kind", "aria-hidden": "true" }, mark) : "";
 }
 
 /** Text only screen readers see: status in words where the screen shows colour or shape. */
@@ -2234,24 +2337,6 @@ function button(text: string, onClick: (e: MouseEvent) => void, attrs: Attrs = {
   const b = html("button", { type: "button", ...attrs }, text);
   b.addEventListener("click", onClick);
   return b;
-}
-
-/** Event chips with an overflow counter: never more than `max` visible. */
-function chips(events: string[], max: number, onClick: (ev: string) => void, muted = false): Node[] {
-  const out: Node[] = events.slice(0, max).map((ev) => {
-    // muted chips are labels, not controls (they sit inside other controls)
-    const c = muted
-      ? html("span", { class: "chip muted", title: ev }, ev)
-      : html("button", { class: "chip", type: "button", title: ev }, ev);
-    if (!muted)
-      c.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onClick(ev);
-      });
-    return c;
-  });
-  if (events.length > max) out.push(html("span", { class: "count", title: events.slice(max).join("\n") }, `+${events.length - max}`));
-  return out;
 }
 
 /** Number of layers the diagram would need (longest shortest-path from the initial child, +1 for unreachable ones). */

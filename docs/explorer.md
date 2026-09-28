@@ -13,9 +13,18 @@ It has two levels:
   - A **tree** of its states on the left, with the active path expanded and highlighted.
   - The **focus** in the middle: one compound or parallel state, its children, the transitions
     between them, and "doors" to states outside it. When it gets crowded, it switches from a
-    diagram to a list.
-  - The **inspector** on the right: the events the machine accepts right now, with a field for
-    event data and a Send button, and the details of the selected state.
+    diagram to a list. In the list, each state says what it does and how it leaves: its entry
+    actions and invokes, and its transitions as "event → target" (with an `if` mark for a
+    condition). While a state is active, those are buttons that send the event. A click opens
+    the row in place with every transition, action and way in, and a link to the full detail.
+  - The **inspector** on the right: the events the machine accepts right now (each name is a
+    button that sends it; event data sits behind a disclosure), and the details of the selected
+    state. At the System level it shows the selected service, and the tree is hidden.
+
+The header holds the levels, the breadcrumb, the playback controls and the Follow toggle. Under
+the title, one line says what the last step did. Colour means one thing each: the running colour
+marks what is active, the waiting colour what just happened (the arrow the last step took, the
+transition just taken and the state it left, marked "last visited").
 
 Below 760 px of width, the panes become tabs.
 
@@ -121,8 +130,10 @@ selected. [Custom UI](custom-ui.md) has a complete example.
 - The tree follows the ARIA tree pattern: ↑ ↓ move, → expands or moves to the first child,
   ← collapses or moves to the parent, Home and End jump, Enter or Space focuses the state, and
   typing jumps to the next state whose name starts with those letters.
-- Cards, rows, lanes and doors are focusable. Enter drills into a container or selects a state;
-  Space selects.
+- Cards, rows, lanes and doors are focusable. In the diagram, Enter drills into a container or
+  selects a state, and Space selects. In the list, Enter, Space or a click drills into a container
+  and opens a leaf in place (its name button says whether it's expanded); the opened row links to
+  the detail. Keyboard focus stays on the row when the view re-renders.
 - With a `PlaybackClock`: Space plays and pauses, `.` steps. They don't apply in fields, buttons,
   rows and cards, which use those keys themselves.
 - A polite live region announces steps and sent events. While a clock plays, step announcements
@@ -146,10 +157,10 @@ Parts, with their modifiers (added while they apply):
 | Area | Parts |
 |---|---|
 | Header | `top`, `levels`, `crumbs`, `crumb` (`current`), `follow` |
-| Playback bar | `playback`, `play`, `step`, `speeds`, `clock`, `last-step` |
+| Playback (in the header) | `playback`, `play`, `step`, `speeds` (a `<select>`), `clock` |
 | Tree | `tree-pane`, `tree-search`, `tree`, `tree-row` (`path` `active` `match`) |
-| Focus | `focus-pane`, `title`, `diagram`, `card` (`path` `active` `waiting` `final` `selected`), `edges`, `edge-label` (`live` `collapsed`), `list`, `list-row` (`path`), `lanes`, `lane` (`path`), `lane-row` (`active`), `doors`, `door` (`exit` or `entry`, `live`) |
-| Accepted events | `inspector`, `event-search`, `scopes`, `event-data`, `events`, `event-group`, `event-row` (`here`, `inherited` or `elsewhere`), `send` |
+| Focus | `focus-pane`, `title`, `last-step`, `diagram`, `card` (`path` `active` `waiting` `final` `selected` `visited`), `edges`, `edge-label` (`live` `fired` `collapsed`), `list`, `list-row` (`path` `active` `visited` `open`), `visited`, `row-actions`, `row-exits`, `row-event` (`fired`), `row-detail`, `open-detail`, `lanes`, `lane` (`path`), `lane-row` (`active` `visited`), `doors`, `door` (`exit` or `entry`, `live`) |
+| Accepted events | `inspector`, `event-search`, `scopes`, `event-data` (a `<details>`), `events`, `event-group`, `event-row` (`here`, `inherited` or `elsewhere`), `send` (the event's name) |
 | Details | `detail`, `warning` |
 | System level | `system`, `machine` (`running` `done` `hot`), `service` (`selected` `hot`) |
 | Narrow layout | `tabs`, `tab` (`selected`), `strip` |

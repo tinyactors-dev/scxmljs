@@ -166,7 +166,7 @@ describe("<scxml-explorer>", () => {
   test("the tree is windowed: 1,000 states, a few dozen rows in the DOM", async () => {
     const states = Array.from({ length: 1000 }, (_, i) => `<state id="s${i}"/>`).join("");
     const { $, $$, el, session } = await mount(`<scxml ${NS}>${states}</scxml>`);
-    expect($(".pane-head .count")?.textContent).toBe("1000");
+    expect($(".pane-head .count")?.textContent).toBe(""); // a count only while filtering
     expect($$(".tree-row").length).toBeGreaterThan(10);
     expect($$(".tree-row").length).toBeLessThan(80);
     session.dispose();
@@ -222,12 +222,14 @@ describe("<scxml-explorer>", () => {
       .find((r) => r.querySelector(".name")?.textContent === "done")!
       .click();
     await frame();
-    $('[data-state="done"]')!.click();
+    $('[data-state="done"]')!.click(); // a leaf row opens in place…
+    await frame();
+    $('[data-state="done"] [part~="open-detail"]')!.click(); // …and links to the detail
     await frame();
     const items = [...$(".detail")!.querySelectorAll<HTMLElement>("ul.warnings li")];
     expect(items.map((li) => [li.getAttribute("part"), li.dataset.code])).toEqual([["warning", "SCXML_W_UNREACHABLE"]]);
     expect(items[0]!.textContent).toContain('State "done" can never be entered');
-    // states without warnings don't get the section
+    // states without warnings don't get the section (a container row drills in; the detail follows)
     $('[data-state="work"]')!.click();
     await frame();
     expect($(".detail h2")?.textContent).toBe("work");
@@ -337,7 +339,7 @@ describe("<scxml-explorer> views", () => {
     expect($("h2.title")?.textContent).toBe("main");
     // happy-dom has no layout (width 0), so "auto" picks the list
     expect($$(".list-row").length).toBe(11); // hub, s1…s8, par, kidHost
-    expect($$(".list-group").map((g) => g.textContent)).toContain("On the active path · 1");
+    expect($$(".list-group").map((g) => g.textContent)).toEqual(["On the active path", "One step away"]); // no counts
     byText(".mode button", "Diagram")!.click();
     await frame();
     await frame();
@@ -363,14 +365,58 @@ describe("<scxml-explorer> views", () => {
     el.remove();
   });
 
+  test("list rows send from an active leaf; the last step marks the transition taken and the state left", async () => {
+    const { $, $$, el, session, clock } = await mount(SHOP);
+    const row = (name: string) => $$(".list-row").find((r) => r.querySelector(".name")?.textContent === name)!;
+    const go = row("idle").querySelector<HTMLElement>("button.tx")!;
+    expect(go.textContent).toBe("go→ busy");
+    go.click();
+    (clock as VirtualClock).run();
+    await frame();
+    expect(session.isActive("busy")).toBe(true);
+    expect($(".last-step")?.textContent).toBe("shop: go · idle → busy");
+    // back to "work" (following moved the focus into busy)
+    $$(".tree-row")
+      .find((r) => r.querySelector(".name")?.textContent === "work")!
+      .click();
+    await frame();
+    expect(row("idle").getAttribute("part")).toBe("list-row visited");
+    expect(row("idle").querySelector(".visited-mark")?.textContent).toBe("last visited");
+    expect(row("idle").querySelector(".select")?.getAttribute("aria-label")).toBe("idle, atomic, last visited");
+    // idle isn't active any more: its transitions are text, and the one just taken is marked
+    const taken = row("idle").querySelector<HTMLElement>(".tx")!;
+    expect(taken.localName).toBe("span");
+    expect(taken.getAttribute("part")).toBe("row-event fired");
+    expect(taken.textContent).toContain("just taken");
+    session.dispose();
+    el.remove();
+  });
+
   test("state detail: actions, data, transitions and where it's entered from", async () => {
     const { $, $$, byText, el, session } = await mountRich();
     let selected = "";
     el.addEventListener("scxml-select", (e) => {
       selected = (e as CustomEvent<{ state: { id: string } }>).detail.state.id;
     });
-    // the focus is "main"; its own detail shows via the tree: select "hub" in the list
-    byText(".list-row .name", "hub")!.closest<HTMLElement>(".list-row")!.click();
+    // the focus is "main". A leaf row says what the state does and how it leaves; hub is active,
+    // so its events are buttons that send them
+    const hub = () => byText(".list-row .name", "hub")!.closest<HTMLElement>(".list-row")!;
+    expect(hub().querySelector(".does")?.textContent).toBe("on entry if x > 0 … · foreach i in [1, 2] +1");
+    const exits = [...hub().querySelectorAll<HTMLElement>(".exits .tx")];
+    expect(exits.map((x) => x.textContent)).toEqual(["go.1→ s1", "go.2→ s2", "go.3→ s3"]);
+    expect(exits.map((x) => x.localName)).toEqual(["button", "button", "button"]);
+    expect(exits[0]!.getAttribute("aria-label")).toBe("Send go.1 → s1");
+    expect(hub().querySelector(".exits .count")?.textContent).toBe("+9 more");
+    // clicking opens it in place: every transition with its condition, every action, the way in
+    hub().click();
+    await frame();
+    expect(hub().querySelector(".select")?.getAttribute("aria-expanded")).toBe("true");
+    expect(hub().querySelectorAll(".exits .tx").length).toBe(12);
+    expect(hub().querySelector('.tx [title="if x > 100"]')?.textContent).toBe("if x > 100");
+    expect(hub().querySelector('[part~="row-detail"] .actions')?.textContent).toContain("foreach i in [1, 2]");
+    expect(selected).toBe("");
+    // …and links to the full detail
+    hub().querySelector<HTMLElement>('[part~="open-detail"]')!.click();
     await frame();
     expect(selected).toBe("hub");
     const detail = $(".detail")!;
@@ -398,6 +444,8 @@ describe("<scxml-explorer> views", () => {
     expect($(".detail dl")?.textContent).toContain("y");
     // entered-from chips navigate
     byText(".list-row .name", "s3")!.closest<HTMLElement>(".list-row")!.click();
+    await frame();
+    byText(".list-row .name", "s3")!.closest<HTMLElement>(".list-row")!.querySelector<HTMLElement>('[part~="open-detail"]')!.click();
     await frame();
     const chip = [...$(".detail")!.querySelectorAll<HTMLElement>(".talks .chip")].find((c) => c.textContent?.startsWith("far"))!;
     chip.click();
@@ -494,6 +542,8 @@ describe("<scxml-explorer> views", () => {
     await send("to.kid");
     byText(".levels button", "System")!.click();
     await frame();
+    expect($(".shell")?.getAttribute("data-level")).toBe("system"); // the CSS hides the state tree
+    expect($(".inspector .pane-head")?.textContent).toBe("Service"); // services, not the machine's events
     expect($$(".machine .name").map((n) => n.textContent)).toEqual(["rich", "kid"]);
     expect($$(".service .name").map((n) => n.textContent)).toEqual(["echo"]);
     byText(".service .name", "echo")!.closest<HTMLElement>(".service")!.click();
@@ -588,7 +638,10 @@ describe("<scxml-explorer> views", () => {
     el.dispatchEvent(new window.KeyboardEvent("keydown", { key: ".", bubbles: true }) as unknown as Event);
     await frame();
     expect($(".last-step")?.textContent).toContain("deep: t");
-    for (const b of $$(".speeds button")) if (b.textContent === "2×") b.click();
+    const speeds = $(".speeds") as HTMLSelectElement;
+    expect([...speeds.options].map((o) => o.textContent)).toEqual(["¼×", "½×", "1×", "2×", "4×"]);
+    speeds.value = "2";
+    speeds.dispatchEvent(new window.Event("change") as unknown as Event);
     expect(clock.speed).toBe(2);
     $(".play")!.click();
     expect(clock.playing).toBe(true);
@@ -730,7 +783,10 @@ describe("<scxml-explorer> accessibility and i18n", () => {
     expect(row("idle").getAttribute("role")).toBe("group");
     expect(select("idle").getAttribute("aria-label")).toBe("idle, atomic, active");
     expect(row("busy").querySelector("button.select button")).toBeNull();
-    key(select("idle"), " "); // Space selects
+    key(select("idle"), " "); // Space (or Enter, or a click) opens a leaf in place…
+    await frame();
+    expect(select("idle").getAttribute("aria-expanded")).toBe("true");
+    row("idle").querySelector<HTMLElement>('[part~="open-detail"]')!.click(); // …which links to the detail
     await frame();
     expect($(".detail h2")?.textContent).toBe("idle");
     key(select("busy"), "Enter"); // Enter drills into a container
@@ -739,7 +795,9 @@ describe("<scxml-explorer> accessibility and i18n", () => {
     // focus is busy (inactive): "reset" comes from an ancestor, "go" from elsewhere
     $$(".inspector .pane-head button")[0]!.click(); // back to "Accepts" (Space had opened the detail)
     await frame();
-    $$(".scopes button")[2]!.click(); // All
+    $$(".scopes button")
+      .find((b) => b.textContent?.startsWith("All"))!
+      .click();
     await frame();
     const tag = (ev: string) =>
       $$(".ev-row")

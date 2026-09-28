@@ -29,16 +29,25 @@ const block = (msg: string) => (blockers.push(msg), console.log(`  ✗ ${msg}`))
 const name: string = pkg.name;
 const version: string = pkg.version;
 const tag = `v${version}`;
-console.log(`\x1b[1mRelease dry run: ${name}@${version}\x1b[0m (nothing is published)`);
+// dist-tag: prereleases go to their first identifier (0.2.0-dev.3 → "dev", 1.0.0-rc.1 → "rc"), the rest to "latest"
+const prerelease = version.includes("-");
+const distTag = prerelease
+  ? version
+      .split("-")[1]!
+      .split(".")[0]!
+      .replace(/[^a-z0-9-]/gi, "") || "next"
+  : "latest";
+console.log(`\x1b[1mRelease dry run: ${name}@${version}\x1b[0m → dist-tag "${distTag}" (nothing is published)`);
 
 // ── changelog ──────────────────────────────────────────────────────────────
 section("changelog");
 const changelog = await Bun.file(join(root, "CHANGELOG.md")).text();
 const heading = changelog.split("\n").find((l) => l.startsWith(`## [${version}]`));
-if (!heading) block(`CHANGELOG.md has no "## [${version}] - YYYY-MM-DD" entry`);
+if (prerelease && !heading) pass(`prerelease: no CHANGELOG entry needed (it goes to the "${distTag}" dist-tag)`);
+else if (!heading) block(`CHANGELOG.md has no "## [${version}] - YYYY-MM-DD" entry`);
 else if (!/^## \[[^\]]+\] - \d{4}-\d{2}-\d{2}$/.test(heading)) block(`CHANGELOG.md: set the release date in "${heading}" (YYYY-MM-DD)`);
 else pass(`CHANGELOG.md: ${heading.slice(3)}`);
-if (!changelog.includes(`[${version}]: ${REPO}/releases/tag/${tag}`)) warn(`CHANGELOG.md has no link line for [${version}]`);
+if (!prerelease && !changelog.includes(`[${version}]: ${REPO}/releases/tag/${tag}`)) warn(`CHANGELOG.md has no link line for [${version}]`);
 
 // ── git ────────────────────────────────────────────────────────────────────
 section("git");
@@ -48,9 +57,14 @@ else {
   const dirty = (await $`git status --porcelain`.cwd(root).quiet().text()).trim();
   if (dirty) block(`uncommitted changes (${dirty.split("\n").length} paths): release from a clean tree`);
   else pass("working tree is clean");
-  const tagged = (await $`git rev-parse --verify refs/tags/${tag}`.cwd(root).quiet().nothrow()).exitCode === 0;
-  if (tagged) block(`tag ${tag} already exists`);
-  else pass(`tag ${tag} is free`);
+  const tagRef = await $`git rev-parse --verify refs/tags/${tag}^{commit}`.cwd(root).quiet().nothrow();
+  if (tagRef.exitCode !== 0) pass(`tag ${tag} is free`);
+  else {
+    // on a tag build (scripts/publish) the tag exists by definition: it must point at what's being released
+    const head = (await $`git rev-parse HEAD`.cwd(root).quiet().text()).trim();
+    if (tagRef.stdout.toString().trim() === head) pass(`tag ${tag} points at HEAD`);
+    else block(`tag ${tag} already exists and points at another commit`);
+  }
 }
 
 // ── registry (read-only) ───────────────────────────────────────────────────
@@ -155,7 +169,7 @@ try {
 
   // ── npm publish --dry-run ────────────────────────────────────────────────
   section("npm publish --dry-run");
-  const dryRun = ["npm", "publish", tarball, "--dry-run", "--access", "public", "--tag", "latest"];
+  const dryRun = ["npm", "publish", tarball, "--dry-run", "--access", "public", "--tag", distTag];
   // this script must never publish: the only publish invocation is a dry run
   if (!dryRun.includes("--dry-run")) throw new Error("refusing to run npm publish without --dry-run");
   const result = Bun.spawnSync(dryRun, { cwd: tmp, stdout: "pipe", stderr: "pipe" });
@@ -176,16 +190,12 @@ console.log(`  ${ok.length} checks passed, ${warnings.length} warnings, ${blocke
 for (const w of warnings) console.log(`  ! ${w}`);
 for (const b of blockers) console.log(`  ✗ ${b}`);
 console.log(`
-  To publish ${name}@${version} later (this script never does):
+  To publish ${name}@${version} (this script never does):
 
-    from GitHub Actions (with provenance; the job needs \`permissions: id-token: write\`
-    and an NPM_TOKEN, or npm trusted publishing configured for the repository):
-      cd packages/scxmljs && npm publish --provenance --access public
+    git tag ${tag} && git push origin main ${tag}
 
-    from a laptop (no provenance: npm can only attest builds on supported CI):
-      cd packages/scxmljs && npm publish --access public
-
-  then: git tag ${tag} && git push origin ${tag}
+  The tag starts .github/workflows/release.yml, which runs scripts/publish: this same check
+  on GitHub, then \`npm publish\` through npm trusted publishing (OIDC, provenance included).
 `);
 if (blockers.length) {
   console.log("\x1b[1;31m✗ not releasable yet\x1b[0m");

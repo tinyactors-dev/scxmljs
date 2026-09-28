@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Publishes @tinyactors/scxmljs to npm. Only ever runs in GitHub Actions, from
+# .github/workflows/release.yml, on a pushed v* tag, using npm trusted
+# publishing (OIDC): no npm token exists anywhere, and npm attaches a provenance
+# attestation automatically.
+#
+# Steps:
+#   1. refuse to run outside GitHub Actions (or without the OIDC token)
+#   2. the tag must be v<version from packages/scxmljs/package.json>
+#   3. if that version is already on npm, stop successfully (re-running a tag is harmless)
+#   4. scripts/release: the full release check (changelog, git, registry, full CI, tarball)
+#   5. npm publish
+#
+# Release procedure (maintainer): bump the version in packages/scxmljs/package.json, add the
+# CHANGELOG entry with its date, commit, `git tag vX.Y.Z`, `git push origin main vX.Y.Z`.
+#
+# Dist-tags: a prerelease goes to its first prerelease identifier and never touches "latest":
+#   0.2.0-dev.3 → dev   0.2.0-beta.1 → beta   1.0.0-rc.1 → rc   (install: npm i @tinyactors/scxmljs@dev)
+# Prereleases need no CHANGELOG entry; everything else goes to "latest".
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if [ "${GITHUB_ACTIONS:-}" != true ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+  echo "scripts/publish only runs in GitHub Actions with id-token: write (release.yml)." >&2
+  echo "Locally, use scripts/release: the same checks, as a dry run." >&2
+  exit 1
+fi
+
+version=$(node -p 'require("./packages/scxmljs/package.json").version')
+name=$(node -p 'require("./packages/scxmljs/package.json").name')
+if [ "${GITHUB_REF:-}" != "refs/tags/v$version" ]; then
+  echo "expected tag v$version (package.json), got ${GITHUB_REF:-<none>}" >&2
+  exit 1
+fi
+
+dist_tag=latest
+case "$version" in
+  *-*)
+    dist_tag=${version#*-}
+    dist_tag=${dist_tag%%.*}
+    ;;
+esac
+
+if npm view "$name@$version" version >/dev/null 2>&1; then
+  echo "$name@$version is already on npm: nothing to do."
+  exit 0
+fi
+
+# the full release check; it also installs the toolchain via scripts/ci
+scripts/release
+
+# npm >= 11.5.1 and Node >= 22.14 are needed for trusted publishing; both come from mise.toml.
+# scripts/ci installed mise in its own process: make it reachable here too.
+export PATH="$HOME/.local/bin:$PATH" MISE_YES=1 MISE_TRUSTED_CONFIG_PATHS="$PWD"
+cd packages/scxmljs
+mise exec -- npm --version
+mise exec -- npm publish --access public --tag "$dist_tag"

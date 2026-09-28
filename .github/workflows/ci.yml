@@ -1,10 +1,12 @@
 # All the work happens in scripts/ci, which runs the same way locally. It picks
 # its own mode: light for pushes and pull requests; full (browsers, visual
-# regression, framework apps, tarball in Node/Bun/Deno) for v* tags,
-# release/* branches and manual runs ("Run workflow").
+# regression, framework apps, tarball in Node/Bun/Deno) for release/* branches
+# and manual runs ("Run workflow"). v* tags are handled by release.yml, which
+# runs the full checks before publishing.
 name: ci
 on:
   push:
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
 jobs:

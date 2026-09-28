@@ -7,7 +7,7 @@
 
 `@tinyactors/scxmljs`: a correctness-first SCXML 1.0 interpreter (ECMAScript data model)
 that runs on DOM elements, plus custom elements that render running statecharts.
-The package is being prepared for publishing; `PUBLISHING.md` is the checklist and
+The package is published on npm (0.1.0); `PUBLISHING.md` is the release checklist and
 records the decisions (custom elements only, no outside contributions, CI = one script).
 
 Layout:
@@ -48,8 +48,9 @@ Layout:
 
 ## Commands
 
-- `scripts/ci` (or `mise run ci`): the light checks every push and pull request runs; `scripts/ci --full` (or `mise run ci:full`) adds browsers, visual regression, framework apps and the tarball in Node/Bun/Deno (release preparation: v* tags, release/* branches, manual runs). The GitHub workflow only calls this script, which picks its mode from the environment
-- `scripts/release` (or `mise run release`): the release DRY RUN (changelog date, git, registry, full CI, pack + verify the tarball, `npm publish --dry-run`); it never publishes and prints the publish command instead. `-- --skip-ci` skips `scripts/ci`
+- `scripts/ci` (or `mise run ci`): the light checks every push and pull request runs; `scripts/ci --full` (or `mise run ci:full`) adds browsers, visual regression, framework apps and the tarball in Node/Bun/Deno (release preparation: release/* branches, manual runs; v* tags go through release.yml). The GitHub workflow only calls this script, which picks its mode from the environment
+- `scripts/release` (or `mise run release`): the release DRY RUN (changelog date, git, registry, full CI, pack + verify the tarball, `npm publish --dry-run`); it never publishes. `-- --skip-ci` skips `scripts/ci`
+- Releasing: bump `packages/scxmljs/package.json`, add the dated CHANGELOG entry, commit, then `git tag vX.Y.Z && git push origin main vX.Y.Z`. The tag runs `.github/workflows/release.yml` → `scripts/publish` (refuses to run outside Actions; skips versions already on npm; runs `scripts/release`, then `npm publish` via npm trusted publishing/OIDC with provenance). No npm tokens exist. Prereleases (`X.Y.Z-dev.N`, `-beta.N`, `-rc.N`) publish under that dist-tag (`dev`, `beta`, `rc`), never `latest`, and need no CHANGELOG entry
 - `mise run lint` / `mise run format`: Biome check (errors only) / fix formatting, safe lint fixes and import order
 - `mise run test:coverage`: unit tests plus the library coverage gate (`scripts/coverage.ts`)
 - `mise run pack:check` / `mise run size`: what `npm pack` would ship; bundle sizes against `size-budgets.json`

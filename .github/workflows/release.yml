@@ -1,0 +1,16 @@
+# Publishes to npm when a v* tag is pushed. All the work happens in
+# scripts/publish (full release check, then npm publish via trusted publishing).
+# npm's trusted-publisher settings must name this file: release.yml.
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/publish

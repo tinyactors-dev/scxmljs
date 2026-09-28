@@ -35,15 +35,9 @@ In this order:
    (about 2 GB), so expect several minutes the first time.
 6. **Run the release dry run** on the committed tree: `scripts/release` (or `mise run release`).
    It must end with "✓ releasable (dry run)".
-7. **Publish** (this repository never does it for you):
-   - *With provenance* (recommended): from a GitHub Actions job with `permissions: id-token: write`
-     and either an `NPM_TOKEN` secret or npm *trusted publishing* configured for the repository,
-     run `cd packages/scxmljs && npm publish --provenance --access public`. There's deliberately
-     no publish workflow in the repository; add one when you want it, keeping to the "workflow
-     only calls a script" rule.
-   - *From a laptop:* `cd packages/scxmljs && npm publish --access public` (npm can't attest
-     provenance outside supported CI, so this release would have none).
-   - Then tag it: `git tag v0.1.0 && git push origin v0.1.0`.
+7. ~~**Publish**~~ Done: 0.1.0 was published from the maintainer's laptop on 2026-09-28 (`npm publish --access public`, no provenance).
+   **From now on releases publish from GitHub Actions:** `.github/workflows/release.yml` runs on `v*` tags and does only `scripts/publish`, which refuses to run outside Actions, skips versions already on npm, runs the full `scripts/release` check and then `npm publish` through npm *trusted publishing* (OIDC: no token anywhere, provenance attached automatically). One-time setup on npmjs.com: package → Settings → *Trusted Publisher* → GitHub Actions with organization `tinyactors-dev`, repository `scxmljs`, workflow filename `release.yml` (exact, case-sensitive), no environment. Then, under *Publishing access*, choose "Require two-factor authentication and disallow tokens".
+   *Dist-tags:* a prerelease version publishes under its first prerelease identifier and never moves `latest` (`0.2.0-dev.3` → `dev`, `0.2.0-beta.1` → `beta`, `1.0.0-rc.1` → `rc`; install with `npm i @tinyactors/scxmljs@dev`). Prereleases need no CHANGELOG entry; other versions go to `latest`.
 8. **After publishing:**
    - try the real CDN URLs from `docs/bundling.md` (jsDelivr and esm.sh, with the import map it
      documents); they could only be tested with a local mirror before;

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "@tinyactors/scxmljs",
+  "entryPoints": [
+    "../../packages/scxmljs/src/index.ts",
+    "../../packages/scxmljs/src/trusted.ts",
+    "../../packages/scxmljs/src/explorer.ts",
+    "../../packages/scxmljs/src/view.ts"
+  ],
+  "tsconfig": "../../packages/scxmljs/tsconfig.build.json",
+  "out": "../../docs/api",
+  "readme": "none",
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "treatWarningsAsErrors": true,
+  "validation": { "notExported": true, "invalidLink": true, "notDocumented": true },
+  "sort": ["kind", "instance-first", "alphabetical-ignoring-documents"],
+  "githubPages": false,
+  "disableSources": true,
+  "hideGenerator": true
+}

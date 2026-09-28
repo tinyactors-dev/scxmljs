@@ -1,0 +1,10 @@
+{
+  "name": "scxmljs-typedoc",
+  "private": true,
+  "description": "API reference tooling, isolated: TypeDoc needs TypeScript's compiler API, which TypeScript 7 (used by the rest of the repository) doesn't ship. Nothing else uses this TypeScript.",
+  "type": "module",
+  "devDependencies": {
+    "typedoc": "0.28.14",
+    "typescript": "5.9.3"
+  }
+}

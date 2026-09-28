@@ -1,0 +1,171 @@
+# Tools and tasks for the scxmljs repository. Run `mise tasks` to list them.
+
+[tools]
+biome = "2.5.14"
+pitchfork = "2.27.0"
+bun = "1.4.1"
+node = "26.10.0"
+deno = "2.9.7"
+
+# ── tests ────────────────────────────────────────────────────────────────
+
+[tasks.test]
+description = "Run all unit tests (library + playground)"
+run = "bun test"
+
+[tasks."test:coverage"]
+description = "Run all unit tests with coverage; fail if the library is below the thresholds in scripts/coverage.ts"
+run = "bun scripts/coverage.ts"
+
+[tasks."test:browser"]
+description = "Browser tests in Chromium, Firefox and WebKit (installs the browsers if needed; builds first). Extra args go to Playwright"
+depends = ["build"]
+run = "scripts/browser-tests.sh"
+
+[tasks."test:visual"]
+description = "Screenshot comparisons inside the pinned Playwright Docker image (skips without Docker)"
+run = "scripts/visual.sh"
+
+[tasks."test:visual:update"]
+description = "Rewrite the screenshot baselines (tests/browser/specs/__screenshots__), inside the Docker image"
+run = "scripts/visual.sh --update-snapshots"
+
+[tasks."examples:frameworks"]
+description = "Install and build the React, Vue, Svelte and Angular example apps (examples/frameworks; builds the library first)"
+depends = ["build"]
+run = "scripts/build-framework-examples.sh"
+
+[tasks."smoke:tarball"]
+description = "npm pack, install into an empty project, and use it from Node, Bun, Deno and a bundler"
+depends = ["build"]
+run = "bun scripts/smoke-tarball.ts"
+
+[tasks.lint]
+description = "Check formatting, lint rules and import order with Biome; errors only (`biome check .` also shows warnings)"
+run = "biome check --diagnostic-level=error ."
+
+[tasks.format]
+description = "Format, fix safe lint issues and sort imports with Biome"
+run = "biome check --write ."
+
+[tasks."pack:check"]
+description = "Check what `npm pack` would ship for @tinyactors/scxmljs (builds first)"
+run = "bun scripts/check-pack.ts"
+
+[tasks.size]
+description = "Check browser bundle sizes of every entry point against size-budgets.json"
+run = "bun scripts/size.ts"
+
+[tasks.bench]
+description = "Benchmarks (Bun, Node, and Chrome if the playground runs): writes bench/results/<date>.json and docs/measurements.md"
+run = "bun scripts/bench.ts"
+
+[tasks."bench:quick"]
+description = "A few-second benchmark run that checks the harness still works (numbers are rough; nothing is written to bench/results)"
+run = "bun scripts/bench.ts --quick"
+
+# ── documentation ──────────────────────────────────────────────────────────
+
+[tasks."docs:test"]
+description = "Run every code sample in the docs (type-check, execute, compare output; render HTML; compile SCXML)"
+run = "bun scripts/docs/doctest.ts"
+
+[tasks."docs:links"]
+description = "Check every link in the docs (relative files, anchors, repository URLs; offline)"
+run = "bun scripts/docs/links.ts"
+
+[tasks."docs:api"]
+description = "Generate the API reference into docs/api with TypeDoc (fails on warnings)"
+dir = "tools/typedoc"
+run = ["bun install --frozen-lockfile", "bun node_modules/typedoc/bin/typedoc"]
+
+[tasks."docs:conformance"]
+description = "Regenerate docs/conformance.md (both data models; `-- --check` fails if it is stale)"
+run = "bun scripts/docs/conformance-report.ts"
+
+[tasks."docs:set-repo"]
+description = "Rewrite the repository URL in the docs and package.json (usage: mise run docs:set-repo -- <old URL> [old branch]; the new one is in scripts/docs/config.ts)"
+run = "bun scripts/docs/set-repo.ts"
+
+[tasks.release]
+description = "Release DRY RUN: scripts/ci, changelog/git/registry checks, pack + verify the tarball, npm publish --dry-run (never publishes; -- --skip-ci skips scripts/ci)"
+run = "scripts/release"
+
+[tasks.ci]
+description = "Run the light CI checks (scripts/ci), as every push and pull request does"
+run = "scripts/ci --light"
+
+[tasks."ci:full"]
+description = "Run the full CI (scripts/ci --full): adds browsers, visual regression, framework apps and the tarball in Node/Bun/Deno; release preparation"
+run = "scripts/ci --full"
+
+[tasks.build]
+description = "Build the library (packages/scxmljs/dist: ESM, declarations, source maps)"
+dir = "packages/scxmljs"
+run = "bun run build"
+
+[tasks."smoke:node"]
+description = "Run the built library in Node, both entry points (builds first)"
+depends = ["build"]
+dir = "packages/scxmljs"
+run = "node scripts/smoke-node.mjs"
+
+[tasks.typecheck]
+description = "Type-check the whole workspace"
+run = "bun run typecheck"
+
+[tasks."conformance:fetch"]
+description = "Regenerate the vendored W3C SCXML IRP suite (network + bunx xslt3; writes conformance/ecma and conformance/manifest.json)"
+run = "bun conformance/fetch.ts"
+
+[tasks.conformance]
+description = "Run the vendored W3C SCXML conformance suite against the sandboxed data model (usage: mise run conformance -- [--verbose] [ids…])"
+run = "bun conformance/run.ts"
+
+[tasks."conformance:trusted"]
+description = "Run the vendored W3C SCXML conformance suite against the trusted data model (host JS engine)"
+run = "bun conformance/run.ts --trusted"
+
+# ── playground (examples/playground) ─────────────────────────────────────
+
+[tasks.dev]
+description = "Run the playground server in the foreground (HMR) on http://localhost:4321"
+dir = "examples/playground"
+run = "bun run dev"
+
+[tasks.up]
+description = "Start the playground server as a pitchfork daemon and wait until it serves"
+dir = "examples/playground"
+run = "pitchfork start dev"
+
+[tasks.down]
+description = "Stop the playground server daemon"
+dir = "examples/playground"
+run = "pitchfork stop dev"
+
+[tasks.restart]
+description = "Restart the playground server daemon"
+dir = "examples/playground"
+run = "pitchfork restart dev"
+
+[tasks.logs]
+description = "Tail the playground server daemon's logs"
+dir = "examples/playground"
+run = "pitchfork logs dev"
+
+[tasks.open]
+description = "Open the playground in the browser"
+run = "open http://localhost:4321/"
+
+[tasks.webhook]
+description = "POST a fake `issues.opened` webhook to the playground server (usage: mise run webhook -- <author> [number])"
+usage = '''
+arg "<author>" help="GitHub login of the issue author"
+arg "[number]" help="Issue number" default="1"
+'''
+run = '''
+curl -sS -X POST http://localhost:4321/webhook \
+  -H 'content-type: application/json' -H 'x-github-event: issues' \
+  -d "{\"action\":\"opened\",\"issue\":{\"number\":${usage_number},\"title\":\"test\",\"user\":{\"login\":\"${usage_author}\"}},\"repository\":{\"full_name\":\"acme/widgets\"}}"
+echo
+'''

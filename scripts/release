@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Release DRY RUN: checks, builds and verifies what would be published, and prints
+# the publish command. It never publishes. See scripts/release.ts.
+#
+#   scripts/release            everything, including the full scripts/ci
+#   scripts/release --skip-ci  skip scripts/ci (still builds)
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec mise exec -- bun scripts/release.ts "$@"

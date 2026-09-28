@@ -1,0 +1,46 @@
+:root{
+/* vellum — tracing paper */
+--vellum-50:#FAF6EE;--vellum-100:#F4EEE2;--vellum-150:#EEE7D9;--vellum-200:#E7DECD;--vellum-300:#DACEB8;--vellum-400:#C9BAA0;
+/* graphite — pencil and ink */
+--graphite-300:#B3A796;--graphite-400:#978B7B;--graphite-500:#766C60;--graphite-600:#5C544B;--graphite-800:#3A342E;--graphite-900:#2A2622;
+/* umber — dark theme stock */
+--umber-1000:#120D09;--umber-950:#18120D;--umber-900:#201811;--umber-850:#281E16;--umber-800:#31251B;--umber-700:#45362A;--umber-600:#5B4838;--umber-500:#7C6752;
+--parchment-100:#F1E6D2;--parchment-300:#CBBBA2;--parchment-500:#A38F76;
+/* pine — drafting-green ink, the one accent */
+--pine-100:#D8E8DF;--pine-300:#86C4AB;--pine-400:#5FAE8F;--pine-500:#1F5E4A;--pine-600:#194D3D;--pine-700:#133D30;--pine-900:#12302A;
+/* lifecycle + data */
+--ochre-400:#D8A64E;--ochre-600:#94650F;--sage-400:#9DB282;--sage-600:#4F6A40;--madder-400:#E0705E;--madder-600:#A3302A;
+--clay-400:#B8876A;--slate-300:#9DB6C3;--slate-400:#7F929B;--slate-600:#3E5F70;--rose-400:#C98A9A;
+
+/* semantic — light (default) */
+--bg-app:var(--vellum-100);--bg-sunken:var(--vellum-200);--surface-1:var(--vellum-50);--surface-2:var(--vellum-150);--surface-3:var(--vellum-200);--surface-inverse:var(--graphite-900);
+--fg-1:var(--graphite-900);--fg-2:var(--graphite-600);--fg-3:var(--graphite-500);--fg-4:var(--graphite-400);--fg-inverse:var(--vellum-50);--fg-on-accent:#FFF8F0;
+--border-1:var(--vellum-300);--border-2:var(--vellum-400);--border-strong:var(--graphite-500);--rule:var(--graphite-900);
+--accent:var(--pine-500);--accent-hover:var(--pine-600);--accent-press:var(--pine-700);--accent-fg:var(--pine-600);--accent-subtle:var(--pine-100);
+--focus-ring:var(--pine-500);
+--state-running:var(--pine-500);--state-running-bg:var(--pine-100);
+--state-waiting:var(--ochre-600);--state-waiting-bg:#F1E2C1;
+--state-done:var(--slate-600);--state-done-bg:#DCE5EA;
+--state-error:var(--madder-600);--state-error-bg:#F2D7D0;
+--state-stopped:var(--graphite-500);--state-stopped-bg:var(--vellum-200);
+--data-1:var(--ochre-400);--data-2:var(--slate-400);--data-3:var(--clay-400);--data-4:var(--rose-400);--data-5:var(--graphite-400);--data-6:var(--pine-300);
+--text-body:var(--fg-1);--text-muted:var(--fg-2);--text-subtle:var(--fg-3);--text-link:var(--accent-fg);
+--surface-card:var(--surface-1);--surface-overlay:rgba(42,38,34,.32);
+--surface-code:var(--vellum-150);--code-fg:var(--graphite-900);--code-muted:var(--graphite-400);--code-border:var(--vellum-300);--code-hl:rgba(31,94,74,.10);
+--grid-minor:rgba(120,96,64,.09);--grid-major:rgba(120,96,64,.17);
+}
+[data-theme="dark"]{
+--bg-app:var(--umber-950);--bg-sunken:var(--umber-1000);--surface-1:var(--umber-900);--surface-2:var(--umber-850);--surface-3:var(--umber-800);--surface-inverse:var(--parchment-100);
+--fg-1:var(--parchment-100);--fg-2:var(--parchment-300);--fg-3:var(--parchment-500);--fg-4:var(--umber-500);--fg-inverse:var(--umber-950);--fg-on-accent:var(--umber-1000);
+--border-1:var(--umber-700);--border-2:var(--umber-600);--border-strong:var(--umber-500);--rule:var(--parchment-300);
+--accent:var(--pine-400);--accent-hover:var(--pine-300);--accent-press:var(--pine-500);--accent-fg:var(--pine-300);--accent-subtle:var(--pine-900);
+--focus-ring:var(--pine-400);
+--state-running:var(--pine-300);--state-running-bg:var(--pine-900);
+--state-waiting:var(--ochre-400);--state-waiting-bg:#3D2C12;
+--state-done:var(--slate-300);--state-done-bg:#1C2A33;
+--state-error:var(--madder-400);--state-error-bg:#45190F;
+--state-stopped:var(--parchment-500);--state-stopped-bg:var(--umber-800);
+--surface-overlay:rgba(10,7,5,.7);
+--surface-code:var(--umber-1000);--code-fg:var(--parchment-100);--code-muted:var(--umber-500);--code-border:var(--umber-700);--code-hl:rgba(95,174,143,.14);
+--grid-minor:rgba(241,230,210,.045);--grid-major:rgba(241,230,210,.09);
+}

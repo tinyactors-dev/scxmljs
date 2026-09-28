@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>scxmljs browser measurements</title>
+  <style>
+    body { margin: 0; font: 14px system-ui, sans-serif; }
+    #stage { width: 1400px; }
+    scxml-explorer, scxml-view { display: block; height: 800px; }
+    pre { margin: 16px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <!-- Browser-side measurements for scripts/bench.ts: open with ?run and read window.__bench. -->
+  <pre id="status">Open with ?run to measure.</pre>
+  <div id="stage"></div>
+  <script type="module" src="./bench.ts"></script>
+</body>
+</html>

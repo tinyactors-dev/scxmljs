@@ -1,0 +1,191 @@
+/* Control panel from src/ui/harness.ts. Tinyactors tokens only. */
+.sx-panel {
+  display: block;
+  color: var(--fg-1);
+  font: var(--type-body-sm);
+}
+.sx-panel h2 {
+  font: var(--fw-regular) var(--fs-22) / var(--lh-snug) var(--font-display);
+  letter-spacing: var(--tracking-tight);
+  margin: 0 0 var(--space-3);
+}
+.sx-panel h3 {
+  font: var(--type-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--fg-3);
+  margin: var(--space-5) 0 var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--border-1);
+}
+.sx-panel h3 code {
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fg-2);
+}
+.sx-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  align-items: center;
+}
+.sx-row > span {
+  font: var(--type-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.sx-panel input {
+  height: var(--control-h-sm);
+  padding: 0 var(--space-2);
+  min-width: 0;
+  font: var(--fw-regular) var(--fs-12) / 1 var(--font-mono);
+  color: var(--fg-1);
+  background: var(--surface-1);
+  border: var(--border-width) solid var(--border-2);
+  border-radius: var(--radius-2);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-step);
+}
+.sx-panel input:hover {
+  border-color: var(--border-strong);
+}
+.sx-panel input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.sx-panel input::placeholder {
+  color: var(--fg-4);
+}
+.sx-panel button {
+  height: var(--control-h-sm);
+  padding: 0 var(--space-3);
+  cursor: pointer;
+  font: var(--type-ui);
+  color: var(--fg-1);
+  background: var(--surface-1);
+  border: var(--border-width) solid var(--border-2);
+  border-radius: var(--radius-2);
+  transition:
+    background var(--dur-fast) var(--ease-step),
+    border-color var(--dur-fast) var(--ease-step);
+}
+.sx-panel button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.sx-panel button:active {
+  background: var(--surface-3);
+}
+.sx-panel button.sx-primary {
+  color: var(--fg-on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.sx-panel button.sx-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.sx-panel button.sx-primary:active {
+  background: var(--accent-press);
+}
+
+.sx-panel ul,
+.sx-panel ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sx-issue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-width) solid var(--border-1);
+}
+.sx-issue b {
+  font: var(--fw-medium) var(--fs-12) / 1 var(--font-mono);
+  color: var(--fg-3);
+}
+/* lifecycle badges */
+.sx-state,
+.sx-label {
+  font: var(--type-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 3px 6px;
+  border-radius: var(--radius-2);
+}
+.sx-state {
+  color: var(--state-running);
+  background: var(--state-running-bg);
+}
+.sx-closed .sx-state {
+  color: var(--state-done);
+  background: var(--state-done-bg);
+}
+.sx-label {
+  color: var(--fg-2);
+  border: var(--border-width) solid var(--border-2);
+  padding: 2px 5px;
+}
+.sx-comments {
+  font: var(--fw-regular) var(--fs-12) / 1 var(--font-mono);
+  color: var(--fg-3);
+}
+
+.sx-data {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  max-height: 230px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font: var(--fw-regular) var(--fs-12) / var(--lh-code) var(--font-mono);
+  color: var(--code-fg);
+  background: var(--surface-code);
+  border: var(--border-width) solid var(--code-border);
+  border-radius: var(--radius-2);
+}
+.sx-log {
+  font: var(--fw-regular) var(--fs-12) / 1.45 var(--font-mono);
+  max-height: 300px;
+  overflow: auto;
+}
+.sx-log li {
+  position: relative;
+  padding: 5px 0 5px 34px;
+  border-bottom: var(--border-width) solid var(--border-1);
+  color: var(--fg-1);
+}
+.sx-log li::before {
+  content: counter(list-item);
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 26px;
+  text-align: right;
+  color: var(--fg-4);
+  font-variant-numeric: tabular-nums;
+}
+.sx-k-send {
+  color: var(--accent-fg);
+}
+.sx-k-log {
+  color: var(--fg-3);
+}
+.sx-k-error {
+  color: var(--state-error);
+}
+.sx-k-note {
+  color: var(--fg-4);
+}
+
+/* declarative controls (data-scxml-send) whose event no active state can take */
+.sx-panel form[data-scxml-send]:not([data-scxml-enabled]) button[type="submit"]:not([data-scxml-send]),
+.sx-panel button[data-scxml-send]:not([data-scxml-enabled]) {
+  opacity: 0.45;
+}

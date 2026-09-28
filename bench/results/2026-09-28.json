@@ -1,0 +1,621 @@
+{
+  "date": "2026-09-28T15:17:08.885Z",
+  "quick": false,
+  "config": {
+    "coldSamples": 15,
+    "compileRuns": {
+      "small": 30,
+      "large": 5
+    },
+    "sessions": 500,
+    "systems": 20,
+    "events": 20000,
+    "microsteps": 20000,
+    "leakCycles": 1000
+  },
+  "env": {
+    "host": "Darios-MacBook-Pro.local",
+    "os": "darwin 25.6.0",
+    "cpu": "Apple M4 Max",
+    "cores": 16,
+    "memoryGB": 48,
+    "bun": "1.4.1",
+    "node": "v26.10.0"
+  },
+  "runtimes": {
+    "bun": {
+      "coldStart": {
+        "sandboxed": {
+          "totalMs": {
+            "median": 14.906584,
+            "p95": 15.273708
+          },
+          "importMs": {
+            "median": 3.0035830000000003
+          },
+          "engineMs": {
+            "median": 11.889791999999998
+          }
+        },
+        "trusted": {
+          "totalMs": {
+            "median": 1.5477500000000002,
+            "p95": 1.5907910000000003
+          },
+          "importMs": {
+            "median": 1.5473750000000002
+          },
+          "engineMs": {
+            "median": 0.0003750000000000142
+          }
+        }
+      },
+      "compile": {
+        "gatekeeper": {
+          "states": 17,
+          "transitions": 14,
+          "parseMs": {
+            "median": 0.2582079999999962,
+            "p95": 0.7092919999999978
+          },
+          "compileMs": {
+            "median": 0.0665830000000085,
+            "p95": 1.0512079999999955
+          }
+        },
+        "fulfillment": {
+          "states": 59,
+          "transitions": 72,
+          "parseMs": {
+            "median": 0.7025000000000006,
+            "p95": 1.7863750000000067
+          },
+          "compileMs": {
+            "median": 0.1928750000000008,
+            "p95": 1.684625000000004
+          }
+        },
+        "support-desk": {
+          "states": 333,
+          "transitions": 954,
+          "parseMs": {
+            "median": 6.519334000000001,
+            "p95": 12.559041999999998
+          },
+          "compileMs": {
+            "median": 1.6583750000000066,
+            "p95": 3.7208749999999995
+          }
+        },
+        "generated-1000": {
+          "states": 1001,
+          "transitions": 2064,
+          "parseMs": {
+            "median": 8.506042000000008,
+            "p95": 13.585542000000004
+          },
+          "compileMs": {
+            "median": 2.89416700000001,
+            "p95": 6.436666000000002
+          }
+        },
+        "generated-5000": {
+          "states": 5001,
+          "transitions": 10384,
+          "parseMs": {
+            "median": 46.90295800000001,
+            "p95": 59.250375
+          },
+          "compileMs": {
+            "median": 22.575458000000026,
+            "p95": 28.36166700000001
+          }
+        }
+      },
+      "sessions": {
+        "sandboxed": {
+          "gatekeeper": {
+            "n": 500,
+            "childSessions": 0,
+            "createStartMs": {
+              "median": 0.2695410000000038,
+              "p95": 0.5282919999999933
+            },
+            "perSessionBytes": {
+              "rss": 175964.16,
+              "heapUsed": 142773.612,
+              "wasm": 67108.864
+            }
+          },
+          "support-desk": {
+            "n": 20,
+            "childSessions": 280,
+            "createStartMs": {
+              "median": 4.948041999999987,
+              "p95": 9.300334000000007
+            },
+            "perSessionBytes": {
+              "rss": 3273523.2,
+              "heapUsed": 2149814.85,
+              "wasm": 907673.6
+            }
+          }
+        },
+        "trusted": {
+          "gatekeeper": {
+            "n": 500,
+            "childSessions": 0,
+            "createStartMs": {
+              "median": 0.04729199999999878,
+              "p95": 0.07858400000000643
+            },
+            "perSessionBytes": {
+              "rss": 112820.224,
+              "heapUsed": 75762.058,
+              "wasm": 0
+            }
+          },
+          "support-desk": {
+            "n": 20,
+            "childSessions": 280,
+            "createStartMs": {
+              "median": 1.1508340000000032,
+              "p95": 4.580416999999997
+            },
+            "perSessionBytes": {
+              "rss": 2959769.6,
+              "heapUsed": 1350329.05,
+              "wasm": 0
+            }
+          }
+        }
+      },
+      "throughput": {
+        "sandboxed": {
+          "eventsPerSec": {
+            "median": 93431.3845260987,
+            "min": 80907.98991684176
+          },
+          "microstepsPerSec": {
+            "median": 101238.41972313935,
+            "min": 98202.10361181201
+          }
+        },
+        "trusted": {
+          "eventsPerSec": {
+            "median": 171677.44191546977,
+            "min": 158104.74529495495
+          },
+          "microstepsPerSec": {
+            "median": 188627.63960803178,
+            "min": 184758.00415092104
+          }
+        }
+      },
+      "leak": {
+        "sandboxed": {
+          "cycles": 1000,
+          "checkpoints": [
+            {
+              "cycles": 250,
+              "rss": 151502848,
+              "heapUsed": 45385014,
+              "external": 38506342,
+              "wasm": 16777216
+            },
+            {
+              "cycles": 500,
+              "rss": 152748032,
+              "heapUsed": 45568928,
+              "external": 38679472,
+              "wasm": 16777216
+            },
+            {
+              "cycles": 750,
+              "rss": 156958720,
+              "heapUsed": 45651119,
+              "external": 38766703,
+              "wasm": 16777216
+            },
+            {
+              "cycles": 1000,
+              "rss": 157040640,
+              "heapUsed": 45652463,
+              "external": 38767343,
+              "wasm": 16777216
+            }
+          ],
+          "growthPerCycleBytes": {
+            "rss": 7383.722666666667,
+            "heapUsed": 356.59866666666665,
+            "wasm": 0
+          }
+        },
+        "trusted": {
+          "cycles": 1000,
+          "checkpoints": [
+            {
+              "cycles": 250,
+              "rss": 116260864,
+              "heapUsed": 10294312,
+              "external": 3542904,
+              "wasm": 0
+            },
+            {
+              "cycles": 500,
+              "rss": 117866496,
+              "heapUsed": 10492193,
+              "external": 3687713,
+              "wasm": 0
+            },
+            {
+              "cycles": 750,
+              "rss": 119898112,
+              "heapUsed": 10467042,
+              "external": 3716626,
+              "wasm": 0
+            },
+            {
+              "cycles": 1000,
+              "rss": 120078336,
+              "heapUsed": 10496901,
+              "external": 3746037,
+              "wasm": 0
+            }
+          ],
+          "growthPerCycleBytes": {
+            "rss": 5089.962666666666,
+            "heapUsed": 270.1186666666667,
+            "wasm": 0
+          }
+        }
+      }
+    },
+    "node": {
+      "coldStart": {
+        "sandboxed": {
+          "totalMs": {
+            "median": 13.588416,
+            "p95": 15.269166
+          },
+          "importMs": {
+            "median": 4.568166
+          },
+          "engineMs": {
+            "median": 8.986958000000001
+          }
+        },
+        "trusted": {
+          "totalMs": {
+            "median": 2.5474999999999994,
+            "p95": 2.7671670000000006
+          },
+          "importMs": {
+            "median": 2.5471670000000017
+          },
+          "engineMs": {
+            "median": 0.00037500000000179057
+          }
+        }
+      },
+      "compile": {
+        "gatekeeper": {
+          "states": 17,
+          "transitions": 14,
+          "parseMs": {
+            "median": 0.352374999999995,
+            "p95": 2.1599999999999966
+          },
+          "compileMs": {
+            "median": 0.08945800000000759,
+            "p95": 0.8540409999999952
+          }
+        },
+        "fulfillment": {
+          "states": 59,
+          "transitions": 72,
+          "parseMs": {
+            "median": 0.9792079999999999,
+            "p95": 2.9648750000000064
+          },
+          "compileMs": {
+            "median": 0.2436670000000163,
+            "p95": 1.7791660000000036
+          }
+        },
+        "support-desk": {
+          "states": 333,
+          "transitions": 954,
+          "parseMs": {
+            "median": 11.917541,
+            "p95": 15.676583999999991
+          },
+          "compileMs": {
+            "median": 2.501958000000002,
+            "p95": 3.9492910000000023
+          }
+        },
+        "generated-1000": {
+          "states": 1001,
+          "transitions": 2064,
+          "parseMs": {
+            "median": 14.716583000000014,
+            "p95": 27.359499999999997
+          },
+          "compileMs": {
+            "median": 6.018084000000044,
+            "p95": 9.709708999999975
+          }
+        },
+        "generated-5000": {
+          "states": 5001,
+          "transitions": 10384,
+          "parseMs": {
+            "median": 87.42516599999999,
+            "p95": 118.23983299999998
+          },
+          "compileMs": {
+            "median": 41.213750000000005,
+            "p95": 53.387541999999996
+          }
+        }
+      },
+      "sessions": {
+        "sandboxed": {
+          "gatekeeper": {
+            "n": 500,
+            "childSessions": 0,
+            "createStartMs": {
+              "median": 0.3112079999999935,
+              "p95": 0.42908400000001734
+            },
+            "perSessionBytes": {
+              "rss": 108429.312,
+              "heapUsed": 8138.24,
+              "wasm": 67108.864
+            }
+          },
+          "support-desk": {
+            "n": 20,
+            "childSessions": 280,
+            "createStartMs": {
+              "median": 5.728582999999986,
+              "p95": 7.947915999999992
+            },
+            "perSessionBytes": {
+              "rss": 2573926.4,
+              "heapUsed": 284342.4,
+              "wasm": 907673.6
+            }
+          }
+        },
+        "trusted": {
+          "gatekeeper": {
+            "n": 500,
+            "childSessions": 0,
+            "createStartMs": {
+              "median": 0.1792079999999885,
+              "p95": 0.22254200000000424
+            },
+            "perSessionBytes": {
+              "rss": 222625.792,
+              "heapUsed": 174459.312,
+              "wasm": 0
+            }
+          },
+          "support-desk": {
+            "n": 20,
+            "childSessions": 280,
+            "createStartMs": {
+              "median": 3.4233330000000137,
+              "p95": 4.75354200000001
+            },
+            "perSessionBytes": {
+              "rss": 4464640,
+              "heapUsed": 2787004.4,
+              "wasm": 0
+            }
+          }
+        }
+      },
+      "throughput": {
+        "sandboxed": {
+          "eventsPerSec": {
+            "median": 55576.92426541422,
+            "min": 50348.90215792248
+          },
+          "microstepsPerSec": {
+            "median": 84511.43149160032,
+            "min": 80520.9706803015
+          }
+        },
+        "trusted": {
+          "eventsPerSec": {
+            "median": 75618.64339994937,
+            "min": 69066.3481556911
+          },
+          "microstepsPerSec": {
+            "median": 132353.11119182722,
+            "min": 126223.94467978121
+          }
+        }
+      },
+      "leak": {
+        "sandboxed": {
+          "cycles": 1000,
+          "checkpoints": [
+            {
+              "cycles": 250,
+              "rss": 156401664,
+              "heapUsed": 22796168,
+              "external": 5157952,
+              "wasm": 16777216
+            },
+            {
+              "cycles": 500,
+              "rss": 156237824,
+              "heapUsed": 22849296,
+              "external": 5157992,
+              "wasm": 16777216
+            },
+            {
+              "cycles": 750,
+              "rss": 156336128,
+              "heapUsed": 22859048,
+              "external": 5157992,
+              "wasm": 16777216
+            },
+            {
+              "cycles": 1000,
+              "rss": 156565504,
+              "heapUsed": 22900576,
+              "external": 5157992,
+              "wasm": 16777216
+            }
+          ],
+          "growthPerCycleBytes": {
+            "rss": 218.45333333333335,
+            "heapUsed": 139.21066666666667,
+            "wasm": 0
+          }
+        },
+        "trusted": {
+          "cycles": 1000,
+          "checkpoints": [
+            {
+              "cycles": 250,
+              "rss": 195985408,
+              "heapUsed": 21117984,
+              "external": 4650848,
+              "wasm": 0
+            },
+            {
+              "cycles": 500,
+              "rss": 196329472,
+              "heapUsed": 21148904,
+              "external": 4650888,
+              "wasm": 0
+            },
+            {
+              "cycles": 750,
+              "rss": 196411392,
+              "heapUsed": 21152064,
+              "external": 4650888,
+              "wasm": 0
+            },
+            {
+              "cycles": 1000,
+              "rss": 196657152,
+              "heapUsed": 21198352,
+              "external": 4650888,
+              "wasm": 0
+            }
+          ],
+          "growthPerCycleBytes": {
+            "rss": 895.6586666666667,
+            "heapUsed": 107.15733333333333,
+            "wasm": 0
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "browser": "154.0.0.0",
+    "devicePixelRatio": 1,
+    "viewport": [1500, 950],
+    "explorer": [
+      {
+        "chart": "gatekeeper",
+        "states": 17,
+        "firstRenderMs": 12.300000071525574,
+        "treeRowsInDom": 11,
+        "scroll": {
+          "frames": 2,
+          "medianFrameMs": 16.800000071525574,
+          "p95FrameMs": 16.800000071525574,
+          "longTasks": 0,
+          "treeRows": 17
+        }
+      },
+      {
+        "chart": "fulfillment",
+        "states": 58,
+        "firstRenderMs": 13.899999976158142,
+        "treeRowsInDom": 10,
+        "scroll": {
+          "frames": 3,
+          "medianFrameMs": 17,
+          "p95FrameMs": 17.399999976158142,
+          "longTasks": 0,
+          "treeRows": 51
+        }
+      },
+      {
+        "chart": "support-desk",
+        "states": 332,
+        "firstRenderMs": 18,
+        "treeRowsInDom": 31,
+        "scroll": {
+          "frames": 18,
+          "medianFrameMs": 16.700000047683716,
+          "p95FrameMs": 17.299999952316284,
+          "longTasks": 0,
+          "treeRows": 314
+        }
+      },
+      {
+        "chart": "generated-1000",
+        "states": 1001,
+        "firstRenderMs": 4.100000023841858,
+        "treeRowsInDom": 31,
+        "scroll": {
+          "frames": 55,
+          "medianFrameMs": 16.700000047683716,
+          "p95FrameMs": 17.59999990463257,
+          "longTasks": 0,
+          "treeRows": 1001
+        }
+      },
+      {
+        "chart": "generated-5000",
+        "states": 5001,
+        "firstRenderMs": 10.300000071525574,
+        "treeRowsInDom": 31,
+        "scroll": {
+          "frames": 120,
+          "medianFrameMs": 16.699999928474426,
+          "p95FrameMs": 17.300000071525574,
+          "longTasks": 0,
+          "treeRows": 5001
+        }
+      }
+    ],
+    "view": [
+      {
+        "chart": "gatekeeper",
+        "stateBoxes": 17,
+        "renderWithSessionMs": 13.200000047683716,
+        "sourceToRenderMs": 15.199999928474426
+      },
+      {
+        "chart": "fulfillment",
+        "stateBoxes": 59,
+        "renderWithSessionMs": 13.600000023841858,
+        "sourceToRenderMs": 14.799999952316284
+      },
+      {
+        "chart": "support-desk",
+        "stateBoxes": 76,
+        "renderWithSessionMs": 17,
+        "sourceToRenderMs": 38.299999952316284
+      },
+      {
+        "chart": "generated-1000",
+        "stateBoxes": 137,
+        "renderWithSessionMs": 44.5,
+        "sourceToRenderMs": 57.700000047683716
+      }
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  // Type-checks the whole workspace (library, examples, conformance runner).
+  // The library's own build config lives in packages/scxmljs.
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "types": ["bun"],
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    // Inside this repository, the package name resolves to its TypeScript sources (Bun and tsc
+    // both honour this), so nothing needs building first. Published consumers get dist/ via
+    // "exports" in packages/scxmljs/package.json.
+    "paths": {
+      "@tinyactors/scxmljs": ["./packages/scxmljs/src/index.ts"],
+      "@tinyactors/scxmljs/*": ["./packages/scxmljs/src/*.ts"]
+    }
+  },
+  "exclude": ["node_modules", "**/node_modules", "**/dist", "conformance/.cache", "conformance/ecma", "examples/frameworks"]
+}

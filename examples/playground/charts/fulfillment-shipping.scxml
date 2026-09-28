@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Shipment of one parcel, invoked by fulfillment.scxml.
+  Creates a label with the carrier, then follows the carrier's webhooks
+  (carrier.*) until the parcel is delivered or returned. Every step is
+  reported to the parent as tracking.* events.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="shipment" initial="labelling">
+  <datamodel>
+    <data id="orderId" expr="''"/>
+    <data id="address" expr="null"/>
+    <data id="parcel" expr="null"/>
+    <data id="trackingNumber" expr="null"/>
+    <data id="scans" expr="[]"/>
+    <data id="labelAttempts" expr="0"/>
+  </datamodel>
+
+  <state id="labelling">
+    <onentry>
+      <assign location="labelAttempts" expr="labelAttempts + 1"/>
+      <send type="carrier" event="createLabel">
+        <param name="orderId" expr="orderId"/>
+        <param name="address" expr="address"/>
+        <param name="parcel" expr="parcel"/>
+      </send>
+    </onentry>
+    <transition event="carrier.createLabel.done" target="enRoute">
+      <assign location="trackingNumber" expr="_event.data.trackingNumber"/>
+      <send target="#_parent" event="tracking.label_created"><param name="trackingNumber" expr="trackingNumber"/></send>
+    </transition>
+    <transition event="carrier.createLabel.error" target="labelRetry"/>
+  </state>
+
+  <state id="labelRetry">
+    <onentry><send id="labelRetryTimer" event="label.retry" delay="2s"/></onentry>
+    <onexit><cancel sendid="labelRetryTimer"/></onexit>
+    <transition event="label.retry" target="labelling"/>
+  </state>
+
+  <state id="enRoute" initial="awaitingPickup">
+    <!-- every carrier scan is recorded and forwarded, whatever the state -->
+    <transition event="carrier.*" type="internal">
+      <script>scans.push({ event: _event.name, at: _event.data &amp;&amp; _event.data.at })</script>
+      <send target="#_parent" event="tracking.update">
+        <param name="status" expr="_event.name.replace('carrier.', '')"/>
+        <param name="trackingNumber" expr="trackingNumber"/>
+      </send>
+    </transition>
+    <transition event="redirect" type="internal">
+      <assign location="address" expr="_event.data.address"/>
+      <send type="carrier" event="redirect">
+        <param name="trackingNumber" expr="trackingNumber"/>
+        <param name="address" expr="address"/>
+      </send>
+    </transition>
+
+    <state id="awaitingPickup">
+      <transition event="carrier.picked_up" target="inNetwork">
+        <send target="#_parent" event="tracking.picked_up"/>
+      </transition>
+    </state>
+
+    <state id="inNetwork" initial="inTransit">
+      <state id="inTransit">
+        <transition event="carrier.out_for_delivery" target="outForDelivery">
+          <send target="#_parent" event="tracking.out_for_delivery"/>
+        </transition>
+      </state>
+      <state id="outForDelivery">
+        <transition event="carrier.delivered" target="delivered"/>
+        <transition event="carrier.delivery_failed" target="inTransit"/>
+      </state>
+      <transition event="carrier.exception" target="exception"/>
+    </state>
+
+    <state id="exception">
+      <onentry><send target="#_parent" event="tracking.exception"/></onentry>
+      <transition event="carrier.in_transit" target="inNetwork"/>
+      <transition event="carrier.returned" target="returned"/>
+    </state>
+  </state>
+
+  <final id="delivered">
+    <donedata>
+      <param name="status" expr="'delivered'"/>
+      <param name="trackingNumber" expr="trackingNumber"/>
+      <param name="scans" expr="scans.length"/>
+    </donedata>
+  </final>
+
+  <final id="returned">
+    <donedata>
+      <param name="status" expr="'returned'"/>
+      <param name="trackingNumber" expr="trackingNumber"/>
+    </donedata>
+  </final>
+</scxml>

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>classic-script (IIFE) fixture</title>
+    <!-- no modules at all: every script is a classic script -->
+    <script src="/fixtures/common.js"></script>
+    <script src="/iife/view.js"></script>
+    <script src="/iife/global.js"></script>
+    <link rel="stylesheet" href="/fixtures/fixtures.css" />
+  </head>
+  <body>
+    <h1>classic scripts</h1>
+    <!-- zero-JS, sandboxed engine (QuickJS inlined into the IIFE) -->
+    <scxml-view id="src" src="/charts/traffic-light.scxml"></scxml-view>
+    <!-- a trusted session from window.scxml, shown in the explorer (iife.js) -->
+    <scxml-explorer id="explorer"></scxml-explorer>
+    <script src="/fixtures/iife.js"></script>
+  </body>
+</html>

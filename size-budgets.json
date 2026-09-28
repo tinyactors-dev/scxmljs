@@ -1,0 +1,7 @@
+{
+  "@tinyactors/scxmljs": { "minKB": 67, "gzipKB": 22, "lazyGzipKB": 319 },
+  "@tinyactors/scxmljs/trusted": { "minKB": 60, "gzipKB": 20 },
+  "@tinyactors/scxmljs/explorer": { "minKB": 88, "gzipKB": 27 },
+  "@tinyactors/scxmljs/view": { "minKB": 109, "gzipKB": 37, "lazyGzipKB": 324 },
+  "@tinyactors/scxmljs/themes/tinyactors.css": { "minKB": 2, "gzipKB": 1 }
+}

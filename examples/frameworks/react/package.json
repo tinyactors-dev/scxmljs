@@ -1,0 +1,18 @@
+{
+  "name": "scxmljs-example-react",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && bun build ./src/main.tsx --outdir dist --target browser --minify --splitting && cp index.html dist/index.html"
+  },
+  "dependencies": {
+    "@tinyactors/scxmljs": "file:../../../packages/scxmljs",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}

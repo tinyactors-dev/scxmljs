@@ -1,0 +1,11 @@
+/*
+ * Tinyactors design system tokens (vendored in ./tokens). The design system
+ * ships no font files, so the same families are loaded from Google Fonts.
+ *
+ * Theme: light by default; [data-theme="dark"] on the root switches to umber.
+ */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap");
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/effects.css";

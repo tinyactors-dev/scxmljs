@@ -1,0 +1,44 @@
+# dependencies
+node_modules/
+
+# build output and packed tarballs
+dist/
+*.tgz
+
+# test coverage
+coverage/
+*.lcov
+
+# W3C conformance suite: the download cache is never committed; the converted
+# tests (conformance/ecma/, manifest.json) are vendored so CI needs no network.
+# Regenerate them with `mise run conformance:fetch`.
+conformance/.cache/
+
+# local environment and secrets
+.env
+.env.*
+mise.local.toml
+
+# logs
+*.log
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+bench/.fixtures/
+
+# generated documentation (mise run docs:api; published separately) and doc-test scratch space
+docs/api/
+.doctest/
+tools/typedoc/node_modules/
+
+# browser tests (Playwright): results and traces; the screenshot baselines are committed
+test-results/
+playwright-report/
+
+# framework example build caches (their dist/ and node_modules/ are covered above)
+.angular/
+.svelte-kit/
+.vite/

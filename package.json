@@ -1,0 +1,23 @@
+{
+  "name": "scxmljs-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "dev": "bun run --cwd examples/playground dev",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "conformance": "bun conformance/run.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/bun": "1.4.2",
+    "axe-core": "4.13.0",
+    "elkjs": "0.10.0",
+    "happy-dom": "20.14.5",
+    "typescript": "7.0.2"
+  }
+}

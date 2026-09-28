@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# The whole CI pipeline. .github/workflows/ci.yml does nothing but run this
+# script, so a laptop and CI run exactly the same checks:
+#
+#   scripts/ci           light checks (every push and pull request)
+#   scripts/ci --full    light checks + the heavy ones (release preparation)
+#
+# Light: lint, typecheck, build, unit tests with coverage (includes the W3C
+# suite), conformance runner, Node smoke test, package contents, size budgets,
+# docs (samples, links, conformance report, API reference).
+# Heavy (--full only): benchmark harness, the packed tarball in Node/Bun/Deno,
+# framework example apps, browser tests in three engines, visual regression.
+#
+# Without a flag the mode comes from the environment, so the workflow stays a
+# single step: full for tags (refs/tags/v*), release branches
+# (refs/heads/release/*) and manual runs (workflow_dispatch), or when
+# SCXMLJS_CI=full; light otherwise. scripts/release always runs --full.
+#
+# It installs its own toolchain (mise, then the tools pinned in mise.toml),
+# installs dependencies from the lockfile, and runs every check as a mise
+# task. It stops at the first failure.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+mode=light
+case "${1:-}" in
+  --full) mode=full ;;
+  --light) mode=light ;;
+  "")
+    if [ "${SCXMLJS_CI:-}" = full ] || [ "${GITHUB_EVENT_NAME:-}" = workflow_dispatch ]; then mode=full; fi
+    case "${GITHUB_REF:-}" in refs/tags/v* | refs/heads/release/*) mode=full ;; esac
+    ;;
+  *)
+    echo "usage: scripts/ci [--light|--full]" >&2
+    exit 2
+    ;;
+esac
+printf '\033[1mCI mode: %s\033[0m\n' "$mode"
+
+started=$SECONDS
+step() {
+  local name=$1
+  shift
+  printf '\n\033[1m── %s\033[0m\n' "$name"
+  local t=$SECONDS
+  "$@"
+  printf '\033[2m   %s: %ss\033[0m\n' "$name" "$((SECONDS - t))"
+}
+
+# ── toolchain ─────────────────────────────────────────────────────────────
+if ! command -v mise >/dev/null 2>&1; then
+  printf '\033[1m── installing mise\033[0m\n'
+  curl -fsSL https://mise.run | sh
+  export PATH="$HOME/.local/bin:$PATH"
+fi
+export MISE_YES=1                      # never prompt (CI has no terminal)
+export MISE_TRUSTED_CONFIG_PATHS="$PWD" # trust this repository's mise.toml
+tools=(bun node biome)                 # the playground-only pitchfork is never needed
+if [ "$mode" = full ]; then tools+=(deno); fi # only the tarball smoke test uses Deno
+step "tools (mise install)" mise install "${tools[@]}"
+step "dependencies (bun install)" mise exec -- bun install --frozen-lockfile
+
+# ── checks ────────────────────────────────────────────────────────────────
+step "format + lint" mise run lint
+step "typecheck" mise run typecheck
+step "build" mise run build
+step "unit tests + coverage" mise run test:coverage
+step "conformance (sandboxed)" mise run conformance
+step "conformance (trusted)" mise run conformance:trusted
+step "node smoke test" mise run smoke:node
+step "package contents" mise run pack:check
+step "size budgets" mise run size
+step "docs: code samples" mise run docs:test
+step "docs: links" mise run docs:links
+step "docs: conformance report is current" mise run docs:conformance -- --check
+step "docs: API reference (no warnings)" mise run docs:api
+
+if [ "$mode" = light ]; then
+  printf '\n\033[1;32m✓ CI (light) passed in %ss\033[0m  \033[2m(release preparation runs scripts/ci --full)\033[0m\n' "$((SECONDS - started))"
+  exit 0
+fi
+
+# ── heavy checks: release preparation only ────────────────────────────────
+step "benchmark harness (quick, no thresholds)" mise run bench:quick
+step "packed tarball: npm install + Node, Bun, Deno, bundler" env SCXML_REQUIRE_DENO=1 mise run smoke:tarball
+step "framework examples: React, Vue, Svelte, Angular (install + build)" mise run examples:frameworks
+step "browser tests: Chromium, Firefox, WebKit" env SCXML_REQUIRE_FRAMEWORKS=1 mise run test:browser
+# screenshots are compared inside the pinned Playwright image; on Linux (CI) Docker must be there,
+# elsewhere they're skipped with a notice when Docker isn't
+visual_required=0
+if [ "$(uname)" = "Linux" ]; then visual_required=1; fi
+step "visual regression (Docker)" env SCXML_VISUAL_REQUIRED=$visual_required mise run test:visual
+
+printf '\n\033[1;32m✓ CI (full) passed in %ss\033[0m\n' "$((SECONDS - started))"

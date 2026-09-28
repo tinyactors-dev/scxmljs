@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>scxml-view fixture</title>
+    <script src="/fixtures/common.js"></script>
+    <!--importmap-->
+    <link rel="stylesheet" href="/fixtures/fixtures.css" />
+    <script type="module" src="/fixtures/view.js"></script>
+  </head>
+  <body>
+    <h1>scxml-view</h1>
+    <!-- zero-JS: fetched, sandboxed (the default engine) -->
+    <scxml-view id="src" src="/charts/traffic-light.scxml"></scxml-view>
+    <!-- zero-JS: inline source, trusted engine (an iframe realm). An inline chart can't contain
+         <script>: the HTML parser would end the outer script at the inner </script>. -->
+    <scxml-view id="inline" trusted>
+      <script type="application/scxml+xml">
+        <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="realm" initial="a">
+          <datamodel><data id="count" expr="0"/></datamodel>
+          <state id="a"><transition event="go" cond="count === 0" target="b"><assign location="count" expr="count + 1"/></transition></state>
+          <state id="b"><transition event="go" cond="count === 1" target="c"><assign location="count" expr="count + 1"/></transition></state>
+          <final id="c"/>
+        </scxml>
+      </script>
+    </scxml-view>
+    <!-- a host session on a paused PlaybackClock (view.js) -->
+    <scxml-view id="host"></scxml-view>
+  </body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SCXML explorer</title>
+  <script>
+    (function () {
+      var root = document.documentElement, saved = null;
+      try { saved = localStorage.getItem("theme"); } catch (e) {}
+      var theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      root.setAttribute("data-theme", theme);
+      window.__toggleTheme = function () {
+        theme = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+        root.setAttribute("data-theme", theme);
+        try { localStorage.setItem("theme", theme); } catch (e) {}
+      };
+    })();
+  </script>
+  <link rel="stylesheet" href="./css/tokens.css">
+  <link rel="stylesheet" href="./css/site.css">
+  <style>
+    main { max-width: 1600px; padding-top: var(--space-5); }
+    .bar { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-bottom: var(--space-4); }
+    .bar select, .bar button { height: var(--control-h-sm); font: var(--type-ui); color: var(--fg-1); background: var(--surface-1); border: 1px solid var(--border-2); border-radius: var(--radius-2); padding: 0 var(--space-2); }
+    .bar button { cursor: pointer; }
+    #about { color: var(--fg-2); font: var(--type-body-sm); flex: 1 1 320px; }
+    /* custom UI slotted into state cards: plain light-DOM elements, any framework could render these */
+    .slotted { display: flex; align-items: center; gap: 6px; font: var(--type-body-sm); color: var(--fg-2); }
+    .slotted strong { color: var(--state-done); }
+    @media (max-width: 700px) { main { padding: var(--space-2); } h1 { font-size: 30px; } .lede { display: none; } }
+  </style>
+</head>
+<body>
+  <nav><b>scxmljs playground</b>
+    <a href="/">Overview</a>
+    <a href="/element">Custom element</a>
+    <a href="/explorer" aria-current="page">Explorer</a>
+    <span class="spacer"></span><button class="theme" type="button" onclick="__toggleTheme()">Light / Dark</button>
+  </nav>
+  <main>
+    <h1>Explorer</h1>
+    <p class="lede">A running system at three levels, without a canvas: the <em>system</em> (machines, services, messages), one <em>machine</em> as a tree plus a focus on one compound state at a time, and a <em>state</em>'s details. The focus follows the action until you navigate; the right-hand pane always shows what the machine accepts right now.</p>
+    <div class="bar">
+      <label>Sample <select id="sample"></select></label>
+      <button id="restart" type="button">Restart</button>
+      <span id="about"></span>
+    </div>
+    <scxml-explorer>
+      <div slot="state:completed" class="slotted">✓ <strong>Order complete</strong> — custom slotted UI</div>
+      <div slot="state:closed" class="slotted">slotted: closed issues are archived nightly</div>
+    </scxml-explorer>
+  </main>
+  <script type="module" src="./explorer.ts"></script>
+</body>
+</html>

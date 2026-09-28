@@ -1,0 +1,16 @@
+{
+  "name": "scxmljs-example-vue",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --base ./"
+  },
+  "dependencies": {
+    "@tinyactors/scxmljs": "file:../../../packages/scxmljs",
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.9",
+    "vite": "8.3.1"
+  }
+}

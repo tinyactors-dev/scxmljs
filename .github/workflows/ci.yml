@@ -1,0 +1,15 @@
+# All the work happens in scripts/ci, which runs the same way locally. It picks
+# its own mode: light for pushes and pull requests; full (browsers, visual
+# regression, framework apps, tarball in Node/Bun/Deno) for v* tags,
+# release/* branches and manual runs ("Run workflow").
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/ci

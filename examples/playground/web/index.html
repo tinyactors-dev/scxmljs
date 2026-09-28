@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>scxmljs playground</title>
+  <script>
+    (function () {
+      var root = document.documentElement, saved = null;
+      try { saved = localStorage.getItem("theme"); } catch (e) {}
+      var theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      root.setAttribute("data-theme", theme);
+      window.__toggleTheme = function () {
+        theme = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+        root.setAttribute("data-theme", theme);
+        try { localStorage.setItem("theme", theme); } catch (e) {}
+      };
+    })();
+  </script>
+  <link rel="stylesheet" href="./css/tokens.css">
+  <link rel="stylesheet" href="./css/site.css">
+</head>
+<body>
+  <nav><b>scxmljs playground</b>
+    <a href="/" aria-current="page">Overview</a>
+    <a href="/element">Custom element</a>
+    <a href="/explorer">Explorer</a>
+    <span class="spacer"></span><button class="theme" type="button" onclick="__toggleTheme()">Light / Dark</button>
+  </nav>
+  <main>
+    <h1>scxmljs playground</h1>
+    <p class="lede">Demos for <code>@tinyactors/scxmljs</code>: an SCXML 1.0 interpreter (ECMAScript data model) and custom
+      elements that render running statecharts in any framework.</p>
+    <div class="cards">
+      <a class="card" href="/explorer"><span class="dwg">Explorer</span><h2>&lt;scxml-explorer&gt;</h2>
+        <p>A running system at three levels — machines and services, one machine as a tree plus a focus, one state's details — with play, pause and step.</p></a>
+      <a class="card" href="/explorer?theme=neutral"><span class="dwg">Theme</span><h2>Neutral default</h2>
+        <p>The same explorer without the Tinyactors stylesheet: what <code>&lt;scxml-explorer&gt;</code> looks like out of the box, following the page's light or dark scheme.</p></a>
+      <a class="card" href="/element"><span class="dwg">Element</span><h2>&lt;scxml-view&gt;</h2>
+        <p>One chart as nested boxes with SVG arrows, clickable transitions, <code>::part()</code> styling hooks and live source editing.</p></a>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# Playground server, managed with pitchfork (https://pitchfork.jdx.dev).
+# Use the mise tasks: `mise run up`, `mise run logs`, `mise run down`.
+
+[daemons.dev]
+run = "bun run dev"
+ready_http = "http://localhost:4321/"

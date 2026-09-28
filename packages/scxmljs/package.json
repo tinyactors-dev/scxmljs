@@ -1,0 +1,87 @@
+{
+  "name": "@tinyactors/scxmljs",
+  "version": "0.1.0",
+  "description": "A correctness-first SCXML 1.0 interpreter (ECMAScript data model) for the browser and Node, with custom elements for interactive statechart diagrams.",
+  "keywords": [
+    "scxml",
+    "statechart",
+    "statecharts",
+    "state-machine",
+    "harel",
+    "w3c",
+    "interpreter",
+    "quickjs",
+    "sandbox",
+    "custom-elements"
+  ],
+  "author": "Dario Hamidi <dario.hamidi@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/tinyactors-dev/scxmljs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tinyactors-dev/scxmljs.git",
+    "directory": "packages/scxmljs"
+  },
+  "bugs": {
+    "url": "https://github.com/tinyactors-dev/scxmljs/issues"
+  },
+  "type": "module",
+  "sideEffects": [
+    "./dist/explorer.js",
+    "./dist/explorer/element.js",
+    "./dist/view.js",
+    "./dist/view/element.js",
+    "./src/explorer.ts",
+    "./src/explorer/element.ts",
+    "./src/view.ts",
+    "./src/view/element.ts",
+    "*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./trusted": {
+      "types": "./dist/trusted.d.ts",
+      "import": "./dist/trusted.js",
+      "default": "./dist/trusted.js"
+    },
+    "./explorer": {
+      "types": "./dist/explorer.d.ts",
+      "import": "./dist/explorer.js",
+      "default": "./dist/explorer.js"
+    },
+    "./view": {
+      "types": "./dist/view.d.ts",
+      "import": "./dist/view.js",
+      "default": "./dist/view.js"
+    },
+    "./themes/tinyactors.css": "./dist/themes/tinyactors.css",
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "THIRD_PARTY_NOTICES"
+  ],
+  "engines": {
+    "node": ">=22.3"
+  },
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "prepack": "bun run build",
+    "smoke": "node scripts/smoke-node.mjs"
+  },
+  "dependencies": {
+    "@jitl/quickjs-singlefile-browser-release-sync": "0.32.0",
+    "quickjs-emscripten-core": "0.32.0"
+  },
+  "devDependencies": {
+    "happy-dom": "20.14.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

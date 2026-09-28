@@ -1,0 +1,17 @@
+body {
+  margin: 16px;
+  font:
+    14px system-ui,
+    sans-serif;
+}
+scxml-view {
+  display: block;
+  margin-bottom: 16px;
+}
+#wide {
+  --scxml-height: 560px;
+}
+#narrow {
+  width: 400px;
+  --scxml-height: 560px;
+}

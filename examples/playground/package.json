@@ -1,0 +1,15 @@
+{
+  "name": "@tinyactors/scxmljs-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot server.ts",
+    "start": "bun server.ts"
+  },
+  "dependencies": {
+    "@tinyactors/scxmljs": "workspace:*"
+  },
+  "devDependencies": {
+    "happy-dom": "20.14.5"
+  }
+}

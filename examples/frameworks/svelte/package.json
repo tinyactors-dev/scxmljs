@@ -1,0 +1,16 @@
+{
+  "name": "scxmljs-example-svelte",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --base ./"
+  },
+  "dependencies": {
+    "@tinyactors/scxmljs": "file:../../../packages/scxmljs"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "svelte": "5.57.1",
+    "vite": "8.3.1"
+  }
+}

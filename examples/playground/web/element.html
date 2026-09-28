@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>scxml-view element</title>
+  <script>
+    (function () {
+      var root = document.documentElement, saved = null;
+      try { saved = localStorage.getItem("theme"); } catch (e) {}
+      var theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      root.setAttribute("data-theme", theme);
+      window.__toggleTheme = function () {
+        theme = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+        root.setAttribute("data-theme", theme);
+        try { localStorage.setItem("theme", theme); } catch (e) {}
+      };
+    })();
+  </script>
+  <link rel="stylesheet" href="./css/tokens.css">
+  <link rel="stylesheet" href="./css/site.css">
+  <link rel="stylesheet" href="./css/panel.css">
+  <style>
+    /* Styling the component from the outside: ::part() hooks + inherited tokens. */
+    scxml-view::part(final) { font-style: italic; }
+  </style>
+</head>
+<body>
+  <nav><b>scxmljs playground</b>
+    <a href="/">Overview</a>
+    <a href="/element" aria-current="page">Custom element</a>
+    <a href="/explorer">Explorer</a>
+    <span class="spacer"></span><button class="theme" type="button" onclick="__toggleTheme()">Light / Dark</button>
+  </nav>
+  <main>
+    <h1>&lt;scxml-view&gt;</h1>
+    <p class="lede">The whole chart at once, drop-in: <code>&lt;scxml-view src="…"&gt;</code> loads, validates, runs and draws a chart with no JavaScript of your own. Transition labels are buttons that send their event. Here GitHub is attached as an SCXML Event I/O Processor backed by a fake repo, through the element's <code>options</code> property. Open an issue as someone off the allowlist and watch the <code>rejecting</code> regions run in parallel.</p>
+    <div class="split">
+      <scxml-view id="view" class="flush" trusted src="/charts/github-issues.scxml"></scxml-view>
+      <aside class="card" id="panel-slot"></aside>
+    </div>
+    <details id="editor">
+      <summary>Edit the chart source live <span class="status" id="status"></span></summary>
+      <textarea class="source" id="source" spellcheck="false"></textarea>
+    </details>
+    <h2>Zero JavaScript</h2>
+    <p>Inline source, the QuickJS sandbox (the default: safe for charts you didn't write), and nothing else on the page.</p>
+<pre style="overflow-x: auto; max-width: 100%"><code>&lt;scxml-view&gt;
+  &lt;script type="application/scxml+xml"&gt; &lt;scxml …&gt; … &lt;/scxml&gt; &lt;/script&gt;
+&lt;/scxml-view&gt;</code></pre>
+    <scxml-view id="inline">
+      <script type="application/scxml+xml">
+        <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="turnstile" initial="locked">
+          <datamodel><data id="coins" expr="0"/></datamodel>
+          <state id="locked">
+            <transition event="coin" target="unlocked"><assign location="coins" expr="coins + 1"/></transition>
+            <transition event="push"/>
+          </state>
+          <state id="unlocked">
+            <transition event="push" target="locked"/>
+            <transition event="coin" cond="coins &gt; 3" target="broken"/>
+          </state>
+          <final id="broken"/>
+        </scxml>
+      </script>
+    </scxml-view>
+  </main>
+  <script type="module" src="./element.ts"></script>
+</body>
+</html>

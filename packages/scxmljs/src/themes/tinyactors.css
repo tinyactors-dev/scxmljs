@@ -1,0 +1,44 @@
+/*
+ * @tinyactors/scxmljs/themes/tinyactors.css
+ *
+ * Maps the Tinyactors design tokens onto the --scxml-* contract shared by the
+ * scxmljs elements. The page provides the tokens (and loads any fonts they
+ * name); where a token is missing, the element falls back to its neutral
+ * default.
+ *
+ * Three mappings deviate from the obvious token so every text/background pair
+ * meets WCAG AA (checked by examples/playground/test/contrast.test.ts):
+ * subtle text uses --fg-2, faint graphics use --fg-3, and "waiting" text is
+ * the ochre deepened a fifth towards --fg-1.
+ */
+scxml-explorer,
+scxml-view {
+  --scxml-bg: var(--bg-app);
+  --scxml-surface: var(--surface-1);
+  --scxml-surface-2: var(--surface-2);
+  --scxml-surface-3: var(--surface-3);
+  --scxml-fg: var(--fg-1);
+  --scxml-fg-muted: var(--fg-2);
+  --scxml-fg-subtle: var(--fg-2);
+  --scxml-fg-faint: var(--fg-3);
+  --scxml-border: var(--border-1);
+  --scxml-border-2: var(--border-2);
+  --scxml-border-strong: var(--border-strong);
+  --scxml-accent: var(--accent);
+  --scxml-accent-text: var(--accent-fg);
+  --scxml-accent-subtle: var(--accent-subtle);
+  --scxml-on-accent: var(--fg-on-accent);
+  --scxml-running: var(--state-running);
+  --scxml-running-bg: var(--state-running-bg);
+  --scxml-waiting: color-mix(in srgb, var(--state-waiting) 80%, var(--fg-1));
+  --scxml-waiting-bg: var(--state-waiting-bg);
+  --scxml-done: var(--state-done);
+  --scxml-done-bg: var(--state-done-bg);
+  --scxml-error: var(--state-error);
+  --scxml-font-sans: var(--font-sans);
+  --scxml-font-mono: var(--font-mono);
+  --scxml-font-display: var(--font-serif);
+  --scxml-display-weight: 400;
+  --scxml-radius: var(--radius-2);
+  --scxml-duration: var(--dur-fast);
+}

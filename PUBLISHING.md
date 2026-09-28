@@ -39,8 +39,7 @@ In this order:
    **From now on releases publish from GitHub Actions:** `.github/workflows/release.yml` runs on `v*` tags and does only `scripts/publish`, which refuses to run outside Actions, skips versions already on npm, runs the full `scripts/release` check and then `npm publish` through npm *trusted publishing* (OIDC: no token anywhere, provenance attached automatically). One-time setup on npmjs.com: package → Settings → *Trusted Publisher* → GitHub Actions with organization `tinyactors-dev`, repository `scxmljs`, workflow filename `release.yml` (exact, case-sensitive), no environment. Then, under *Publishing access*, choose "Require two-factor authentication and disallow tokens".
    *Dist-tags:* a prerelease version publishes under its first prerelease identifier and never moves `latest` (`0.2.0-dev.3` → `dev`, `0.2.0-beta.1` → `beta`, `1.0.0-rc.1` → `rc`; install with `npm i @tinyactors/scxmljs@dev`). Prereleases need no CHANGELOG entry; other versions go to `latest`.
 8. **After publishing:**
-   - try the real CDN URLs from `docs/bundling.md` (jsDelivr and esm.sh, with the import map it
-     documents); they could only be tested with a local mirror before;
+   - ~~try the real CDN URLs~~ Done (2026-09-28): the documented import map works against jsDelivr (sandboxed `<scxml-view>`), and esm.sh works without a map (trusted);
    - host the API reference: `mise run docs:api` writes `docs/api/` (for example for GitHub
      Pages); the READMEs currently tell readers to generate it themselves;
    - try `<scxml-view>` and `<scxml-explorer>` once in a shipping Safari (CI covers Playwright's

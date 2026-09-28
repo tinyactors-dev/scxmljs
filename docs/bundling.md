@@ -71,8 +71,9 @@ fetched when a sandboxed session is created).
 - CDNs that rewrite imports for you, such as `https://esm.sh/@tinyactors/scxmljs@0.1.0/view`,
   work without the dependency entries.
 
-This map has been tested with the same files served locally, in Chrome. The jsDelivr and esm.sh
-URLs will work once the package is published; they haven't been tried yet.
+Both CDNs were tried with the published 0.1.0 in Chrome: this import map against jsDelivr (a
+sandboxed `<scxml-view>`, QuickJS fetched on demand), and esm.sh without an import map (a
+`trusted` `<scxml-view>`). The sandboxed engine is about 290 KB on first load, so give it a moment.
 
 ## Classic scripts (no modules)
 

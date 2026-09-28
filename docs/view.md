@@ -13,7 +13,7 @@ It needs no JavaScript of your own. Import the module once to register the eleme
 <scxml-view src="traffic-light.scxml"></scxml-view>
 ```
 
-![<scxml-view> in the dark neutral theme](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-dark-00000000.webp)
+![<scxml-view> in the dark neutral theme](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-dark-93a44977.webp)
 
 For charts with hundreds of states, or systems of several machines, use
 [`<scxml-explorer>`](explorer.md) instead; see [large charts](large-charts.md).

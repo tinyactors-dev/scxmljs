@@ -11,6 +11,7 @@
       "!**/dist",
       "!conformance/ecma",
       "!conformance/manifest.json",
+      "!docs/media.lock.json",
       "!examples/playground/web/css/tokens",
       "!examples/frameworks",
       "!**/*.html",

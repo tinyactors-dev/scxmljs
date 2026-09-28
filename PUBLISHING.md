@@ -45,6 +45,14 @@ In this order:
    - try `<scxml-view>` and `<scxml-explorer>` once in a shipping Safari (CI covers Playwright's
      WebKit on Linux, not Safari itself).
 
+## README media
+
+`scripts/readme-media` (also `mise run readme-media`, and the manual `readme-media` workflow: "Run workflow") records a new video of `<scxml-explorer>` with the Tinyactors theme and updates the READMEs:
+- a deterministic ~20 s tour on a paused `PlaybackClock` (fulfilment sample: steps through intake and payment, the fulfilment lanes, the System level while the shipment machine runs, back and step), captured at 2880×1800;
+- `explorer-<hash>.webm` (the video), `explorer-<hash>.webp` (animated preview, 1600 wide) and `explorer-<hash>.png` (full-resolution still);
+- hosted on the orphan branch `readme-media` (one force-pushed commit, newest two sets) and linked through raw.githubusercontent.com. A GitHub release was tried first: its assets are served as `application/octet-stream` with `Content-Disposition: attachment`, so they neither render inline nor play in the browser;
+- the READMEs show the animated preview (npmjs.com strips `<video>`), linked to the video. npm picks up the package README's new media only with the next npm release.
+
 ## Decisions (made)
 
 - **Name:** `@tinyactors/scxmljs`.

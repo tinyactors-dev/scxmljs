@@ -6,6 +6,7 @@ pitchfork = "2.27.0"
 bun = "1.4.1"
 node = "26.10.0"
 deno = "2.9.7"
+ffmpeg = "8.1.2" # scripts/readme-media only (conda build: has libvpx-vp9 and libwebp_anim on macOS and Linux)
 
 # ── tests ────────────────────────────────────────────────────────────────
 
@@ -169,3 +170,9 @@ curl -sS -X POST http://localhost:4321/webhook \
   -d "{\"action\":\"opened\",\"issue\":{\"number\":${usage_number},\"title\":\"test\",\"user\":{\"login\":\"${usage_author}\"}},\"repository\":{\"full_name\":\"acme/widgets\"}}"
 echo
 '''
+
+# ── README media ─────────────────────────────────────────────────────────
+
+[tasks.readme-media]
+description = "Record a new README video of the explorer, push it to the readme-media branch, update and commit the READMEs (-- --dry-run only records)"
+run = "scripts/readme-media"

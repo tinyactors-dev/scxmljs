@@ -1,0 +1,15 @@
+# Records a new README video of the explorer and updates the READMEs ("Run workflow" only).
+# All the work happens in scripts/readme-media, which runs the same way locally.
+name: readme-media
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  readme-media:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/readme-media
+        env:
+          GH_TOKEN: ${{ github.token }}

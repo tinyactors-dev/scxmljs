@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Records a new README video of <scxml-explorer>, uploads it to GitHub and points the
+# READMEs at it. .github/workflows/readme-media.yml ("Run workflow") runs exactly this.
+#
+#   scripts/readme-media               record, encode, upload, update the READMEs, commit, push
+#   scripts/readme-media --dry-run     record and encode only; files go to ./readme-media-out
+#                                      (or --out DIR); nothing is uploaded or committed
+#   scripts/readme-media --no-upload   don't push the media branch (implies no README change)
+#   scripts/readme-media --no-commit   upload and rewrite the READMEs, but don't commit or push
+#
+# Steps: bootstrap the toolchain (mise: bun, node, ffmpeg; Playwright's Chromium) → serve the
+# playground (tests/browser/server.ts) → scripts/media/record.mjs drives the explorer through a
+# deterministic tour on a paused PlaybackClock and captures 2× frames → ffmpeg makes
+#   explorer-<hash>.webm   the video, 2880×1800, VP9
+#   explorer-<hash>.webp   an animated preview, 1600 wide (npm strips <video>; images render everywhere)
+#   explorer-<hash>.png    a full-resolution still
+# → scripts/media/publish.ts pushes them to the orphan branch `readme-media` (one squashed commit,
+# the newest two sets kept, so old links survive one refresh), rewrites the block between
+# <!-- readme-media:start --> and <!-- readme-media:end --> in README.md and
+# packages/scxmljs/README.md, and commits and pushes only those two files.
+# Why a branch and not a release: GitHub serves release assets as application/octet-stream with
+# Content-Disposition: attachment, so they don't render inline or play in the browser;
+# raw.githubusercontent.com serves the branch's files as image/webp, image/png and video/webm.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+dry_run=0
+args=()
+out=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) dry_run=1 ;;
+    --no-upload | --no-commit) args+=("$1") ;;
+    --out) out=$2; shift ;;
+    -h | --help)
+      sed -n '2,/^set /p' scripts/readme-media | sed '$d;s/^# \{0,1\}//'
+      exit 0
+      ;;
+    *) echo "unknown option: $1 (see scripts/readme-media --help)" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+step() {
+  printf '\n\033[1m── %s\033[0m\n' "$1"
+}
+
+# ── toolchain (the same bootstrap as scripts/ci, plus ffmpeg) ────────────────
+if ! command -v mise >/dev/null 2>&1; then
+  step "installing mise"
+  curl -fsSL https://mise.run | sh
+fi
+export PATH="$HOME/.local/bin:$PATH"
+export MISE_YES=1 MISE_TRUSTED_CONFIG_PATHS="$PWD"
+step "tools (mise install bun node ffmpeg)"
+mise install bun node ffmpeg
+step "dependencies (bun install)"
+mise exec -- bun install --frozen-lockfile
+step "chromium (Playwright)"
+if [ "$(uname)" = "Linux" ]; then
+  mise exec -- node node_modules/@playwright/test/cli.js install --with-deps chromium
+else
+  mise exec -- node node_modules/@playwright/test/cli.js install chromium
+fi
+
+# ── record ──────────────────────────────────────────────────────────────────
+work=$(mktemp -d "${TMPDIR:-/tmp}/readme-media.XXXXXX")
+port=${SCXML_MEDIA_PORT:-4393}
+server_pid=""
+cleanup() {
+  if [ -n "$server_pid" ]; then kill "$server_pid" 2>/dev/null || true; fi
+  rm -rf "$work"
+}
+trap cleanup EXIT
+
+step "playground server (tests/browser/server.ts on :$port)"
+PORT=$port mise exec -- bun tests/browser/server.ts >"$work/server.log" 2>&1 &
+server_pid=$!
+for _ in $(seq 60); do
+  if curl -fs -o /dev/null "http://127.0.0.1:$port/explorer"; then break; fi
+  sleep 0.5
+done
+curl -fs -o /dev/null "http://127.0.0.1:$port/explorer" || { cat "$work/server.log"; echo "the server didn't start" >&2; exit 1; }
+
+step "recording the explorer tour"
+mise exec -- node scripts/media/record.mjs --base "http://127.0.0.1:$port" --out "$work/frames"
+kill "$server_pid" 2>/dev/null || true
+server_pid=""
+
+# ── encode ──────────────────────────────────────────────────────────────────
+step "encoding (ffmpeg)"
+ff() { mise exec -- ffmpeg -hide_banner -loglevel error -y "$@"; }
+# the video: full resolution (2880×1800), VP9, 30 fps
+ff -f concat -safe 0 -i "$work/frames/frames.ffconcat" -vf "fps=30,format=yuv420p" \
+  -c:v libvpx-vp9 -crf 30 -b:v 0 -row-mt 1 -deadline good -cpu-used 3 -an "$work/explorer.webm"
+# the inline preview: an animated WebP (renders on GitHub and npm, where <video> doesn't)
+ff -f concat -safe 0 -i "$work/frames/frames.ffconcat" -vf "fps=12,scale=1600:-2:flags=lanczos" \
+  -c:v libwebp_anim -q:v 75 -compression_level 5 -loop 0 -an "$work/explorer.webp"
+# the still: a full-resolution PNG from the tour
+cp "$work/frames/poster.png" "$work/explorer.png"
+ls -l "$work"/explorer.* | awk '{printf "   %-14s %8.1f KB\n", $NF, $5 / 1024}' | sed "s#$work/##"
+
+if [ "$dry_run" = 1 ]; then
+  dest=${out:-readme-media-out}
+  mkdir -p "$dest"
+  cp "$work"/explorer.webm "$work"/explorer.webp "$work"/explorer.png "$dest/"
+  step "dry run: wrote $dest/explorer.{webm,webp,png}; nothing uploaded or committed"
+  exit 0
+fi
+
+step "publishing"
+mise exec -- bun scripts/media/publish.ts --work "$work" ${args[@]+"${args[@]}"}

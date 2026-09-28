@@ -18,6 +18,17 @@ export const TREE = `${REPO}/tree/${BRANCH}`;
 /** Images: npm renders raw URLs, not blob URLs. */
 export const RAW = `${REPO.replace("https://github.com/", "https://raw.githubusercontent.com/")}/${BRANCH}`;
 
+/**
+ * README media (the explorer video, its animated preview and a still) live on an orphan branch,
+ * written by `scripts/readme-media`, and are linked through raw URLs: `${MEDIA}/explorer-<hash>.webp`.
+ */
+export const MEDIA_BRANCH = "readme-media";
+export const MEDIA = `${REPO.replace("https://github.com/", "https://raw.githubusercontent.com/")}/${MEDIA_BRANCH}`;
+/** The READMEs whose media block `scripts/readme-media` rewrites (between these markers). */
+export const MEDIA_READMES = ["README.md", "packages/scxmljs/README.md"];
+export const MEDIA_START = "<!-- readme-media:start -->";
+export const MEDIA_END = "<!-- readme-media:end -->";
+
 /** Markdown files that make up the documentation (checked for links; samples tested). */
 export const DOC_GLOBS = ["README.md", "SECURITY.md", "CHANGELOG.md", "packages/scxmljs/README.md", "docs/**/*.md", "conformance/*.md"];
 

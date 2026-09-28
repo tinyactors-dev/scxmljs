@@ -11,6 +11,10 @@ custom elements that render running statecharts in any framework.
 - **Built for visualisation:** typed events, a playback clock that can pause and step, and a
   view-model for the system, tree and focus views of a running chart.
 
+<!-- readme-media:start -->
+![<scxml-explorer> with a running order-fulfilment system](docs/images/explorer-light.webp)
+<!-- readme-media:end -->
+
 Documentation: the [package README](packages/scxmljs/README.md) (also the npm page), the
 [guides](docs/README.md), [SECURITY.md](SECURITY.md) and the [changelog](CHANGELOG.md).
 

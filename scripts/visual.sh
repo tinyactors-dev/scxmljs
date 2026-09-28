@@ -24,9 +24,13 @@ exec docker run --rm --ipc=host --init \
   -v scxmljs-visual-nm:/work/node_modules \
   -v scxmljs-visual-nm-pkg:/work/packages/scxmljs/node_modules \
   -v scxmljs-visual-nm-playground:/work/examples/playground/node_modules \
-  -e CI=1 -e SCXML_VISUAL=1 \
+  -e CI=1 -e SCXML_VISUAL=1 -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
   "$IMAGE" bash -c "
     set -euo pipefail
+    # the container runs as root: give everything it creates in the working tree (dist/, test
+    # results, updated baselines) back to the host user, or later host builds can't delete it
+    # (Linux; Docker Desktop on macOS maps ownership anyway)
+    trap 'find /work \\( -name node_modules -type d \\) -prune -o -user 0 -print0 | xargs -0r chown \"\$HOST_UID:\$HOST_GID\"' EXIT
     npm install -g --silent bun@${BUN_VERSION} >/dev/null
     bun install --frozen-lockfile >/dev/null
     (cd packages/scxmljs && bun run build >/dev/null)

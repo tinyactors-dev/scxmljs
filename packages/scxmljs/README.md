@@ -13,6 +13,8 @@ systems one level at a time. They are plain custom elements, so they work with a
 <sub>[Full-resolution video](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-08b6af42.webm) (WebM, 2880×1800) · [High-resolution screenshot](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-08b6af42.png) (PNG) · the explorer with the optional Tinyactors theme</sub>
 <!-- readme-media:end -->
 
+**Docs & demos: <https://scxmljs.tinyactors.dev>**: guides, live demos and the API reference.
+
 ## Install
 
 ```sh
@@ -150,7 +152,7 @@ Details: [sandboxed vs trusted](https://github.com/tinyactors-dev/scxmljs/blob/m
 - Elements: [`<scxml-view>`](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/view.md), [`<scxml-explorer>`](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/explorer.md), [theming](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/theming.md), [custom UI and translations](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/custom-ui.md), [large charts](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/large-charts.md), [frameworks](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/frameworks.md)
 - Interpreter: [sandboxed vs trusted](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/sandboxed-vs-trusted.md), [driving charts from the page](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/driving-charts.md), [custom I/O processors](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/io-processors.md), [custom invokers](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/invokers.md), [playback and stepping](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/playback.md), [testing](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/testing.md), [Node and servers](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/node-and-servers.md)
 - Shipping: [bundling, CDNs and classic scripts](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/bundling.md), [Content-Security-Policy](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/csp.md)
-- Reference: [conformance report](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/conformance.md), [deviations from the spec](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/deviations.md), [measurements](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/measurements.md), API reference (`mise run docs:api` in the repository)
+- Reference: [conformance report](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/conformance.md), [deviations from the spec](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/deviations.md), [measurements](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/measurements.md), [API reference](https://scxmljs.tinyactors.dev/api/)
 
 ## Support
 

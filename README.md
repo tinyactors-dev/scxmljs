@@ -18,7 +18,8 @@ custom elements that render running statecharts in any framework.
 <sub>[Full-resolution video](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-08b6af42.webm) (WebM, 2880×1800) · [High-resolution screenshot](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-08b6af42.png) (PNG) · the explorer with the optional Tinyactors theme</sub>
 <!-- readme-media:end -->
 
-Documentation: the [package README](packages/scxmljs/README.md) (also the npm page), the
+**Docs & demos: <https://scxmljs.tinyactors.dev>**: the guides, live demos, the API reference
+and search. In the repository: the [package README](packages/scxmljs/README.md) (also the npm page), the
 [guides](docs/README.md), [SECURITY.md](SECURITY.md) and the [changelog](CHANGELOG.md).
 
 ## Repository layout

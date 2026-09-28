@@ -40,8 +40,7 @@ In this order:
    *Dist-tags:* a prerelease version publishes under its first prerelease identifier and never moves `latest` (`0.2.0-dev.3` → `dev`, `0.2.0-beta.1` → `beta`, `1.0.0-rc.1` → `rc`; install with `npm i @tinyactors/scxmljs@dev`). Prereleases need no CHANGELOG entry; other versions go to `latest`.
 8. **After publishing:**
    - ~~try the real CDN URLs~~ Done (2026-09-28): the documented import map works against jsDelivr (sandboxed `<scxml-view>`), and esm.sh works without a map (trusted);
-   - host the API reference: `mise run docs:api` writes `docs/api/` (for example for GitHub
-     Pages); the READMEs currently tell readers to generate it themselves;
+   - ~~host the API reference~~ Done: it's part of the website, <https://scxmljs.tinyactors.dev/api/> (see *Website*);
    - try `<scxml-view>` and `<scxml-explorer>` once in a shipping Safari (CI covers Playwright's
      WebKit on Linux, not Safari itself).
 
@@ -52,6 +51,46 @@ In this order:
 - `explorer-<hash>.webm` (the video), `explorer-<hash>.webp` (animated preview, 1600 wide) and `explorer-<hash>.png` (full-resolution still);
 - hosted on the orphan branch `readme-media` (one force-pushed commit, newest two sets) and linked through raw.githubusercontent.com. A GitHub release was tried first: its assets are served as `application/octet-stream` with `Content-Disposition: attachment`, so they neither render inline nor play in the browser;
 - the READMEs show the animated preview (npmjs.com strips `<video>`), linked to the video. npm picks up the package README's new media only with the next npm release.
+
+## Website
+
+<https://scxmljs.tinyactors.dev>: landing page (a live `<scxml-view>`, the explorer tour), demos
+(the explorer on the three playground samples, a `<scxml-view>` gallery), every guide plus
+SECURITY and CHANGELOG, the TypeDoc API reference under `/api/`, Pagefind search, and
+`/playground/` (a placeholder until the live editor ships). Sources in `site/`, build in
+`scripts/site/`.
+
+- **Build:** `mise run site:build` → `_site/` (gitignored; builds `docs/api` first if it's
+  missing). `mise run site:check` checks internal links, anchors and assets, that nothing points at
+  localhost, and that every page has a title and a description. `mise run site:serve` serves
+  `_site/` on http://localhost:4400 the way Pages does (directories, 404.html).
+- **Checks:** light CI (`scripts/ci`) runs build + check; `scripts/ci --full` adds
+  `mise run site:test` (Playwright in Chromium: the landing page's live view runs, the explorer
+  steps, search finds results, no horizontal scrolling at 390px, axe on every page in both themes).
+- **Deploy:** `scripts/site-deploy` (or `mise run site:deploy`) installs the toolchain, builds the
+  checked-out commit, checks it, and force-pushes `_site/` as the only commit of the orphan branch
+  `gh-pages` (no history accumulates). `-- --dry-run` stops before the push. Locally it refuses a
+  dirty working tree.
+- **Trigger:** `.github/workflows/site.yml` runs `scripts/site-deploy` on every pushed `v*` tag
+  (it builds the tagged commit, so the site documents the latest release) and on "Run workflow"
+  (builds the chosen branch or tag). Prerelease tags (`v0.2.0-dev.1`, …) are skipped on push, so
+  the site keeps following `latest`; run the workflow by hand on such a tag to publish it anyway.
+  The first deploy (2026-09-28) was built from `main` (0.2.0-dev.0), because `v0.1.0` predates
+  the site; the first release tag after that replaces it.
+- **Pages settings** (configured with `gh api`): source = branch `gh-pages`, folder `/`; custom
+  domain `scxmljs.tinyactors.dev` (also written to `_site/CNAME` on every build); "Enforce HTTPS"
+  on once GitHub has issued the certificate.
+- **DNS** (Cloudflare, zone tinyactors.dev): `CNAME scxmljs → tinyactors-dev.github.io`,
+  **DNS only** (grey cloud: GitHub must see its own IPs to issue the Let's Encrypt certificate).
+- **Recommended:** verify the domain for the organization (GitHub → tinyactors-dev → Settings →
+  Pages → *Add a domain*; add the `TXT _github-pages-challenge-tinyactors-dev.tinyactors.dev`
+  record it shows). Verified domains can't be claimed by another account's Pages site if this
+  one's Pages setting is ever removed (subdomain takeover).
+- **Social preview:** `site/public/og.png` (1200×630) is committed; `mise run site:og` renders it
+  again from a built `_site/`. Set it as the repository's social preview by hand if wanted
+  (Settings → General → Social preview; there's no API for it).
+- **npm:** `packages/scxmljs/package.json` `homepage` points at the site; npmjs.com shows it
+  from the next published version on.
 
 ## Decisions (made)
 

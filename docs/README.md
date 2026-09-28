@@ -39,7 +39,8 @@ with [getting started](getting-started.md).
 
 ## API reference
 
-Generated from the sources with [TypeDoc](https://typedoc.org): run `mise run docs:api` in the
+Online at [scxmljs.tinyactors.dev/api](https://scxmljs.tinyactors.dev/api/). Generated from the
+sources with [TypeDoc](https://typedoc.org); to build it locally, run `mise run docs:api` in the
 repository and open `docs/api/index.html`. Every exported symbol is documented; CI fails on
 missing documentation or broken `{@link}`s.
 

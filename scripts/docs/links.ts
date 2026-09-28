@@ -16,7 +16,7 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 import { $ } from "bun";
-import { BLOB, DOC_GLOBS, MEDIA, MEDIA_BRANCH, MEDIA_END, MEDIA_READMES, MEDIA_START, RAW, REPO, TREE } from "./config.ts";
+import { BLOB, DOC_GLOBS, MEDIA, MEDIA_BRANCH, MEDIA_END, MEDIA_READMES, MEDIA_START, RAW, REPO, SITE, TREE } from "./config.ts";
 import { anchors, links, markdownFiles, ROOT } from "./markdown.ts";
 
 const NPM_README = "packages/scxmljs/README.md";
@@ -108,9 +108,9 @@ for (const f of MEDIA_READMES) {
 const sets = new Set([...mediaSets.values()].flatMap((s) => [...s]));
 if (sets.size > 1) problems.push(`README media: the READMEs link different sets (${[...sets].join(", ")}); run scripts/readme-media`);
 
-// package.json must point at the same repository
+// package.json must point at the website and the same repository
 const pkg = await Bun.file(join(ROOT, "packages/scxmljs/package.json")).json();
-if (pkg.homepage !== `${REPO}#readme`) problems.push(`packages/scxmljs/package.json: homepage should be ${REPO}#readme`);
+if (pkg.homepage !== SITE) problems.push(`packages/scxmljs/package.json: homepage should be ${SITE}`);
 if (pkg.repository?.url !== `git+${REPO}.git`) problems.push(`packages/scxmljs/package.json: repository.url should be git+${REPO}.git`);
 if (pkg.bugs?.url !== `${REPO}/issues`) problems.push(`packages/scxmljs/package.json: bugs.url should be ${REPO}/issues`);
 

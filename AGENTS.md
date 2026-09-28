@@ -28,6 +28,14 @@ Layout:
   the playground pages and `fixtures/*.html` (the BUILT package via an import map; `?csp=` adds a
   Content-Security-Policy). Specs tagged `@visual` are screenshot comparisons that only run inside
   the pinned Playwright Docker image; baselines live in `specs/__screenshots__/`.
+- `site/`: the website https://scxmljs.tinyactors.dev (GitHub Pages). `scripts/site/build.ts` renders
+  it into `_site/` (gitignored): `site/src/layout.ts` is the page shell (head, nav, footer),
+  `site/src/pages.ts` the hand-written pages, `site/src/docs.ts` renders `docs/*.md`, `SECURITY.md`
+  and `CHANGELOG.md` (sidebar `GROUPS`: a new guide must be added there, or the build fails),
+  `site/client/*.ts` are the browser entries (bundled from source with hashed names),
+  `site/styles/site.css` the stylesheet (playground design tokens + the Tinyactors theme),
+  `site/charts/` extra charts, `site/public/` static files (`og.png` from `mise run site:og`).
+  `/playground/` is a placeholder until the live editor lands. Smoke tests: `tests/site/`.
 - `examples/frameworks/{react,vue,svelte,angular}/`: real apps, each its own project and
   lockfile, depending on the library via `file:` (so `dist/` must be built). Their component
   files ARE the snippets in `docs/frameworks.md` (`<!-- doctest: app file=… -->` checks they're
@@ -70,4 +78,6 @@ Layout:
 - `mise run examples:frameworks`: install and build the four framework apps (needed before their browser test)
 - `mise run smoke:tarball`: `npm pack` → empty project → Node, Bun, Deno, and a bundler
 - `scripts/readme-media` (or `mise run readme-media`; the `readme-media.yml` workflow runs it on "Run workflow"): records a 2× tour of `<scxml-explorer>` (Tinyactors theme, paused `PlaybackClock`; `scripts/media/record.mjs` via Playwright/Node), encodes `explorer-<hash>.{webm,webp,png}` with ffmpeg (pinned in `mise.toml`), force-pushes them to the orphan branch `readme-media` (newest 2 sets; raw.githubusercontent URLs, because release assets download as octet-stream/attachment), rewrites the block between `<!-- readme-media:start/end -->` in `README.md` and `packages/scxmljs/README.md` and commits/pushes only those. `-- --dry-run` records into `./readme-media-out`; `--no-upload` / `--no-commit` stop earlier. Don't edit the media block by hand
+- `mise run site:build` / `site:check` / `site:serve`: build the website into `_site/` (about a second once `docs/api` exists) / check its internal links, anchors, assets, titles and descriptions / serve it on :4400 with GitHub Pages semantics. `mise run site:test`: build, then Playwright smoke tests + axe over every page (Chromium; part of `scripts/ci --full`). Light CI runs build + check
+- `scripts/site-deploy` (or `mise run site:deploy`; the `site.yml` workflow runs it on `v*` tags and "Run workflow"): builds the checked-out commit and force-pushes `_site/` as the single commit of the orphan branch `gh-pages`; skips prerelease tags unless run by hand; locally it needs a clean tree (`-- --dry-run` builds and checks only)
 - `mise run up` / `mise run down` / `mise run logs`: playground on http://localhost:4321 (`/explorer`, `/element`)

@@ -6,9 +6,10 @@
  *   - the package README (shown on npm, where relative links break) uses
  *     only absolute links;
  *   - package.json's repository URLs match config.ts;
- *   - README media (config.ts: MEDIA, on the `readme-media` branch) is linked only inside the
- *     generated block of the READMEs that have one, as explorer-<hash>.{webm,webp,png}, the same
- *     set everywhere; the files are checked against origin/readme-media when that ref is fetched.
+ *   - media (config.ts: MEDIA, the `readme-media` branch) are linked as <name>-<hash8>.<ext>, with a
+ *     name and format from docs/media.json and the hash from docs/media.lock.json (scripts/media
+ *     keeps them current); the files are checked against origin/readme-media when that ref is
+ *     fetched. Nothing links docs/images/ (frozen: only old npm READMEs use it).
  * Other external URLs are listed but not fetched (CI stays offline).
  *
  *   bun scripts/docs/links.ts          (mise run docs:links)
@@ -16,7 +17,7 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 import { $ } from "bun";
-import { BLOB, DOC_GLOBS, MEDIA, MEDIA_BRANCH, MEDIA_END, MEDIA_READMES, MEDIA_START, RAW, REPO, SITE, TREE } from "./config.ts";
+import { BLOB, DOC_GLOBS, MEDIA, MEDIA_BRANCH, RAW, REPO, SITE, TREE } from "./config.ts";
 import { anchors, links, markdownFiles, ROOT } from "./markdown.ts";
 
 const NPM_README = "packages/scxmljs/README.md";
@@ -39,25 +40,28 @@ function fromRepoUrl(url: string): string | undefined {
   return undefined;
 }
 
+const mediaSpec: { media: { name: string; formats: string[] }[] } = await Bun.file(join(ROOT, "docs/media.json")).json();
+const mediaLock: Record<string, { hash: string }> = await Bun.file(join(ROOT, "docs/media.lock.json")).json();
+const mediaBranch = (await $`git cat-file -e refs/remotes/origin/${MEDIA_BRANCH}`.cwd(ROOT).quiet().nothrow()).exitCode === 0;
+
 let count = 0;
-const mediaSets = new Map<string, Set<string>>(); // README → media hashes it links
 for (const file of await markdownFiles(DOC_GLOBS)) {
   const text = await Bun.file(join(ROOT, file)).text();
-  const lines = text.split("\n");
-  const blockStart = lines.findIndex((l) => l.includes(MEDIA_START)) + 1;
-  const blockEnd = lines.findIndex((l) => l.includes(MEDIA_END)) + 1;
   for (const { line, url, image } of links(text)) {
     count++;
     const where = `${file}:${line}`;
     if (/^(mailto|tel):/.test(url)) continue;
     if (url.startsWith(`${MEDIA}/`)) {
       const name = url.slice(MEDIA.length + 1);
-      const m = name.match(/^explorer-([0-9a-f]{8})\.(webm|webp|png)$/);
-      if (!m) problems.push(`${where}: README media must be explorer-<hash8>.{webm,webp,png}: ${url}`);
-      else (mediaSets.get(file) ?? mediaSets.set(file, new Set()).get(file)!).add(m[1]!);
-      if (!MEDIA_READMES.includes(file) || line < blockStart || line > blockEnd)
-        problems.push(`${where}: README media may only be linked inside the ${MEDIA_START} block (scripts/readme-media writes it)`);
-      if (m && (await $`git cat-file -e refs/remotes/origin/${MEDIA_BRANCH}`.cwd(ROOT).quiet().nothrow()).exitCode === 0) {
+      const m = name.match(/^(.+)-([0-9a-f]{8})\.([a-z0-9]+)$/);
+      const entry = mediaSpec.media.find((e) => e.name === m?.[1]);
+      if (!m || !entry || !entry.formats.includes(m[3]!))
+        problems.push(`${where}: media must be <name>-<hash8>.<ext> for an entry and format of docs/media.json: ${url}`);
+      else if (mediaLock[entry.name]?.hash !== m[2])
+        problems.push(
+          `${where}: ${name} is stale: docs/media.lock.json has ${entry.name}-${mediaLock[entry.name]?.hash ?? "(none)"} (run scripts/media)`,
+        );
+      if (m && mediaBranch) {
         const present = await $`git cat-file -e refs/remotes/origin/${MEDIA_BRANCH}:${name}`.cwd(ROOT).quiet().nothrow();
         if (present.exitCode !== 0) problems.push(`${where}: ${name} isn't on origin/${MEDIA_BRANCH}`);
       }
@@ -90,6 +94,10 @@ for (const file of await markdownFiles(DOC_GLOBS)) {
       problems.push(`${where}: link leaves the repository: ${url}`);
       continue;
     }
+    if (target.startsWith("docs/images/")) {
+      problems.push(`${where}: docs/images/ is frozen (old npm READMEs link it); add the image to docs/media.json instead: ${url}`);
+      continue;
+    }
     const abs = join(ROOT, target);
     if (!existsSync(abs)) {
       problems.push(`${where}: missing ${relative(ROOT, abs)} (${url})`);
@@ -99,14 +107,6 @@ for (const file of await markdownFiles(DOC_GLOBS)) {
       problems.push(`${where}: no heading #${anchor} in ${target}`);
   }
 }
-
-// every README with a media block links one and the same set
-for (const f of MEDIA_READMES) {
-  const text = await Bun.file(join(ROOT, f)).text();
-  if (!text.includes(MEDIA_START) || !text.includes(MEDIA_END)) problems.push(`${f}: missing the ${MEDIA_START} … ${MEDIA_END} block`);
-}
-const sets = new Set([...mediaSets.values()].flatMap((s) => [...s]));
-if (sets.size > 1) problems.push(`README media: the READMEs link different sets (${[...sets].join(", ")}); run scripts/readme-media`);
 
 // package.json must point at the website and the same repository
 const pkg = await Bun.file(join(ROOT, "packages/scxmljs/package.json")).json();

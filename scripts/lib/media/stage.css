@@ -1,0 +1,41 @@
+/* The media stage: the Tinyactors tokens with fonts from local packages (no network, so every
+   render uses the same font files), and one element filling the viewport. */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/newsreader/400.css";
+@import "@fontsource/newsreader/500.css";
+@import "../../../examples/playground/web/css/tokens/colors.css";
+@import "../../../examples/playground/web/css/tokens/typography.css";
+@import "../../../examples/playground/web/css/tokens/spacing.css";
+@import "../../../examples/playground/web/css/tokens/effects.css";
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+body[data-stage="tinyactors"] {
+  background: var(--bg-app);
+}
+body[data-stage="neutral"] {
+  background: light-dark(#fff, #111);
+  color-scheme: light dark;
+}
+scxml-explorer {
+  --scxml-height: 100vh;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+#stage-frame {
+  padding: 16px;
+  display: inline-block;
+}
+scxml-view {
+  display: block;
+  width: 830px;
+}

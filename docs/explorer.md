@@ -3,7 +3,7 @@
 `<scxml-explorer>` explores a running system one level at a time. It never draws a whole chart,
 so it stays usable for charts with thousands of states and for many machines invoking each other.
 
-![<scxml-explorer> showing an order-fulfilment system](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/main/docs/images/explorer-light.webp)
+![<scxml-explorer> showing an order-fulfilment system](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-light-00000000.webp)
 
 It has two levels:
 

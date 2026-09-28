@@ -1,0 +1,55 @@
+{
+  "$comment": "Every screenshot and video in the documentation. scripts/media renders them (deterministically, in the pinned Playwright image), names them <name>-<hash8>.<ext>, publishes them to the readme-media branch and points the docs at them; docs/media.lock.json records the current hashes. Link them as https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/<name>-<hash8>.<ext>. The scenes (what happens on screen) are in scripts/lib/media/render.mjs.",
+  "media": [
+    {
+      "name": "explorer-tour",
+      "about": "README hero: the explorer following the order-fulfilment system, Tinyactors theme",
+      "scene": "explorer-tour",
+      "theme": "tinyactors",
+      "scheme": "light",
+      "viewport": [1440, 900],
+      "scale": 2,
+      "formats": ["webm", "webp", "png"]
+    },
+    {
+      "name": "explorer-light",
+      "about": "docs/explorer.md, docs/theming.md: the explorer on the fulfilment sample, neutral theme",
+      "scene": "explorer",
+      "theme": "neutral",
+      "scheme": "light",
+      "viewport": [1352, 860],
+      "scale": 2,
+      "formats": ["webp"]
+    },
+    {
+      "name": "explorer-dark",
+      "about": "docs/theming.md: the same, dark",
+      "scene": "explorer",
+      "theme": "neutral",
+      "scheme": "dark",
+      "viewport": [1352, 860],
+      "scale": 2,
+      "formats": ["webp"]
+    },
+    {
+      "name": "view-light",
+      "about": "package README, docs/theming.md: <scxml-view> with the media player chart after play, neutral theme",
+      "scene": "view",
+      "theme": "neutral",
+      "scheme": "light",
+      "viewport": [880, 600],
+      "scale": 2,
+      "formats": ["webp"]
+    },
+    {
+      "name": "view-dark",
+      "about": "docs/view.md, docs/theming.md: the same, dark",
+      "scene": "view",
+      "theme": "neutral",
+      "scheme": "dark",
+      "viewport": [880, 600],
+      "scale": 2,
+      "formats": ["webp"]
+    }
+  ]
+}

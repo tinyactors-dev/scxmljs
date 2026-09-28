@@ -10,7 +10,7 @@
 # docs (samples, links, conformance report, API reference), website (build + check).
 # Heavy (--full only): benchmark harness, the packed tarball in Node/Bun/Deno,
 # framework example apps, browser tests in three engines, website smoke tests,
-# visual regression.
+# visual regression, docs media are current (scripts/media --check; arm64 + Docker).
 #
 # Without a flag the mode comes from the environment, so the workflow stays a
 # single step: full for tags (refs/tags/v*), release branches
@@ -94,5 +94,14 @@ visual_required=0
 if [ "$(uname)" = "Linux" ]; then visual_required=1; fi
 step "website: smoke tests + axe (Chromium)" mise run site:test
 step "visual regression (Docker)" env SCXML_VISUAL_REQUIRED=$visual_required mise run test:visual
+# the docs' screenshots and video show what the code renders now. They render on linux/arm64 only:
+# hosts that can't (amd64 CI, no Docker) skip with a notice (exit 3); scripts/release runs it itself
+media_check() {
+  local code=0
+  scripts/media --check || code=$?
+  if [ "$code" = 3 ]; then return 0; fi
+  return "$code"
+}
+if [ "${SCXML_MEDIA_CHECKED:-0}" != 1 ]; then step "docs media are current (Docker, arm64)" media_check; fi
 
 printf '\n\033[1;32m✓ CI (full) passed in %ss\033[0m\n' "$((SECONDS - started))"

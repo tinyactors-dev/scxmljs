@@ -1,0 +1,38 @@
+# Keeps every screenshot and video in the docs current: on each push to main that can change what
+# they show (and on "Run workflow"). All the work happens in scripts/media, which runs the same way
+# locally: it renders docs/media.json, and only when a hash changed does it push the new files to
+# the readme-media branch, commit the new links to main and start site.yml. Its own commit doesn't
+# start this workflow again (pushes made with GITHUB_TOKEN never trigger workflows).
+# arm64: media render on linux/arm64 only (the same pixels as an Apple-silicon laptop).
+name: media
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/scxmljs/src/**"
+      - "examples/playground/src/explorer/**"
+      - "examples/playground/charts/**"
+      - "examples/playground/web/css/tokens/**"
+      - "docs/examples/**"
+      - "docs/media.json"
+      - "scripts/media"
+      - "scripts/lib/media/**"
+      - "package.json"
+      - "bun.lock"
+      - "mise.toml"
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: media
+  cancel-in-progress: false
+jobs:
+  media:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/media
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCXML_MEDIA_REQUIRED: "1"

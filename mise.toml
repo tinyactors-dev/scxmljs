@@ -6,7 +6,7 @@ pitchfork = "2.27.0"
 bun = "1.4.1"
 node = "26.10.0"
 deno = "2.9.7"
-ffmpeg = "8.1.2" # scripts/readme-media only (conda build: has libvpx-vp9 and libwebp_anim on macOS and Linux)
+ffmpeg = "8.1.2" # scripts/media only (conda build: has libvpx-vp9 and libwebp_anim on macOS and Linux)
 
 # ── tests ────────────────────────────────────────────────────────────────
 
@@ -198,8 +198,13 @@ curl -sS -X POST http://localhost:4321/webhook \
 echo
 '''
 
-# ── README media ─────────────────────────────────────────────────────────
+# ── documentation media ──────────────────────────────────────────────────
 
-[tasks.readme-media]
-description = "Record a new README video of the explorer, push it to the readme-media branch, update and commit the READMEs (-- --dry-run only records)"
-run = "scripts/readme-media"
+[tasks.media]
+description = "Render every screenshot and video in docs/media.json; publish the changed ones and point the docs at them (-- --dry-run only renders)"
+run = "scripts/media"
+alias = "readme-media"
+
+[tasks."media:check"]
+description = "Fail when a screenshot or video in the docs is stale (renders in Docker, compares with docs/media.lock.json)"
+run = "scripts/media --check"

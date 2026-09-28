@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Every screenshot and video in the documentation, rendered from docs/media.json. The media
+# workflow (.github/workflows/media.yml) runs exactly this on every push to main that can change
+# what they show; `scripts/media --check` is part of scripts/ci --full and scripts/release.
+#
+#   scripts/media                 render; if anything changed: encode, push it to the readme-media
+#                                 branch, point the docs at the new files, commit and push main,
+#                                 redeploy the website (from main only; needs a clean tree)
+#   scripts/media --check         render and compare with docs/media.lock.json; exit 1 when stale
+#   scripts/media --dry-run       render and encode everything into ./media-out (or --out DIR)
+#   scripts/media --twice         render twice and fail unless both renders are identical
+#   scripts/media --no-commit     publish the media branch and rewrite the docs, but don't commit
+#   scripts/media --only a,b      only these entries of docs/media.json
+#
+# Deterministic: the pinned Playwright image (linux/arm64), a paused PlaybackClock moved one fixed
+# step at a time, reduced motion, a seeded Math.random, a fixed Date and local fonts. Each file is
+# named <name>-<hash8>.<ext>, hashed from its frames' pixels and the encode settings, so a name
+# changes exactly when what it shows does. Hosts that can't render (no Docker, or not arm64: Chromium
+# crashes under emulation) exit 3 with a notice, or fail when SCXML_MEDIA_REQUIRED=1.
+# The code: scripts/lib/media/ (media.ts drives, render.mjs renders, stage.* is the page).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+case "${1:-}" in
+  -h | --help)
+    sed -n '2,/^set /p' scripts/media | sed '$d;s/^# \{0,1\}//'
+    exit 0
+    ;;
+esac
+
+if ! command -v mise >/dev/null 2>&1; then
+  curl -fsSL https://mise.run | sh
+fi
+export PATH="$HOME/.local/bin:$PATH"
+export MISE_YES=1 MISE_TRUSTED_CONFIG_PATHS="$PWD"
+tools=(bun node)
+case " $* " in *" --check "*) ;; *) tools+=(ffmpeg) ;; esac # --check compares pixels; it never encodes
+mise install --quiet "${tools[@]}" >/dev/null
+mise exec -- bun install --frozen-lockfile >/dev/null
+exec mise exec -- bun scripts/lib/media/media.ts "$@"

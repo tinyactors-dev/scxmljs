@@ -9,8 +9,8 @@ page's light or dark colour scheme.
 
 | Light | Dark |
 |---|---|
-| ![<scxml-view>, light](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/main/docs/images/view-light.webp) | ![<scxml-view>, dark](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/main/docs/images/view-dark.webp) |
-| ![<scxml-explorer>, light](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/main/docs/images/explorer-light.webp) | ![<scxml-explorer>, dark](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/main/docs/images/explorer-dark.webp) |
+| ![<scxml-view>, light](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-light-00000000.webp) | ![<scxml-view>, dark](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-dark-00000000.webp) |
+| ![<scxml-explorer>, light](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-light-00000000.webp) | ![<scxml-explorer>, dark](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-dark-00000000.webp) |
 
 ## Light and dark
 

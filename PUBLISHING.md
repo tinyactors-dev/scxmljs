@@ -44,13 +44,41 @@ In this order:
    - try `<scxml-view>` and `<scxml-explorer>` once in a shipping Safari (CI covers Playwright's
      WebKit on Linux, not Safari itself).
 
-## README media
+## Documentation media
 
-`scripts/readme-media` (also `mise run readme-media`, and the manual `readme-media` workflow: "Run workflow") records a new video of `<scxml-explorer>` with the Tinyactors theme and updates the READMEs:
-- a deterministic ~20 s tour on a paused `PlaybackClock` (fulfilment sample: steps through intake and payment, the fulfilment lanes, the System level while the shipment machine runs, back and step), captured at 2880×1800;
-- `explorer-<hash>.webm` (the video), `explorer-<hash>.webp` (animated preview, 1600 wide) and `explorer-<hash>.png` (full-resolution still);
-- hosted on the orphan branch `readme-media` (one force-pushed commit, newest two sets) and linked through raw.githubusercontent.com. A GitHub release was tried first: its assets are served as `application/octet-stream` with `Content-Disposition: attachment`, so they neither render inline nor play in the browser;
-- the READMEs show the animated preview (npmjs.com strips `<video>`), linked to the video. npm picks up the package README's new media only with the next npm release.
+Every screenshot and video in the docs is listed in `docs/media.json` and rendered by
+`scripts/media` (also `mise run media`). Nothing binary lives on `main`, and nobody updates media
+by hand: the `media` workflow runs `scripts/media` on every push to `main` that can change what
+they show (the library, the playground samples and charts, the tokens, the list itself), and on
+"Run workflow".
+
+- **Entries:** `explorer-tour` (the README hero: a ~20 s tour of `<scxml-explorer>` with the
+  Tinyactors theme, as `.webm` 2880×1800, animated `.webp` 1600 wide, `.png` poster),
+  `explorer-light` / `explorer-dark` and `view-light` / `view-dark` (the neutral theme).
+- **Deterministic:** rendered in the pinned Playwright image on linux/arm64 (Apple-silicon laptops
+  and GitHub's `ubuntu-24.04-arm`; Chromium crashes under amd64 emulation), on a paused clock moved
+  one fixed step at a time, with reduced motion, a seeded `Math.random`, a fixed `Date` and fonts
+  from local packages. Each file is `<name>-<hash8>.<ext>`, the hash taken from its frames' pixels
+  and the encode settings, so a name changes exactly when what it shows changes.
+  `scripts/media --twice` renders twice and fails unless both are identical.
+- **Hosting:** the orphan branch `readme-media` (one force-pushed commit), linked as
+  `https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/<name>-<hash8>.<ext>`. A
+  GitHub release doesn't work: its assets download as attachments instead of rendering. The branch
+  keeps what `main`'s docs link now, what they linked before the last refresh, and everything any
+  `v*` tag's docs link (npm shows every published README forever); the rest is pruned.
+- **When something changed**, `scripts/media` encodes the new files (ffmpeg, pinned in `mise.toml`),
+  pushes them, rewrites the links in the docs whose hash changed, writes `docs/media.lock.json`,
+  commits and pushes `main` (rebasing and retrying on a race) and starts `site.yml`, so the
+  website shows the same media as the docs on `main`. Otherwise it changes nothing.
+- **Safety net:** `scripts/media --check` (`mise run media:check`) fails when the docs are stale;
+  it runs in `scripts/ci --full` and in `scripts/release` (a blocker; on hosts that can't render,
+  such as amd64 CI, it's skipped with a notice). The link checker (`mise run docs:links`, light
+  CI) requires every media link to match `docs/media.lock.json` and to exist on the branch.
+- **Adding an image:** add an entry to `docs/media.json` (and its scene to
+  `scripts/lib/media/render.mjs`), link it with any 8-hex hash, and run `scripts/media` on `main`
+  (or push and let the workflow do it). `scripts/media --dry-run` writes everything to
+  `./media-out` to look at first.
+- `docs/images/view-light.webp` is frozen: only the npm README of 0.1.0 links it.
 
 ## Website
 

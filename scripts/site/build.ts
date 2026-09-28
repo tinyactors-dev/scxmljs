@@ -23,7 +23,7 @@ import { compile, parseSCXML } from "../../packages/scxmljs/src/trusted.ts";
 import { type DocPage, GROUPS, pager, renderMarkdown, sidebar, sitePath, tocHtml } from "../../site/src/docs.ts";
 import { type Assets, page, type Section } from "../../site/src/layout.ts";
 import * as pages from "../../site/src/pages.ts";
-import { MEDIA, MEDIA_END, MEDIA_START, SITE } from "../docs/config.ts";
+import { MEDIA, SITE } from "../docs/config.ts";
 
 const root = new URL("../../", import.meta.url).pathname.replace(/\/$/, "");
 const out = join(root, "_site");
@@ -103,14 +103,12 @@ const emit = (
   extra: Partial<Parameters<typeof page>[0]> = {},
 ) => write(path, page({ path, section, title, description, body, ...common, ...extra }), extra.noindex);
 
-// README media (the explorer tour), from the block scripts/readme-media maintains
-const readme = await Bun.file(join(root, "README.md")).text();
-const block = readme.slice(readme.indexOf(MEDIA_START), readme.indexOf(MEDIA_END));
-const hash = new RegExp(`${MEDIA.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/explorer-([0-9a-f]{8})\\.webp`).exec(block)?.[1];
-const media = hash
-  ? { webp: `${MEDIA}/explorer-${hash}.webp`, png: `${MEDIA}/explorer-${hash}.png`, webm: `${MEDIA}/explorer-${hash}.webm` }
+// the explorer tour, the same files the READMEs link (docs/media.lock.json, written by scripts/media)
+const tour = (await Bun.file(join(root, "docs/media.lock.json")).json())["explorer-tour"]?.hash as string | undefined;
+const media = tour
+  ? { webp: `${MEDIA}/explorer-tour-${tour}.webp`, png: `${MEDIA}/explorer-tour-${tour}.png`, webm: `${MEDIA}/explorer-tour-${tour}.webm` }
   : undefined;
-if (!media) console.warn("  ! no README media block found: the landing page has no explorer tour");
+if (!media) console.warn("  ! docs/media.lock.json has no explorer-tour: the landing page has no explorer tour");
 
 await emit(
   "/",

@@ -45,3 +45,5 @@ playwright-report/
 
 # the documentation website (scripts/site/build.ts)
 /_site/
+/.media/
+/media-out/

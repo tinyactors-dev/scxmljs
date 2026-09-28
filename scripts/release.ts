@@ -99,6 +99,14 @@ if (!String(pkg.repository?.url ?? "").includes(REPO.replace("https://", "")))
 if (blockers.every((b) => !b.startsWith("package.json") && !b.startsWith("publishConfig") && !b.startsWith("repository")))
   pass("required fields present");
 
+// ── docs media ─────────────────────────────────────────────────────────────
+// every screenshot and video must show what this code renders (scripts/media; arm64 + Docker only)
+section("docs media");
+const media = Bun.spawnSync([join(root, "scripts/media"), "--check"], { cwd: root, stdout: "inherit", stderr: "inherit" });
+if (media.exitCode === 0) pass("docs media are current");
+else if (media.exitCode === 3) warn("docs media weren't checked: this host can't render them (needs Docker on arm64)");
+else block("docs media are stale or didn't render: run scripts/media (the media workflow does it on main)");
+
 // ── checks ─────────────────────────────────────────────────────────────────
 section(skipCi ? "scripts/ci (skipped)" : "scripts/ci");
 if (skipCi) {
@@ -106,7 +114,12 @@ if (skipCi) {
   await $`mise run build`.cwd(root).quiet();
   pass("built dist/");
 } else {
-  const ci = Bun.spawnSync([join(root, "scripts/ci"), "--full"], { cwd: root, stdout: "inherit", stderr: "inherit" });
+  const ci = Bun.spawnSync([join(root, "scripts/ci"), "--full"], {
+    cwd: root,
+    stdout: "inherit",
+    stderr: "inherit",
+    env: { ...process.env, SCXML_MEDIA_CHECKED: "1" }, // checked above
+  });
   if (ci.exitCode === 0) pass("scripts/ci passed");
   else block("scripts/ci failed");
 }

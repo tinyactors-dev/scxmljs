@@ -11,9 +11,9 @@ custom elements that render running statecharts in any framework.
 - **Built for visualisation:** typed events, a playback clock that can pause and step, and a
   view-model for the system, tree and focus views of a running chart.
 
-[![<scxml-explorer> following a running order-fulfilment system: the order machine's tree, the focus on its current state, the events it accepts, and the System level with the payment and shipment machines](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-03b12739.webp)](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-03b12739.webm)
+[![<scxml-explorer> following a running order-fulfilment system: the order machine's tree, the focus on its current state, the events it accepts, and the System level with the payment and shipment machines](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-06091531.webp)](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-06091531.webm)
 
-<sub>[Full-resolution video](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-03b12739.webm) (WebM, 2880×1800) · [High-resolution screenshot](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-03b12739.png) (PNG) · the explorer with the optional Tinyactors theme</sub>
+<sub>[Full-resolution video](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-06091531.webm) (WebM, 2880×1800) · [High-resolution screenshot](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-06091531.png) (PNG) · the explorer with the optional Tinyactors theme</sub>
 
 **Docs & demos: <https://scxmljs.tinyactors.dev>**: the guides, live demos, the API reference
 and search. In the repository: the [package README](packages/scxmljs/README.md) (also the npm page), the

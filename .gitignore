@@ -42,3 +42,6 @@ playwright-report/
 .angular/
 .svelte-kit/
 .vite/
+
+# the documentation website (scripts/site/build.ts)
+/_site/

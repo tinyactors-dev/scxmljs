@@ -7,9 +7,10 @@
 #
 # Light: lint, typecheck, build, unit tests with coverage (includes the W3C
 # suite), conformance runner, Node smoke test, package contents, size budgets,
-# docs (samples, links, conformance report, API reference).
+# docs (samples, links, conformance report, API reference), website (build + check).
 # Heavy (--full only): benchmark harness, the packed tarball in Node/Bun/Deno,
-# framework example apps, browser tests in three engines, visual regression.
+# framework example apps, browser tests in three engines, website smoke tests,
+# visual regression.
 #
 # Without a flag the mode comes from the environment, so the workflow stays a
 # single step: full for tags (refs/tags/v*), release branches
@@ -74,6 +75,8 @@ step "docs: code samples" mise run docs:test
 step "docs: links" mise run docs:links
 step "docs: conformance report is current" mise run docs:conformance -- --check
 step "docs: API reference (no warnings)" mise run docs:api
+step "website: build" mise run site:build
+step "website: links, anchors, titles" mise run site:check
 
 if [ "$mode" = light ]; then
   printf '\n\033[1;32m✓ CI (light) passed in %ss\033[0m  \033[2m(release preparation runs scripts/ci --full)\033[0m\n' "$((SECONDS - started))"
@@ -89,6 +92,7 @@ step "browser tests: Chromium, Firefox, WebKit" env SCXML_REQUIRE_FRAMEWORKS=1 m
 # elsewhere they're skipped with a notice when Docker isn't
 visual_required=0
 if [ "$(uname)" = "Linux" ]; then visual_required=1; fi
+step "website: smoke tests + axe (Chromium)" mise run site:test
 step "visual regression (Docker)" env SCXML_VISUAL_REQUIRED=$visual_required mise run test:visual
 
 printf '\n\033[1;32m✓ CI (full) passed in %ss\033[0m\n' "$((SECONDS - started))"

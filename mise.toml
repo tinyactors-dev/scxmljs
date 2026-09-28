@@ -88,6 +88,33 @@ run = "bun scripts/docs/conformance-report.ts"
 description = "Rewrite the repository URL in the docs and package.json (usage: mise run docs:set-repo -- <old URL> [old branch]; the new one is in scripts/docs/config.ts)"
 run = "bun scripts/docs/set-repo.ts"
 
+# ── website (scxmljs.tinyactors.dev) ───────────────────────────────────────
+
+[tasks."site:build"]
+description = "Build the website into _site/ (landing, demos, docs, API reference, search index)"
+run = "bun scripts/site/build.ts"
+
+[tasks."site:check"]
+description = "Check the built website: internal links, anchors and assets, no localhost, a title and description on every page"
+run = "bun scripts/site/check.ts"
+
+[tasks."site:serve"]
+description = "Serve _site/ like GitHub Pages does (http://localhost:4400; -- --port N)"
+run = "bun scripts/site/serve.ts"
+
+[tasks."site:og"]
+description = "Render the social preview image site/public/og.png (needs a built _site/; commit the result)"
+run = "bun scripts/site/og.ts"
+
+[tasks."site:deploy"]
+description = "Build, check and publish the website to GitHub Pages (scripts/site-deploy; -- --dry-run to skip the push)"
+run = "scripts/site-deploy"
+
+[tasks."site:test"]
+description = "Build the website, then smoke-test it in Chromium (live views, explorer, search, 390px, axe)"
+depends = ["site:build"]
+run = ["node node_modules/@playwright/test/cli.js install chromium", "node node_modules/@playwright/test/cli.js test -c tests/site"]
+
 [tasks.release]
 description = "Release DRY RUN: scripts/ci, changelog/git/registry checks, pack + verify the tarball, npm publish --dry-run (never publishes; -- --skip-ci skips scripts/ci)"
 run = "scripts/release"

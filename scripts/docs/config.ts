@@ -11,6 +11,9 @@
 export const REPO = "https://github.com/tinyactors-dev/scxmljs";
 export const BRANCH = "main";
 
+/** The documentation website (built by `scripts/site/build.ts`, deployed to GitHub Pages). */
+export const SITE = "https://scxmljs.tinyactors.dev";
+
 /** Links to files in the repository: `${BLOB}/docs/testing.md`. */
 export const BLOB = `${REPO}/blob/${BRANCH}`;
 /** Links to directories: `${TREE}/examples`. */

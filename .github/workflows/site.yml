@@ -1,0 +1,19 @@
+# Builds and publishes https://scxmljs.tinyactors.dev (GitHub Pages, branch gh-pages) on a
+# release tag, or on "Run workflow". All the work happens in scripts/site-deploy, which skips
+# prerelease tags and runs the same way locally.
+name: site
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: site
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/site-deploy

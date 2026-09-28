@@ -1,5 +1,6 @@
-# Publishes to npm when a v* tag is pushed. All the work happens in
-# scripts/publish (full release check, then npm publish via trusted publishing).
+# Stages a release on npm when a v* tag is pushed. All the work happens in
+# scripts/publish (full release check, then `npm stage publish` via trusted
+# publishing); a maintainer approves the staged version with 2FA on npmjs.com.
 # npm's trusted-publisher settings must name this file: release.yml.
 name: release
 on:

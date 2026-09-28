@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
-# Publishes @tinyactors/scxmljs to npm. Only ever runs in GitHub Actions, from
+# Stages @tinyactors/scxmljs on npm. Only ever runs in GitHub Actions, from
 # .github/workflows/release.yml, on a pushed v* tag, using npm trusted
-# publishing (OIDC): no npm token exists anywhere, and npm attaches a provenance
-# attestation automatically.
+# publishing (OIDC): no npm token exists anywhere, and the package carries a
+# provenance attestation.
+#
+# The trusted publisher is configured for STAGED publishing: CI can only
+# `npm stage publish`. The version becomes public when a maintainer approves it
+# with 2FA: npmjs.com → the package → "Staged Packages" → Approve, or
+# `npm stage list @tinyactors/scxmljs` then `npm stage approve <stage-id>`.
 #
 # Steps:
 #   1. refuse to run outside GitHub Actions (or without the OIDC token)
 #   2. the tag must be v<version from packages/scxmljs/package.json>
 #   3. if that version is already on npm, stop successfully (re-running a tag is harmless)
 #   4. scripts/release: the full release check (changelog, git, registry, full CI, tarball)
-#   5. npm publish
+#   5. npm stage publish (then a maintainer approves it)
 #
 # Release procedure (maintainer): bump the version in packages/scxmljs/package.json, add the
 # CHANGELOG entry with its date, commit, `git tag vX.Y.Z`, `git push origin main vX.Y.Z`.
@@ -49,9 +54,17 @@ fi
 # the full release check; it also installs the toolchain via scripts/ci
 scripts/release
 
-# npm >= 11.5.1 and Node >= 22.14 are needed for trusted publishing; both come from mise.toml.
+# npm >= 11.15.0 (staged publishing; trusted publishing needs 11.5.1) and Node >= 22.14; both come from mise.toml.
 # scripts/ci installed mise in its own process: make it reachable here too.
 export PATH="$HOME/.local/bin:$PATH" MISE_YES=1 MISE_TRUSTED_CONFIG_PATHS="$PWD"
 cd packages/scxmljs
 mise exec -- npm --version
-mise exec -- npm publish --access public --tag "$dist_tag"
+mise exec -- npm stage publish . --access public --tag "$dist_tag" --provenance
+
+cat <<MSG
+
+Staged $name@$version (dist-tag "$dist_tag"). It is NOT public yet: approve it with 2FA on
+npmjs.com (the package → Staged Packages → Approve), or from a terminal:
+  npm stage list $name
+  npm stage approve <stage-id>
+MSG

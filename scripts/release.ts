@@ -1,7 +1,7 @@
 /**
  * Release DRY RUN for @tinyactors/scxmljs. It never publishes: it checks that the
  * tree is releasable, builds the exact tarball that would be published, verifies
- * it, runs `npm publish --dry-run` on it, and prints the command the maintainer
+ * it, runs `npm stage publish --dry-run` on it, and prints the command the maintainer
  * runs later. It exits non-zero while anything blocks a release.
  *
  *   scripts/release            everything, including the full scripts/ci
@@ -167,9 +167,9 @@ try {
   console.log(`  packed ${(info.size / 1024).toFixed(1)} KB, unpacked ${(info.unpackedSize / 1024).toFixed(1)} KB`);
   console.log(`  ${info.integrity}`);
 
-  // ── npm publish --dry-run ────────────────────────────────────────────────
-  section("npm publish --dry-run");
-  const dryRun = ["npm", "publish", tarball, "--dry-run", "--access", "public", "--tag", distTag];
+  // ── npm stage publish --dry-run (CI stages; a maintainer approves) ────────
+  section("npm stage publish --dry-run");
+  const dryRun = ["npm", "stage", "publish", tarball, "--dry-run", "--access", "public", "--tag", distTag];
   // this script must never publish: the only publish invocation is a dry run
   if (!dryRun.includes("--dry-run")) throw new Error("refusing to run npm publish without --dry-run");
   const result = Bun.spawnSync(dryRun, { cwd: tmp, stdout: "pipe", stderr: "pipe" });
@@ -178,8 +178,8 @@ try {
     .split("\n")
     .filter((l) => /Publishing to|name:|version:|package size|unpacked size|total files|tag|access|dry-run/i.test(l));
   for (const l of notable) console.log(`  ${l.replace(/^npm notice\s*/, "")}`);
-  if (result.exitCode === 0) pass("npm publish --dry-run accepted the tarball");
-  else block(`npm publish --dry-run failed: ${out.trim().split("\n").slice(-3).join(" / ")}`);
+  if (result.exitCode === 0) pass("npm stage publish --dry-run accepted the tarball");
+  else block(`npm stage publish --dry-run failed: ${out.trim().split("\n").slice(-3).join(" / ")}`);
 } finally {
   await rm(tmp, { recursive: true, force: true });
 }
@@ -195,7 +195,9 @@ console.log(`
     git tag ${tag} && git push origin main ${tag}
 
   The tag starts .github/workflows/release.yml, which runs scripts/publish: this same check
-  on GitHub, then \`npm publish\` through npm trusted publishing (OIDC, provenance included).
+  on GitHub, then \`npm stage publish\` through npm trusted publishing (OIDC, provenance).
+  Then approve it with 2FA: npmjs.com → the package → Staged Packages → Approve
+  (or \`npm stage list ${name}\` and \`npm stage approve <stage-id>\`).
 `);
 if (blockers.length) {
   console.log("\x1b[1;31m✗ not releasable yet\x1b[0m");

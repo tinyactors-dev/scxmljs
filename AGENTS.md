@@ -35,7 +35,10 @@ Layout:
   `site/client/*.ts` are the browser entries (bundled from source with hashed names),
   `site/styles/site.css` the stylesheet (playground design tokens + the Tinyactors theme),
   `site/charts/` extra charts, `site/public/` static files (`og.png` from `mise run site:og`).
-  `/playground/` is a placeholder until the live editor lands. Smoke tests: `tests/site/`.
+  `/playground/` is the live editor: `site/client/playground.ts` (+ `playground-editor.ts`,
+  CodeMirror, lazy), `diagnostics.ts`, `share.ts`; examples in `site/src/playground-examples.ts`.
+  User charts run only in the sandboxed engine and load only the playground's own `/charts/` files.
+  Smoke tests: `tests/site/` (`*.pw.ts` Playwright, `*.test.ts` bun).
 - `examples/frameworks/{react,vue,svelte,angular}/`: real apps, each its own project and
   lockfile, depending on the library via `file:` (so `dist/` must be built). Their component
   files ARE the snippets in `docs/frameworks.md` (`<!-- doctest: app file=… -->` checks they're

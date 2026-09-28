@@ -56,9 +56,29 @@ In this order:
 
 <https://scxmljs.tinyactors.dev>: landing page (a live `<scxml-view>`, the explorer tour), demos
 (the explorer on the three playground samples, a `<scxml-view>` gallery), every guide plus
-SECURITY and CHANGELOG, the TypeDoc API reference under `/api/`, Pagefind search, and
-`/playground/` (a placeholder until the live editor ships). Sources in `site/`, build in
-`scripts/site/`.
+SECURITY and CHANGELOG, the TypeDoc API reference under `/api/`, Pagefind search, and the
+`/playground/`. Sources in `site/`, build in `scripts/site/`.
+
+- **Playground** (`site/client/playground.ts`, examples in `site/src/playground-examples.ts`):
+  pick an example (traffic light, microwave, media player, sign in, downloads/invoke, the GitHub
+  gatekeeper and order fulfilment with their fake services, a blank chart), edit it in CodeMirror 6
+  (lazy; a textarea until it loads) and it re-runs 400 ms after the last keystroke, disposing the
+  previous session. Parse errors, `SCXMLValidationError` problems and `SCXML_W_*` warnings show
+  inline and in a clickable problems list (`site/client/diagnostics.ts` maps them to source
+  offsets). `<scxml-view>` and `<scxml-explorer>` share one session and `PlaybackClock`; a form
+  sends events with JSON data; the log shows `<log>` output, errors and each macrostep. Share
+  links carry the chart in the hash (`#example=…&chart=…`, raw DEFLATE + base64url,
+  `site/client/share.ts`; ≤ 60,000 characters, ≤ 256 KB inflated; malformed links fall back to an
+  example with a notice). Drafts are kept in localStorage per example. Docs code samples that are
+  whole charts get an "Open in playground" link (made at build time), and so do gallery cards.
+  **Safety:** user charts only ever run in the sandboxed QuickJS engine (`scriptTimeoutMs` 500,
+  `maxMicrosteps` 10,000, 32 MB memory); the loader serves only the playground's own chart files
+  from `/charts/` (never the URL a chart names), so `<invoke src>`, `<data src>` and
+  `<script src>` can't fetch anything else; only the default processors plus an example's
+  in-memory fake services exist (no BasicHTTP). **Sizes** (0.2.0-dev.0, minified, gzip level 9):
+  the page's JS is 205 KB (69 KB gzip) plus 27.5 KB CSS (6.1 KB gzip); lazy: QuickJS 1,149 KB
+  (280 KB gzip) and its glue 34 KB (9 KB), CodeMirror 429 KB (138 KB gzip), the fulfilment
+  services 5 KB (2 KB). About 1.8 MB (≈ 500 KB gzip) once everything has loaded.
 
 - **Build:** `mise run site:build` → `_site/` (gitignored; builds `docs/api` first if it's
   missing). `mise run site:check` checks internal links, anchors and assets, that nothing points at
@@ -66,7 +86,10 @@ SECURITY and CHANGELOG, the TypeDoc API reference under `/api/`, Pagefind search
   `_site/` on http://localhost:4400 the way Pages does (directories, 404.html).
 - **Checks:** light CI (`scripts/ci`) runs build + check; `scripts/ci --full` adds
   `mise run site:test` (Playwright in Chromium: the landing page's live view runs, the explorer
-  steps, search finds results, no horizontal scrolling at 390px, axe on every page in both themes).
+  steps, search finds results, the playground runs, re-runs edits, reports problems, sends
+  events through fake services, stops a runaway script, round-trips a share link and switches
+  tabs at 390px, no horizontal scrolling at 390px, axe on every page in both themes).
+  `tests/site/*.test.ts` (under `bun test`) cover share-link encoding and the diagnostics mapping.
 - **Deploy:** `scripts/site-deploy` (or `mise run site:deploy`) installs the toolchain, builds the
   checked-out commit, checks it, and force-pushes `_site/` as the only commit of the orphan branch
   `gh-pages` (no history accumulates). `-- --dry-run` stops before the push. Locally it refuses a

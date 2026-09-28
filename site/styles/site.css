@@ -835,3 +835,370 @@ h3 {
 .prose td:first-child code {
   white-space: nowrap;
 }
+
+/* ── playground ──────────────────────────────────────────────────────────── */
+.playground {
+  --pg-fg: var(--fg-1);
+  --pg-fg-subtle: var(--fg-2);
+  --pg-border: var(--border-1);
+  --pg-border-strong: var(--border-strong);
+  --pg-accent: var(--accent);
+  --pg-surface: var(--surface-1);
+  --pg-surface-2: var(--surface-2);
+  --pg-error: var(--state-error);
+  --pg-warning: var(--state-waiting);
+  --pg-font-mono: var(--font-mono);
+  --pg-editor-bg: var(--surface-1);
+  --pg-editor-gutter: var(--surface-2);
+  --pg-editor-active: color-mix(in srgb, var(--accent) 7%, transparent);
+  --pg-editor-selection: color-mix(in srgb, var(--accent) 22%, transparent);
+  --pg-editor-match: color-mix(in srgb, var(--accent) 16%, transparent);
+  --pg-hl-tag: var(--pine-600);
+  --pg-hl-attr: var(--slate-600);
+  --pg-hl-string: var(--madder-600);
+  --pg-hl-comment: var(--fg-3);
+  --pg-height: clamp(460px, calc(100vh - var(--header-h) - 260px), 820px);
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--gutter) var(--space-12);
+}
+[data-theme="dark"] .playground {
+  --pg-hl-tag: var(--pine-300);
+  --pg-hl-attr: var(--slate-300);
+  --pg-hl-string: var(--rose-400);
+}
+.pg-intro .lede {
+  max-width: 88ch;
+}
+.pg-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  margin: var(--space-4) 0 var(--space-2);
+}
+.pg-picker {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  font: var(--type-ui);
+}
+.pg-picker select,
+.pg-send input {
+  height: var(--control-h-sm);
+  font: var(--type-ui);
+  color: var(--fg-1);
+  background: var(--surface-1);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-2);
+  padding: 0 var(--space-2);
+}
+.pg-about {
+  flex: 1 1 280px;
+  color: var(--fg-2);
+  font-size: var(--fs-14);
+}
+.pg-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.pg-actions .button,
+.pg-send .button,
+.pg-log-head .button {
+  height: var(--control-h-sm);
+  padding: 0 var(--space-3);
+  font-size: var(--fs-13);
+}
+.pg-status {
+  margin: 0 0 var(--space-2);
+  min-height: 1.4em;
+  font: var(--type-ui);
+  color: var(--fg-2);
+}
+.pg-status::before {
+  content: "●";
+  margin-right: var(--space-2);
+  color: var(--state-running);
+}
+.pg-status[data-kind="busy"]::before {
+  color: var(--state-waiting);
+}
+.pg-status[data-kind="error"]::before {
+  color: var(--state-error);
+}
+.pg-status[data-kind="idle"]::before {
+  color: var(--state-done);
+}
+.pg-notice {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.pg-notice[data-kind="warning"] {
+  border-left: 3px solid var(--state-waiting);
+}
+.pg-notice .linklike {
+  font: inherit;
+  color: var(--text-link);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.pg-link {
+  width: min(100%, 60ch);
+  font: var(--fw-regular) var(--fs-12) var(--font-mono);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-2);
+  background: var(--surface-1);
+  color: var(--fg-1);
+}
+.pg-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-1);
+  margin-bottom: var(--space-3);
+}
+.pg-tabs button {
+  font: var(--type-ui);
+  color: var(--fg-2);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-2) var(--space-3);
+  min-height: 36px;
+  cursor: pointer;
+}
+.pg-tabs button[aria-selected="true"] {
+  color: var(--fg-1);
+  border-bottom-color: var(--accent);
+}
+.pg-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.pg-edit,
+.pg-run {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.pg-editor {
+  height: var(--pg-height);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.pg-editor .cm-editor {
+  flex: 1;
+  min-height: 0;
+}
+.pg-loading {
+  margin: var(--space-4);
+  color: var(--fg-2);
+}
+.pg-fallback {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  resize: none;
+  padding: var(--space-3);
+  font: var(--fw-regular) 13px / 1.55 var(--font-mono);
+  color: var(--fg-1);
+  background: var(--surface-1);
+  tab-size: 2;
+}
+.pg-problems-box summary {
+  cursor: pointer;
+  font: var(--type-ui);
+  color: var(--fg-2);
+}
+.pg-problems {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  max-height: 180px;
+  overflow: auto;
+}
+.pg-problems button {
+  width: 100%;
+  text-align: left;
+  font: var(--fw-regular) var(--fs-13) / 1.4 var(--font-sans);
+  color: var(--fg-1);
+  background: var(--surface-1);
+  border: 1px solid var(--border-1);
+  border-left: 3px solid var(--state-waiting);
+  border-radius: var(--radius-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+.pg-problems button[data-severity="error"] {
+  border-left-color: var(--state-error);
+}
+.pg-problems button:hover {
+  border-color: var(--border-strong);
+}
+.pg-problems code {
+  color: var(--fg-2);
+  font-size: var(--fs-12);
+}
+.pg-sev {
+  font: var(--type-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+.pg-line {
+  color: var(--fg-2);
+}
+.pg-stage {
+  height: var(--pg-height);
+  overflow: auto;
+  position: relative;
+  transition: opacity var(--dur-base);
+}
+.playground[data-stale] .pg-stage {
+  opacity: 0.55;
+}
+.pg-view,
+.pg-explorer {
+  display: block;
+  height: 100%;
+  --scxml-height: 100%;
+  border: 0;
+}
+.playground[data-tab="explore"] .pg-view,
+.playground:not([data-tab="explore"]) .pg-explorer {
+  display: none;
+}
+.pg-send {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: end;
+}
+.pg-send label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font: var(--type-ui);
+  color: var(--fg-2);
+}
+.pg-send label:first-child input {
+  width: 14ch;
+}
+.pg-send label:nth-child(2) {
+  flex: 1 1 200px;
+}
+.pg-send input {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  min-height: 32px;
+}
+.pg-suggestions {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.pg-suggestions .chip {
+  font: var(--fw-regular) var(--fs-12) / 1 var(--font-mono);
+  color: var(--accent-fg);
+  background: var(--surface-1);
+  border: 1px solid var(--border-2);
+  border-radius: 999px;
+  padding: var(--space-2) var(--space-3);
+  min-height: 28px;
+  cursor: pointer;
+}
+.pg-suggestions .chip:hover {
+  border-color: var(--accent);
+}
+.pg-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pg-log-head h2 {
+  font: var(--type-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--fg-2);
+  margin: 0;
+}
+.pg-log {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  height: 180px;
+  overflow: auto;
+  font: var(--fw-regular) var(--fs-12) / 1.6 var(--font-mono);
+  background: var(--surface-code);
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-2);
+  color: var(--code-fg);
+}
+.pg-log li {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pg-log li[data-kind="error"] {
+  color: var(--state-error);
+}
+.pg-log li[data-kind="step"] {
+  color: var(--fg-2);
+}
+.pg-log li[data-kind="send"] {
+  color: var(--accent-fg);
+}
+.pg-log li[data-kind="info"] {
+  color: var(--fg-2);
+  font-style: italic;
+}
+/* wide: the editor is always there, so the Edit tab isn't needed */
+@media (min-width: 1001px) {
+  .pg-tabs [data-pg-tab="edit"] {
+    display: none;
+  }
+  .pg-tabs {
+    margin-left: calc(5 / 11 * 100% + var(--space-5) * 6 / 11);
+  }
+}
+/* narrow: one panel at a time */
+@media (max-width: 1000px) {
+  .pg-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .playground:not([data-tab="edit"]) .pg-edit,
+  .playground[data-tab="edit"] .pg-run {
+    display: none;
+  }
+  .playground {
+    --pg-height: clamp(380px, calc(100vh - var(--header-h) - 220px), 680px);
+  }
+}
+@media (max-width: 640px) {
+  .playground {
+    padding: var(--space-4) var(--space-4) var(--space-10);
+  }
+  .pg-intro .lede {
+    font-size: var(--fs-16);
+  }
+}
+
+/* "Open in playground" under SCXML samples in the docs */
+.code-with-action {
+  position: relative;
+}
+.code-with-action .open-in-playground {
+  display: inline-block;
+  margin: calc(-1 * var(--space-3)) 0 var(--space-4);
+  font: var(--type-ui);
+}

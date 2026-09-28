@@ -1,6 +1,7 @@
 /** Page bodies that aren't rendered from Markdown: landing, demos, playground placeholder, search, 404. */
 import { REPO } from "../../scripts/docs/config.ts";
 import { esc } from "./layout.ts";
+import { EXAMPLES } from "./playground-examples.ts";
 
 export interface Media {
   webp: string;
@@ -8,8 +9,8 @@ export interface Media {
   webm: string;
 }
 
-/** Charts shown in the gallery: file name in /charts/, title, one-line description. */
-export const GALLERY: { file: string; title: string; text: string }[] = [
+/** Charts shown in the gallery: file name in /charts/, title, one-line description, and the data label clicks send (`event-data`). */
+export const GALLERY: { file: string; title: string; text: string; eventData?: Record<string, unknown> }[] = [
   {
     file: "traffic-light.scxml",
     title: "Traffic light",
@@ -28,7 +29,8 @@ export const GALLERY: { file: string; title: string; text: string }[] = [
   {
     file: "login.scxml",
     title: "Sign in",
-    text: "Guards on event data and <assign>: the smallest useful chart. Send login with data to sign in.",
+    text: "Guards on event data and <assign>: the smallest useful chart. Clicking login sends {user: 'ada'} (set with the event-data attribute).",
+    eventData: { login: { user: "ada" } },
   },
 ];
 
@@ -88,7 +90,7 @@ export function demosIndex(): string {
   <div class="demo-cards">
     <a class="card" href="/demos/explorer/"><h2>Explorer</h2><p>Three systems — an order pipeline with invoked payment and shipping machines, a 333-state support desk, and a GitHub gatekeeper — with playback controls.</p></a>
     <a class="card" href="/demos/gallery/"><h2>Chart gallery</h2><p>Classic statecharts drawn by <code>&lt;scxml-view&gt;</code>: parallel regions, history, delayed events, guards. Click a transition to send its event.</p></a>
-    <a class="card" href="/playground/"><h2>Playground</h2><p>Edit a chart and watch it run. Coming soon.</p></a>
+    <a class="card" href="/playground/"><h2>Playground</h2><p>Edit a chart and watch it re-run as you type, in the sandboxed engine: diagnostics in the editor, playback controls, share links.</p></a>
   </div>
 </div>`;
 }
@@ -117,8 +119,8 @@ export function gallery(): string {
   <div class="gallery">
 ${GALLERY.map(
   (c) => `    <figure class="card">
-      <scxml-view trusted fit src="/charts/${c.file}" data-gallery aria-label="${esc(c.title)} statechart"></scxml-view>
-      <figcaption><h2>${esc(c.title)}</h2><p>${esc(c.text)} <a href="/charts/${c.file}">Source</a></p></figcaption>
+      <scxml-view trusted fit src="/charts/${c.file}"${c.eventData ? ` event-data="${esc(JSON.stringify(c.eventData))}"` : ""} data-gallery aria-label="${esc(c.title)} statechart"></scxml-view>
+      <figcaption><h2>${esc(c.title)}</h2><p>${esc(c.text)} <a href="/charts/${c.file}">Source</a> · <a href="/playground/?example=${c.file.replace(/\.scxml$/, "")}">Open in playground</a></p></figcaption>
     </figure>`,
 ).join("\n")}
   </div>
@@ -126,12 +128,52 @@ ${GALLERY.map(
 }
 
 export function playground(): string {
-  return `<div class="wrap">
-  <h1 class="page-title">Playground</h1>
-  <p class="lede">Edit a statechart and watch it run, in the sandboxed engine.</p>
-  <div class="card notice">
-    <h2>Coming soon</h2>
-    <p>The live editor is being built. Until then, the <a href="/demos/gallery/">gallery</a> runs example charts, and <a href="/docs/getting-started/">getting started</a> shows how to run your own.</p>
+  const first = EXAMPLES[0]!;
+  return `<div class="playground" id="playground" data-tab="view">
+  <div class="pg-intro" data-pagefind-body>
+    <h1 class="page-title">Playground</h1>
+    <p class="lede">Pick an example, edit its SCXML, and it re-runs as you type. Charts run in the <a href="/docs/sandboxed-vs-trusted/">sandboxed engine</a>: they can't touch this page or the network, and runaway scripts are stopped. Click a transition to send its event, or use the form below the diagram. New to SCXML? Start with <a href="/docs/getting-started/">getting started</a>.</p>
+  </div>
+  <div class="pg-bar">
+    <label class="pg-picker">Example <select id="pg-example">${EXAMPLES.map((e) => `<option value="${e.id}">${esc(e.title)}</option>`).join("")}</select></label>
+    <span class="pg-about" id="pg-about">${esc(first.text)}</span>
+    <span class="pg-actions">
+      <button class="button" id="pg-reset" type="button">Reset</button>
+      <button class="button" id="pg-download" type="button">Download</button>
+      <button class="button primary" id="pg-share" type="button">Share link</button>
+    </span>
+  </div>
+  <p class="pg-status" id="pg-status" role="status" aria-live="polite">Loading…</p>
+  <div class="pg-notice notice" id="pg-notice" hidden></div>
+  <div class="pg-tabs" role="tablist" aria-label="Playground panels">
+    <button type="button" role="tab" data-pg-tab="edit" aria-selected="false" aria-controls="pg-panel-edit">Edit</button>
+    <button type="button" role="tab" data-pg-tab="view" aria-selected="true" aria-controls="pg-panel-run">Diagram</button>
+    <button type="button" role="tab" data-pg-tab="explore" aria-selected="false" aria-controls="pg-panel-run">Explorer</button>
+  </div>
+  <div class="pg-grid">
+    <section class="pg-edit" id="pg-panel-edit" aria-label="Editor">
+      <div class="pg-editor card" id="pg-editor"><p class="pg-loading">Loading the editor…</p></div>
+      <details class="pg-problems-box" open>
+        <summary>Problems: <span id="pg-problem-count">none</span></summary>
+        <ul class="pg-problems" id="pg-problems"></ul>
+      </details>
+    </section>
+    <section class="pg-run" id="pg-panel-run" aria-label="Running chart">
+      <div class="pg-stage card">
+        <scxml-view class="pg-view" id="pg-view" direction="auto" fit aria-label="The chart, running"></scxml-view>
+        <scxml-explorer class="pg-explorer" id="pg-explorer" aria-label="The chart in the explorer"></scxml-explorer>
+      </div>
+      <form class="pg-send" id="pg-send" aria-label="Send an event">
+        <label>Event <input id="pg-send-name" name="event" required placeholder="e.g. go" autocomplete="off" spellcheck="false"></label>
+        <label>Data <input id="pg-send-data" name="data" placeholder='JSON, e.g. {"user": "ada"}' autocomplete="off" spellcheck="false"></label>
+        <button class="button" type="submit">Send</button>
+        <div class="pg-suggestions" id="pg-suggestions" aria-label="Suggested events"></div>
+      </form>
+      <div class="pg-log-box">
+        <div class="pg-log-head"><h2>Log</h2><button class="button" id="pg-log-clear" type="button">Clear</button></div>
+        <ol class="pg-log" id="pg-log" aria-label="Log: <log> output, errors and steps"></ol>
+      </div>
+    </section>
   </div>
 </div>`;
 }

@@ -5,7 +5,7 @@
  *
  *   /                      landing page (a live <scxml-view>, the explorer tour, features)
  *   /demos/                demos index · /demos/explorer/ · /demos/gallery/
- *   /playground/           the live editor (placeholder until site phase 2)
+ *   /playground/           the live editor (sandboxed engine, CodeMirror, share links)
  *   /docs/…                docs/*.md, SECURITY.md, CHANGELOG.md rendered (sidebar, TOC, pager)
  *   /api/                  the TypeDoc reference (`mise run docs:api`; built here if missing)
  *   /search/               Pagefind UI over the build-time index in /pagefind/
@@ -39,7 +39,7 @@ await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 
 // ── client bundles ────────────────────────────────────────────────────────
-const entries = ["common", "landing", "gallery", "explorer", "search"].map((n) => join(root, "site/client", `${n}.ts`));
+const entries = ["common", "landing", "gallery", "explorer", "search", "playground"].map((n) => join(root, "site/client", `${n}.ts`));
 const bundle = await Bun.build({
   entrypoints: [...entries, join(root, "site/styles/site.css")],
   outdir: join(out, "assets"),
@@ -148,8 +148,9 @@ await emit(
   "/playground/",
   "playground",
   "Playground",
-  "Edit an SCXML statechart and watch it run in the sandboxed engine (coming soon).",
+  "Edit an SCXML statechart and watch it re-run as you type, in the sandboxed engine: live diagram and explorer, diagnostics, playback controls and share links.",
   pages.playground(),
+  { scripts: ["playground"] },
 );
 await emit("/search/", "search", "Search", "Search the scxmljs documentation.", pages.search(), {
   scripts: ["search"],

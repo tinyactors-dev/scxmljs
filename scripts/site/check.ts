@@ -69,13 +69,16 @@ for (const [file, text] of html) {
     links++;
     const [pathPart, hash] = raw.split("#", 2) as [string, string | undefined];
     const base = posix.dirname(`/${file}`);
-    const target = pathPart === "" ? file : resolve(pathPart.startsWith("/") ? pathPart : posix.join(base, pathPart.split("?")[0]!));
+    const path = pathPart.split("?")[0]!; // a query string doesn't change which file is served
+    const target = path === "" ? file : resolve(path.startsWith("/") ? path : posix.join(base, path));
     if (!target) {
       problems.push(`${file}: broken link ${raw}`);
       continue;
     }
-    // anchors are checked into our own pages; TypeDoc's are generated client-side in places
-    if (hash && target.endsWith(".html") && !target.startsWith("api/") && !idsOf(target).has(decodeURIComponent(hash)))
+    // anchors are checked into our own pages; TypeDoc's are generated client-side in places.
+    // The playground's hash is app state (a shared chart), not an anchor.
+    const appState = target === "playground/index.html" && /^(example|chart)=/.test(hash ?? "");
+    if (hash && !appState && target.endsWith(".html") && !target.startsWith("api/") && !idsOf(target).has(decodeURIComponent(hash)))
       problems.push(`${file}: no #${hash} on ${target}`);
   }
 }

@@ -71,6 +71,106 @@ test("docs: a guide renders with sidebar, TOC and highlighted code", async ({ pa
   await expect(page.locator(".prose pre.shiki").first()).toBeVisible();
 });
 
+// ── playground ──────────────────────────────────────────────────────────
+type PlaygroundHandle = { getText(): string; setText(t: string): void; session?: { configuration: { id: string }[] } };
+const pg = (page: Page) => ({
+  states: () =>
+    page.evaluate(() => ((window as any).__playground as PlaygroundHandle).session?.configuration.map((s) => s.id).join(",") ?? ""),
+  edit: (fn: (text: string) => string) =>
+    page.evaluate((src) => {
+      const p = (window as any).__playground as PlaygroundHandle;
+      p.setText(new Function("t", `return (${src})(t)`)(p.getText()));
+    }, fn.toString()),
+});
+
+test("playground: runs an example, re-runs edits, shows problems", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/playground/?example=traffic-light");
+  await expect(page.locator("#pg-status")).toHaveText("Running");
+  await expect(page.locator("#pg-editor .cm-editor")).toBeVisible(); // CodeMirror replaced the textarea
+  const { states, edit } = pg(page);
+  await expect.poll(states).toContain("red");
+  // an edit re-runs the chart: start in yellow instead
+  await edit((t) => t.replace('initial="red"', 'initial="yellow"'));
+  await expect.poll(states).toContain("yellow");
+  // a parse error: a diagnostic in the list and the editor, the last good run stays up
+  await edit((t) => t.replace('<state id="green">', '<state id="green"'));
+  await expect(page.locator("#pg-status")).toHaveText("Not well-formed XML");
+  const problem = page.locator("#pg-problems button[data-severity=error]");
+  await expect(problem).toHaveCount(1);
+  await expect(page.locator("#pg-editor .cm-lintRange-error")).toHaveCount(1);
+  await problem.click();
+  await expect(page.locator("#pg-editor .cm-content")).toBeFocused();
+  // a validation problem (unknown target) is reported too
+  await edit((t) => t.replace('<state id="green"', '<state id="green">').replace('target="green"', 'target="nowhere"'));
+  await expect(page.locator("#pg-status")).toContainText("Invalid");
+  await expect(page.locator("#pg-problems")).toContainText("nowhere");
+  expect(errors).toEqual([]);
+});
+
+test("playground: sending events, and the fake services of the gatekeeper", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/playground/?example=login");
+  const { states } = pg(page);
+  await expect.poll(states).toContain("signed-out");
+  await page.locator("#pg-suggestions button", { hasText: "login as ada" }).click();
+  await expect.poll(states).toContain("signed-in");
+  await page.fill("#pg-send-name", "logout");
+  await page.click("#pg-send button[type=submit]");
+  await expect.poll(states).toContain("signed-out");
+
+  await page.selectOption("#pg-example", "gatekeeper");
+  await expect(page.locator("#pg-status")).toHaveText("Running");
+  await page.locator("#pg-suggestions button", { hasText: "issue by mallory" }).click();
+  await expect(page.locator("#pg-log")).toContainText("closed: #1", { timeout: 15_000 });
+  expect(errors).toEqual([]);
+});
+
+test("playground: a runaway script is stopped", async ({ page }) => {
+  await page.goto("/playground/?example=blank");
+  await expect(page.locator("#pg-status")).toHaveText("Running");
+  await pg(page).edit((t) => t.replace('<assign location="count" expr="count + 1"/>', "<script>while (true) {}</script>"));
+  await expect(page.locator("#pg-status")).toHaveText("Running");
+  await page.locator("#pg-suggestions button", { hasText: "go" }).click();
+  await expect(page.locator("#pg-notice")).toContainText("was stopped");
+  await expect(page.locator("#pg-log")).toContainText("interrupted");
+});
+
+test("playground: share links round-trip; broken ones fall back to an example", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/playground/?example=microwave");
+  await expect(page.locator("#pg-status")).toHaveText("Running");
+  await pg(page).edit((t) => t.replace('name="microwave"', 'name="shared-oven"'));
+  await page.click("#pg-share");
+  await expect(page).toHaveURL(/#example=microwave&chart=[\w-]+$/);
+  const url = page.url();
+  await page.evaluate(() => localStorage.clear());
+  await page.goto("about:blank");
+  await page.goto(url);
+  await expect(page.locator("#pg-notice")).toContainText("shared link");
+  expect(await page.evaluate(() => ((window as any).__playground as PlaygroundHandle).getText())).toContain("shared-oven");
+
+  await page.goto("about:blank");
+  await page.goto("/playground/#example=login&chart=AAAA");
+  await expect(page.locator("#pg-notice")).toContainText("couldn't be opened");
+  await expect(page.locator("#pg-example")).toHaveValue("login");
+  await expect(page.locator("#pg-status")).toHaveText("Running");
+});
+
+test.describe("playground at 390px", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test("Edit / Diagram / Explorer tabs", async ({ page }) => {
+    await page.goto("/playground/");
+    await expect(page.locator("#pg-view")).toBeVisible();
+    await expect(page.locator("#pg-editor")).toBeHidden();
+    await page.click("[data-pg-tab=edit]");
+    await expect(page.locator("#pg-editor")).toBeVisible();
+    await expect(page.locator("#pg-view")).toBeHidden();
+    await page.click("[data-pg-tab=explore]");
+    await expect(page.locator("#pg-explorer")).toBeVisible();
+  });
+});
+
 const PAGES = [
   "/",
   "/docs/",

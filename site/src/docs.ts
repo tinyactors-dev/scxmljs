@@ -3,11 +3,14 @@
  * build-time highlighting, GitHub-compatible heading anchors (so every existing `#anchor` link
  * keeps working), repository links rewritten to site routes, a sidebar and an on-page TOC.
  */
+
 import { dirname, join, normalize } from "node:path";
+import { deflateRawSync } from "node:zlib";
 import { Marked, type Tokens } from "marked";
 import { createHighlighter, type Highlighter } from "shiki";
 import { BLOB, BRANCH, REPO, SITE, TREE } from "../../scripts/docs/config.ts";
 import { slug } from "../../scripts/docs/markdown.ts";
+import { toBase64url } from "../client/share.ts";
 import { esc } from "./layout.ts";
 
 export interface DocPage {
@@ -119,6 +122,17 @@ export function rewriteHref(href: string, file: string, images: Set<string>): st
   return `${isDir ? TREE : BLOB}/${target}${hash}`;
 }
 
+/**
+ * A playground link for a complete SCXML sample (same format as site/client/share.ts), or
+ * undefined when it isn't a whole chart or needs host code the playground doesn't have
+ * (custom I/O processors or invokers).
+ */
+export function playgroundLink(text: string): string | undefined {
+  if (!/^\s*<scxml[\s>]/.test(text)) return undefined;
+  if (/<(send|invoke)\b[^>]*\stype="(?!scxml"|http:\/\/www\.w3\.org\/TR\/scxml)/.test(text)) return undefined;
+  return `/playground/#chart=${toBase64url(new Uint8Array(deflateRawSync(Buffer.from(text))))}`;
+}
+
 export async function renderMarkdown(file: string, source: string, images: Set<string>): Promise<Rendered> {
   const hl = await getHighlighter();
   const seen = new Map<string, number>();
@@ -143,13 +157,17 @@ export async function renderMarkdown(file: string, source: string, images: Set<s
       code({ text, lang }: Tokens.Code) {
         const l = (lang ?? "").split(/\s/)[0]!.toLowerCase();
         const language = l === "scxml" ? "xml" : l === "bash" || l === "shell" ? "sh" : LANGS.includes(l) ? l : "text";
-        return hl.codeToHtml(text.replace(/\n$/, ""), {
+        const html = hl.codeToHtml(text.replace(/\n$/, ""), {
           lang: language,
           themes: { light: "github-light-default", dark: "github-dark-default" },
           defaultColor: false,
           // comments are too faint on the site's code background: darken to WCAG AA
           colorReplacements: { "github-light-default": { "#6e7781": "#57606a" } },
         });
+        const link = language === "xml" ? playgroundLink(text) : undefined;
+        return link
+          ? `<div class="code-with-action">${html}<a class="open-in-playground" href="${link}">Open in playground</a></div>`
+          : html;
       },
       html({ text }: Tokens.HTML | Tokens.Tag) {
         // the doc-test directives are comments; drop them (and any other comment) from the output

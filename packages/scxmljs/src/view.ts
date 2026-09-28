@@ -2,8 +2,10 @@
  * @tinyactors/scxmljs/view — the `<scxml-view>` custom element: a whole
  * statechart, drawn and running, with no JavaScript of your own.
  *
- *   <script type="module">import "@tinyactors/scxmljs/view";</script>
- *   <scxml-view src="traffic-light.scxml"></scxml-view>
+ * ```html
+ * <script type="module">import "@tinyactors/scxmljs/view";</script>
+ * <scxml-view src="traffic-light.scxml"></scxml-view>
+ * ```
  *
  * Importing this module registers `<scxml-view>`. The data model engine is
  * loaded on demand: the QuickJS sandbox by default, the host's engine with

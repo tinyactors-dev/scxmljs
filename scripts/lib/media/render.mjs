@@ -115,7 +115,15 @@ async function render(entry) {
     return file;
   };
   const still = async (target) => writeFile(join(dir, "still.png"), await shot(target));
-  const advance = (ms) => page.evaluate((d) => globalThis.stage.clock.advance(d), ms);
+  // Moving a paused PlaybackClock by hand doesn't notify its subscribers (only ticks, steps and
+  // queued work do), so the explorer's time readout would show whenever work was last queued.
+  // Re-setting the speed notifies synchronously: the readout always shows the time of the frame.
+  const advance = (ms) =>
+    page.evaluate((d) => {
+      const { clock } = globalThis.stage;
+      clock.advance(d);
+      if ("speed" in clock) clock.speed = clock.speed;
+    }, ms);
   const clockNow = () => page.evaluate(() => globalThis.stage.clock.now());
 
   if (entry.scene === "explorer-tour") {

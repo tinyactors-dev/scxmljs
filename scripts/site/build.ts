@@ -4,7 +4,7 @@
  *   bun scripts/site/build.ts            (mise run site:build)
  *
  *   /                      landing page (a live <scxml-view>, the explorer tour, features)
- *   /demos/                demos index · /demos/explorer/ · /demos/gallery/
+ *   /demos/                demos index · /demos/explorer/ · /demos/gallery/ · /demos/llm-chat/
  *   /playground/           the live editor (sandboxed engine, CodeMirror, share links)
  *   /docs/…                docs/*.md, SECURITY.md, CHANGELOG.md rendered (sidebar, TOC, pager)
  *   /api/                  the TypeDoc reference (`mise run docs:api`; built here if missing)
@@ -29,6 +29,8 @@ const root = new URL("../../", import.meta.url).pathname.replace(/\/$/, "");
 const out = join(root, "_site");
 const started = performance.now();
 const log = (msg: string) => console.log(`  ${msg}`);
+/** Where @wasmer/sdk resolves (GraphQL) and downloads (packages) the LLM chat demo's real tools. */
+const WASMER_HOSTS = ["https://registry.wasmer.io", "https://cdn.wasmer.io"];
 
 // ── version shown in the footer ───────────────────────────────────────────
 const pkg = await Bun.file(join(root, "packages/scxmljs/package.json")).json();
@@ -39,7 +41,9 @@ await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 
 // ── client bundles ────────────────────────────────────────────────────────
-const entries = ["common", "landing", "gallery", "explorer", "search", "playground"].map((n) => join(root, "site/client", `${n}.ts`));
+const entries = ["common", "landing", "gallery", "explorer", "search", "playground", "llm-chat"].map((n) =>
+  join(root, "site/client", `${n}.ts`),
+);
 const bundle = await Bun.build({
   entrypoints: [...entries, join(root, "site/styles/site.css")],
   outdir: join(out, "assets"),
@@ -122,7 +126,7 @@ await emit(
   "/demos/",
   "demos",
   "Demos",
-  "Live demos of scxmljs: the explorer on three sample systems and a gallery of classic statecharts.",
+  "Live demos of scxmljs: the explorer on three sample systems, a gallery of classic statecharts, and a multi-client LLM chat run by statecharts.",
   pages.demosIndex(),
 );
 const { samples } = await import("../../examples/playground/src/explorer/samples.ts");
@@ -134,6 +138,36 @@ await emit(
   pages.explorerDemo(samples.map((s: { id: string; title: string }) => ({ id: s.id, title: s.title }))),
   { scripts: ["explorer"] },
 );
+await emit(
+  "/demos/llm-chat/",
+  "demos",
+  "LLM chat demo",
+  "A group chat with a language model, run by statecharts: streaming, parallel tool calls from several clients, queueing, steering and stopping. Simulated in your browser, or Claude with your own key.",
+  pages.llmChatDemo(),
+  {
+    scripts: ["llm-chat"],
+    head: [
+      // the visitor's API key can only ever reach Anthropic; the real tools download from Wasmer
+      `<meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://api.anthropic.com ${WASMER_HOSTS.join(" ")}">`,
+      // cross-origin isolation (SharedArrayBuffer, for the real tools): GitHub Pages can't send
+      // COOP/COEP, so a service worker scoped to this page adds them (it reloads the page once)
+      `<script>window.coi = { coepCredentialless: () => false, quiet: true };</script>`,
+      `<script src="/demos/llm-chat/coi-serviceworker.js"></script>`,
+      "",
+    ].join("\n"),
+  },
+);
+// @wasmer/sdk for the real tools, verbatim: it loads its glue, worker and .wasm relative to its
+// own URL. Under /demos/llm-chat/ so the page's service worker covers every request it makes.
+{
+  const sdk = join(Bun.resolveSync("@wasmer/sdk/package.json", join(root, "examples/llm-chat")), "..");
+  const dest = join(out, "demos/llm-chat/wasmer-sdk");
+  const browserOnly = (f: string) =>
+    !/\.(map|d\.ts)$/.test(f) && !/^(node|node-network|node-cache|node-worker.*|wisp-network)\.js$/.test(basename(f));
+  await cp(join(sdk, "dist"), join(dest, "dist"), { recursive: true, filter: (f) => browserOnly(f) });
+  await cp(join(sdk, "pkg"), join(dest, "pkg"), { recursive: true, filter: (f) => browserOnly(f) });
+  await cp(join(sdk, "LICENSE"), join(dest, "LICENSE.txt"));
+}
 await emit(
   "/demos/gallery/",
   "demos",

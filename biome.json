@@ -14,6 +14,7 @@
       "!docs/media.lock.json",
       "!examples/playground/web/css/tokens",
       "!examples/frameworks",
+      "!site/public/demos/llm-chat/coi-serviceworker.js",
       "!**/*.html",
       "!**/*.xhtml"
     ]

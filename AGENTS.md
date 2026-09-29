@@ -23,6 +23,10 @@ Layout:
 - `examples/playground/`: private demo app (Bun server, the explorer with sample systems,
   the library `<scxml-view>` on `/element`, a GitHub-webhook gatekeeper).
   Its tests live in `examples/playground/test/`.
+- `examples/llm-chat/`: the multi-client LLM chat demo (`/demos/llm-chat/`): host and client charts,
+  scenario charts, `PROTOCOL.md` (every processor/invoker's messages; keep `src/protocol.ts` in step),
+  a simulated model and tools on one clock, Claude via the SDK with the visitor's key (loaded lazily).
+  `site/client/llm-chat.ts` renders it. Tests: `examples/llm-chat/test/` (headless) and `tests/site/`.
 - `conformance/`: W3C SCXML IRP suite. `fetch.ts` downloads and converts it, `run.ts` runs it.
 - `tests/browser/`: Playwright tests (Chromium, Firefox, WebKit) against `server.ts`, which serves
   the playground pages and `fixtures/*.html` (the BUILT package via an import map; `?csp=` adds a

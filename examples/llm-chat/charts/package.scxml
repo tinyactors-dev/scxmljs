@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  llm-chat: one WebAssembly package of the real tools (the Wasmer runtime, bash, coreutils,
+  Python, PGlite, psql). workspace.scxml invokes one of these per package.
+
+    absent ──need──▶ waiting ──runtime.ready──▶ fetching ──▶ ready
+                      (the Wasmer runtime        resolving       │
+                       must be up first)         downloading     └──need──▶ (tells the workspace again)
+                                                 installing
+                                                     │ fails
+                                                     ▼
+                                                   failed ──need──▶ waiting (retry)
+
+  Invoker type="wasm-package" (params: key): does the work, sends package.progress
+  { phase, downloadedBytes, totalBytes, percent, cached } while it runs, and finishes with
+  done.invoke.fetch { ok, cached?, error? }. Leaving `fetching` cancels it.
+
+  Every change goes to the parent as package.changed { key, status }.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="package" initial="absent">
+  <datamodel>
+    <data id="key" expr="''"/>
+    <data id="label" expr="''"/>
+    <data id="approxBytes" expr="0"/>
+    <!-- false for the Wasmer runtime itself -->
+    <data id="needsRuntime" expr="true"/>
+    <data id="downloadedBytes" expr="0"/>
+    <data id="totalBytes" expr="null"/>
+    <data id="percent" expr="null"/>
+    <data id="cached" expr="false"/>
+    <data id="error" expr="null"/>
+    <data id="attempts" expr="0"/>
+  </datamodel>
+
+  <script>
+    function phase() {
+      if (In("absent") || In("waiting")) return "waiting";
+      if (In("resolving")) return "resolving";
+      if (In("downloading")) return "downloading";
+      if (In("installing")) return "loading";
+      if (In("ready")) return "ready";
+      return "failed";
+    }
+    function status() {
+      return {
+        key: key, label: label, approxBytes: approxBytes, phase: phase(), needed: !In("absent"),
+        downloadedBytes: downloadedBytes, totalBytes: totalBytes, percent: percent,
+        cached: cached, error: error, attempts: attempts
+      };
+    }
+    function track(p) {
+      if (typeof p.downloadedBytes === "number") downloadedBytes = p.downloadedBytes;
+      if (p.totalBytes !== undefined) totalBytes = p.totalBytes;
+      if (p.percent !== undefined) percent = p.percent;
+      if (p.cached) cached = true;
+    }
+  </script>
+
+  <state id="absent">
+    <transition event="need" target="waiting"/>
+  </state>
+
+  <state id="waiting">
+    <onentry>
+      <send target="#_parent" event="package.changed">
+        <param name="key" expr="key"/>
+        <param name="status" expr="status()"/>
+      </send>
+    </onentry>
+    <transition cond="!needsRuntime" target="fetching"/>
+    <transition event="runtime.ready" target="fetching"/>
+  </state>
+
+  <state id="fetching" initial="resolving">
+    <onentry>
+      <assign location="attempts" expr="attempts + 1"/>
+      <assign location="error" expr="null"/>
+    </onentry>
+    <invoke type="wasm-package" id="fetch">
+      <param name="key" expr="key"/>
+    </invoke>
+
+    <state id="resolving">
+      <onentry>
+        <send target="#_parent" event="package.changed">
+          <param name="key" expr="key"/>
+          <param name="status" expr="status()"/>
+        </send>
+      </onentry>
+    </state>
+    <!-- re-entered on every progress event (internal transition), so each one is reported -->
+    <state id="downloading">
+      <onentry>
+        <send target="#_parent" event="package.changed">
+          <param name="key" expr="key"/>
+          <param name="status" expr="status()"/>
+        </send>
+      </onentry>
+    </state>
+    <state id="installing">
+      <onentry>
+        <send target="#_parent" event="package.changed">
+          <param name="key" expr="key"/>
+          <param name="status" expr="status()"/>
+        </send>
+      </onentry>
+    </state>
+
+    <!-- progress: move between the steps (the invoke keeps running), report the bytes -->
+    <!-- report from the steps' onentry: during a transition's own content neither step is active -->
+    <transition event="package.progress" cond="_event.data.phase === 'downloading'" type="internal" target="downloading">
+      <script>track(_event.data)</script>
+    </transition>
+    <transition event="package.progress" cond="_event.data.phase === 'loading' || _event.data.phase === 'ready'" type="internal" target="installing">
+      <script>track(_event.data)</script>
+    </transition>
+    <transition event="package.progress">
+      <script>track(_event.data)</script>
+    </transition>
+
+    <transition event="done.invoke.fetch" cond="_event.data.ok" target="ready">
+      <assign location="percent" expr="100"/>
+      <assign location="cached" expr="cached || !!_event.data.cached"/>
+    </transition>
+    <transition event="done.invoke.fetch" target="failed">
+      <assign location="error" expr="_event.data.error"/>
+    </transition>
+    <transition event="error.execution" target="failed">
+      <assign location="error" expr="'could not start the download'"/>
+    </transition>
+  </state>
+
+  <state id="ready">
+    <onentry>
+      <send target="#_parent" event="package.changed">
+        <param name="key" expr="key"/>
+        <param name="status" expr="status()"/>
+      </send>
+    </onentry>
+    <!-- asked again (another client): say so again -->
+    <transition event="need">
+      <send target="#_parent" event="package.changed">
+        <param name="key" expr="key"/>
+        <param name="status" expr="status()"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="failed">
+    <onentry>
+      <send target="#_parent" event="package.changed">
+        <param name="key" expr="key"/>
+        <param name="status" expr="status()"/>
+      </send>
+    </onentry>
+    <!-- asked again: try again -->
+    <transition event="need" target="waiting"/>
+  </state>
+</scxml>

@@ -1,0 +1,14 @@
+{
+  "name": "@tinyactors/scxmljs-llm-chat",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.129.0",
+    "@tinyactors/scxmljs": "workspace:*",
+    "@wasmer/sdk": "0.19.0",
+    "lucide": "1.48.0"
+  },
+  "devDependencies": {
+    "happy-dom": "20.14.5"
+  }
+}

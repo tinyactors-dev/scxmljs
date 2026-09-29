@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Scenario: a tool provider leaves while its call is running.
+
+  A scenario is a chart that drives the stage the way a person would (type="stage", see
+  PROTOCOL.md). The stage sends it `host.enter.<stateId>` whenever the host enters a state,
+  so the script can wait for the system instead of guessing times.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="scenario-provider-leaves" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Terminal and Python join. Each offers a tool.'"/>
+      </send>
+      <send type="stage" event="client.add"><param name="kind" expr="'terminal'"/></send>
+      <send type="stage" event="client.add"><param name="kind" expr="'python'"/></send>
+      <send event="next" delay="1500ms"/>
+    </onentry>
+    <transition event="next" target="ask"/>
+  </state>
+
+  <state id="ask">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Ada asks something that needs both. The model calls both tools at once.'"/>
+      </send>
+      <send type="stage" event="type">
+        <param name="client" expr="'ada'"/>
+        <param name="text" expr="'How many files are in the workspace? And use python to compute 2**64.'"/>
+      </send>
+    </onentry>
+    <transition event="host.enter.tools" target="pull"/>
+  </state>
+
+  <state id="pull">
+    <onentry>
+      <send event="next" delay="800ms"/>
+    </onentry>
+    <transition event="next" target="wait">
+      <send type="stage" event="note">
+        <param name="text" expr="'Python leaves before answering. The host answers its call with an error: every tool call still gets a result.'"/>
+      </send>
+      <send type="stage" event="client.remove"><param name="client" expr="'python'"/></send>
+    </transition>
+  </state>
+
+  <state id="wait">
+    <transition event="host.enter.idle" target="done"/>
+  </state>
+
+  <final id="done">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'The model answered with what it had. Python is gone from the roster, so the next turn will not offer its tool.'"/>
+      </send>
+    </onentry>
+  </final>
+</scxml>

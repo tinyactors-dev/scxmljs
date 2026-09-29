@@ -90,6 +90,7 @@ export function demosIndex(): string {
   <div class="demo-cards">
     <a class="card" href="/demos/explorer/"><h2>Explorer</h2><p>Three systems — an order pipeline with invoked payment and shipping machines, a 333-state support desk, and a GitHub gatekeeper — with playback controls.</p></a>
     <a class="card" href="/demos/gallery/"><h2>Chart gallery</h2><p>Classic statecharts drawn by <code>&lt;scxml-view&gt;</code>: parallel regions, history, delayed events, guards. Click a transition to send its event.</p></a>
+    <a class="card" href="/demos/llm-chat/"><h2>LLM chat</h2><p>A group chat with a language model, run by statecharts: streaming, parallel tool calls from several clients, queueing, steering and stopping. Simulated by default; bring your own API key for Claude.</p></a>
     <a class="card" href="/playground/"><h2>Playground</h2><p>Edit a chart and watch it re-run as you type, in the sandboxed engine: diagnostics in the editor, playback controls, share links.</p></a>
   </div>
 </div>`;
@@ -109,6 +110,94 @@ export function explorerDemo(samples: { id: string; title: string }[]): string {
     <div slot="state:closed" class="slotted">slotted: closed issues are archived nightly</div>
   </scxml-explorer>
   <p>Built with <a href="/docs/explorer/"><code>&lt;scxml-explorer&gt;</code></a> and a <a href="/docs/playback/"><code>PlaybackClock</code></a>. The simulated services are custom <a href="/docs/io-processors/">I/O processors</a>; the source is in <a href="${REPO}/tree/main/examples/playground/src/explorer">examples/playground</a>.</p>
+</div>`;
+}
+
+export function llmChatDemo(): string {
+  const speeds = [
+    ["0.25", "¼×"],
+    ["0.5", "½×"],
+    ["1", "1×"],
+    ["2", "2×"],
+    ["4", "4×"],
+  ];
+  return `<div class="chat-demo" data-view="chat">
+  <h1 class="page-title">LLM chat</h1>
+  <p class="lede">A group chat with a language model where statecharts make every decision: who may type, when a message waits, where a steer goes, which client runs which tool. It all runs in this tab, simulated, on one clock you can slow down, pause and step.</p>
+  <div class="chat-toolbar">
+    <div class="chat-playback" role="group" aria-label="Playback">
+      <button id="chat-play" type="button" class="chat-play" aria-label="Pause"></button>
+      <fieldset class="chat-speed">
+        <legend class="visually-hidden">Speed</legend>
+        ${speeds.map(([v, label]) => `<label><input type="radio" name="chat-speed" value="${v}"><span>${label}</span></label>`).join("")}
+      </fieldset>
+      <label class="chat-speed-compact"><span class="visually-hidden">Speed</span><select id="chat-speed-select">${speeds.map(([v, label]) => `<option value="${v}">${label}</option>`).join("")}</select></label>
+      <button id="chat-step" type="button" class="chat-step" aria-label="Step"><span class="chat-step-label">Step</span></button>
+      <span class="chat-time" id="chat-time" aria-label="Simulated time">0.0 s</span>
+    </div>
+    <div class="chat-views" role="group" aria-label="Show">
+      <button type="button" data-view="chat" aria-pressed="true">Chat</button>
+      <button type="button" data-view="inside" aria-pressed="false">Inside</button>
+    </div>
+    <div class="chat-dl" id="chat-dl" hidden>
+      <button type="button" class="chat-dl-toggle" id="chat-dl-toggle" aria-expanded="false" aria-controls="chat-dl-list">
+        <span class="chat-dl-text" id="chat-dl-text"></span>
+        <progress class="chat-dl-bar" id="chat-dl-bar" max="100" aria-label="All downloads"></progress>
+      </button>
+      <ul class="chat-dl-list" id="chat-dl-list" hidden></ul>
+    </div>
+  </div>
+  <p class="chat-caption" id="chat-caption" aria-live="polite"></p>
+  <div class="chat-panes">
+    <section class="chat-pane" id="chat-pane-chat" aria-labelledby="chat-pane-chat-title">
+      <h2 class="visually-hidden" id="chat-pane-chat-title">Chat</h2>
+      <details class="chat-setup" id="chat-setup">
+        <summary>Scenario · add a client · reset</summary>
+        <div class="chat-setup-body">
+          <div class="chat-field">
+            <label class="chat-field-label" for="chat-scenario">Scenario</label>
+            <div class="chat-combo">
+              <select id="chat-scenario"><option value="">Free play</option></select>
+              <button id="chat-run" type="button" class="chat-primary">Run</button>
+            </div>
+          </div>
+          <div class="chat-field">
+            <label class="chat-field-label" for="chat-add">Add a client</label>
+            <div class="chat-combo">
+              <select id="chat-add"></select>
+              <button id="chat-add-button" type="button">Add</button>
+            </div>
+          </div>
+          <button id="chat-reset" type="button" class="chat-quiet">Reset</button>
+        </div>
+      </details>
+      <div class="chat-switcher" id="chat-switcher" role="group" aria-label="Clients"></div>
+      <div class="chat-clients" id="chat-clients"></div>
+    </section>
+    <section class="chat-pane chat-inspect" id="chat-pane-inside" aria-labelledby="chat-inspect-title">
+      <h2 id="chat-inspect-title">Inside</h2>
+      <div class="chat-inside-grid">
+        <section class="chat-host card" aria-labelledby="chat-host-title">
+          <h3 id="chat-host-title">Host</h3>
+          <div id="chat-host-body"></div>
+        </section>
+        <div class="chat-inside-main">
+          <div class="chat-field chat-chart-picker">
+            <label class="chat-field-label" for="chat-session">Chart</label>
+            <select id="chat-session"></select>
+            <span class="chat-small">One machine at a time; the playback controls drive the whole system.</span>
+          </div>
+          <scxml-explorer></scxml-explorer>
+          <div class="chat-timeline-head">
+            <h3>Timeline</h3>
+            <label><input type="checkbox" id="chat-batches"> show log batches</label>
+          </div>
+          <ol class="chat-timeline" id="chat-timeline" aria-label="Messages between the host and the clients"></ol>
+        </div>
+      </div>
+    </section>
+  </div>
+  <p>The charts, protocols and simulated model and tools are in <a href="${REPO}/tree/main/examples/llm-chat">examples/llm-chat</a>. Built with <a href="/docs/explorer/"><code>&lt;scxml-explorer&gt;</code></a>, a <a href="/docs/playback/"><code>PlaybackClock</code></a>, <a href="/docs/io-processors/">custom I/O processors</a> and <a href="/docs/invokers/">invokers</a>.</p>
 </div>`;
 }
 

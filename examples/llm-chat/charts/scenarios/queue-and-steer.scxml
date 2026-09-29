@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Scenario: queueing, steering and stopping while a turn runs.
+  Bo (input only) queues and is refused a steer; Ada (input and control) steers during the tool
+  calls, then stops. Bo's queued message then goes out as its own turn.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="scenario-queue-and-steer" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="kind" expr="'terminal'"/></send>
+      <send type="stage" event="client.add"><param name="kind" expr="'bo'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'Bo joins. Bo may type, but not steer or stop.'"/>
+      </send>
+      <send event="next" delay="1s"/>
+    </onentry>
+    <transition event="next" target="ask"/>
+  </state>
+
+  <state id="ask">
+    <onentry>
+      <send type="stage" event="type">
+        <param name="client" expr="'ada'"/>
+        <param name="text" expr="'List the files in the workspace and tell me what each one is for.'"/>
+      </send>
+    </onentry>
+    <transition event="host.enter.writing host.enter.calling" target="queue"/>
+  </state>
+
+  <state id="queue">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Bo types while the model is busy: his message waits in his own queue, above his editor. He tries to steer too, but may not: the host refuses, and the text goes back into his editor.'"/>
+      </send>
+      <send type="stage" event="type">
+        <param name="client" expr="'bo'"/>
+        <param name="text" expr="'Afterwards, also count the lines of the README.'"/>
+      </send>
+      <send type="stage" event="type">
+        <param name="client" expr="'bo'"/>
+        <param name="steer" expr="true"/>
+        <param name="text" expr="'Only the markdown files, please.'"/>
+      </send>
+    </onentry>
+    <transition event="host.enter.tools" target="steer"/>
+  </state>
+
+  <state id="steer">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Ada may steer: her steer rides along with the tool results.'"/>
+      </send>
+      <send type="stage" event="type">
+        <param name="client" expr="'ada'"/>
+        <param name="steer" expr="true"/>
+        <param name="text" expr="'Only the markdown files, please.'"/>
+      </send>
+    </onentry>
+    <transition event="host.enter.writing" target="stop"/>
+  </state>
+
+  <state id="stop">
+    <onentry>
+      <send event="next" delay="600ms"/>
+    </onentry>
+    <transition event="next" target="stopped">
+      <send type="stage" event="note">
+        <param name="text" expr="'Ada stops the answer: it is dropped from the history. The host is idle again, so Bo’s queued message goes out as the next turn.'"/>
+      </send>
+      <send type="stage" event="interrupt"><param name="client" expr="'ada'"/></send>
+    </transition>
+  </state>
+
+  <!-- the idle right after the stop, then Bo's turn, then idle again -->
+  <state id="stopped">
+    <transition event="host.enter.turn" target="bo"/>
+  </state>
+  <state id="bo">
+    <transition event="host.enter.idle" target="done"/>
+  </state>
+
+  <final id="done">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Bo’s message got its own turn and its own answer.'"/>
+      </send>
+    </onentry>
+  </final>
+</scxml>

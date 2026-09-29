@@ -84,8 +84,13 @@ for (const [file, text] of html) {
 }
 
 for (const f of files) {
-  if (!/\.(html|js|css|xml|txt)$/.test(f) || f.startsWith("pagefind/")) continue;
-  const text = html.get(f) ?? (await Bun.file(join(out, f)).text());
+  // pagefind and the vendored @wasmer/sdk (its sandboxes have a virtual localhost) aren't ours
+  if (!/\.(html|js|css|xml|txt)$/.test(f) || f.startsWith("pagefind/") || f.startsWith("demos/llm-chat/wasmer-sdk/")) continue;
+  let text = html.get(f) ?? (await Bun.file(join(out, f)).text());
+  // the Anthropic SDK (the LLM chat demo) allows credentials over plain http only to local hosts
+  text = text.replace(/[\w$]+==="localhost"\|\|[\w$]+==="127\.0\.0\.1"\|\|[\w$]+==="::1"/g, "");
+  // psql (the LLM chat demo's real Postgres) connects to PGlite on the sandbox's virtual localhost
+  text = text.replace(/"-h","localhost"/g, "");
   if (/\b(localhost|127\.0\.0\.1)\b/.test(text)) problems.push(`${f}: mentions localhost`);
 }
 

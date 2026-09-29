@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Scenario: three messages in quick succession. The first starts a turn; the other two wait
+  in Ada's own queue. She edits one (back into her editor); the other goes out by itself
+  once the host has settled.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="scenario-three-in-a-row" initial="spam">
+  <state id="spam">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Ada sends three messages in quick succession. The first starts a turn; the other two wait in her queue, above her editor.'"/>
+      </send>
+      <send type="stage" event="type">
+        <param name="client" expr="'ada'"/>
+        <param name="text" expr="'What can you do?'"/>
+      </send>
+      <send type="stage" event="type">
+        <param name="client" expr="'ada'"/>
+        <param name="text" expr="'And what can you not do?'"/>
+      </send>
+      <send type="stage" event="type">
+        <param name="client" expr="'ada'"/>
+        <param name="text" expr="'Thanks!'"/>
+      </send>
+      <send event="next" delay="300ms"/>
+    </onentry>
+    <transition event="next" target="edit"/>
+  </state>
+
+  <state id="edit">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'She edits the second one: it leaves the queue and is appended to her editor, so nothing she typed is lost.'"/>
+      </send>
+      <send type="stage" event="queue.edit">
+        <param name="client" expr="'ada'"/>
+        <param name="index" expr="0"/>
+      </send>
+    </onentry>
+    <transition event="host.enter.idle" target="next">
+      <send type="stage" event="note">
+        <param name="text" expr="'The first turn is over. Nothing streams and no tools run, so the next queued message goes out by itself.'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="next">
+    <transition event="host.enter.idle" target="done"/>
+  </state>
+
+  <final id="done">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Each message got its own turn. The edited one is still in Ada’s editor, waiting for her.'"/>
+      </send>
+    </onentry>
+  </final>
+</scxml>

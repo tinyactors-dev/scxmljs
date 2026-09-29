@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  llm-chat: the host's controller.
+
+  One tab runs one system: this chart, a model (simulated or Claude), and the clients
+  (people, tool providers, viewers), each running client.scxml. The chart is the control
+  plane only. Message bodies, streamed text and history live in the chat log (host code);
+  this chart decides what happens to them.
+
+  I/O processors (see PROTOCOL.md):
+    type="bus"  messages to one client (target = clientId) or to everyone (target = "*").
+                Inbound bus events carry the sender in _event.origin ("host" = the control panel).
+    type="log"  commands to the chat log, which broadcasts every change to the clients.
+  Invokers:
+    type="llm"        one Messages API request (simulated or real), streamed into the log.
+    type="key-check"  verifies the API key the control panel stored.
+
+  Regions:
+    roster        who is connected, their roles and tools (last region, see there)
+    model         simulated, or Claude (locked until a key is verified)
+    conversation  turns: request → (tools → request)* → settle, with steer and stop. It tells the
+                  clients host.busy / host.idle; each client keeps its own queue and sends the
+                  next message when the host is idle.
+    inbox         whether steers are waiting (for the picture; the data is steers)
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="llm-chat-host" initial="host">
+  <datamodel>
+    <!-- clientId → { name, kind, roles: [], tools: [ToolDef] } -->
+    <data id="clients" expr="({})"/>
+    <!-- the input that starts the next turn: { inputId, author, text }. Clients hold their own
+         queues and send the next message when the host says it is idle again (host.idle). -->
+    <data id="incoming" expr="[]"/>
+    <!-- steers for the next boundary: after the tool results, or as the next turn -->
+    <data id="steers" expr="[]"/>
+    <!-- who stopped the last turn, if anyone (sent with host.idle) -->
+    <data id="stoppedBy" expr="null"/>
+    <data id="turn" expr="0"/>
+    <data id="request" expr="0"/>
+    <!-- the tools offered to the model this turn, frozen when the turn starts -->
+    <data id="toolset" expr="[]"/>
+    <!-- the tool_use blocks of the last response, with the client that provides each -->
+    <data id="calls" expr="[]"/>
+    <!-- callId → provider clientId, while their results are outstanding -->
+    <data id="pending" expr="({})"/>
+    <data id="results" expr="[]"/>
+    <data id="attempts" expr="0"/>
+    <data id="maxAttempts" expr="4"/>
+    <data id="retryInMs" expr="0"/>
+    <!-- how long tool calls may take; re-armed when a provider says it needs longer or comes back -->
+    <data id="toolTimeoutMs" expr="30000"/>
+  </datamodel>
+
+  <script>
+    var ROLES = ["input", "control", "tools"];
+
+    function can(origin, role) {
+      if (origin === "host") return true;
+      var c = clients[origin];
+      return !!c &amp;&amp; c.roles.indexOf(role) >= 0;
+    }
+    function roleFor(name) { return name === "input.submit" ? "input" : "control"; }
+    function modelReady() { return In("simulated") || In("unlocked"); }
+    function authorOf(origin) {
+      if (origin === "host") return "Host";
+      return clients[origin] ? clients[origin].name : origin;
+    }
+    function hold(list, origin, data) {
+      list.push({ inputId: data.inputId, author: authorOf(origin), text: String(data.text || "") });
+    }
+    /** Steers first, then the new input; empties both. */
+    function take() {
+      var entries = steers.concat(incoming);
+      steers = [];
+      incoming = [];
+      return entries;
+    }
+
+    /** A hello → the roster entry. Tool names already provided by someone else are refused. */
+    function admit(id, hello) {
+      var taken = {};
+      for (var k in clients) {
+        if (k === id) continue;
+        for (var i = 0; i &lt; clients[k].tools.length; i++) taken[clients[k].tools[i].name] = true;
+      }
+      var roles = (hello.wants || []).filter(function (r) { return ROLES.indexOf(r) >= 0; });
+      var tools = [];
+      var refused = [];
+      var offered = roles.indexOf("tools") >= 0 ? hello.tools || [] : [];
+      for (var j = 0; j &lt; offered.length; j++) (taken[offered[j].name] ? refused : tools).push(offered[j]);
+      return { name: hello.name || id, kind: hello.kind || "client", roles: roles, tools: tools, refused: refused };
+    }
+    function rosterView() {
+      var out = [];
+      for (var id in clients) {
+        var c = clients[id];
+        out.push({ id: id, name: c.name, kind: c.kind, roles: c.roles, tools: c.tools.map(function (t) { return t.name; }) });
+      }
+      return out;
+    }
+    function freezeTools() {
+      var out = [];
+      for (var id in clients) {
+        var c = clients[id];
+        if (c.roles.indexOf("tools") &lt; 0) continue;
+        for (var i = 0; i &lt; c.tools.length; i++) {
+          var t = c.tools[i];
+          out.push({ name: t.name, description: t.description, input_schema: t.input_schema, provider: id });
+        }
+      }
+      return out;
+    }
+    function route(toolCalls) {
+      return toolCalls.map(function (call) {
+        var provider = null;
+        for (var i = 0; i &lt; toolset.length; i++) if (toolset[i].name === call.name) provider = toolset[i].provider;
+        return { id: call.id, name: call.name, input: call.input, invalid: call.invalid || null, provider: provider };
+      });
+    }
+    function callById(id) {
+      for (var i = 0; i &lt; calls.length; i++) if (calls[i].id === id) return calls[i];
+      return null;
+    }
+    function settle(callId, isError, content) {
+      results.push({ callId: callId, isError: !!isError, content: content });
+      delete pending[callId];
+    }
+    /** Outstanding call ids, all of them or only those of one provider. */
+    function pendingFrom(provider) {
+      var ids = [];
+      for (var id in pending) if (!provider || pending[id] === provider) ids.push(id);
+      return ids;
+    }
+    /** Why an input was refused: a code clients act on, and a reason people read. */
+    function whyNot(origin, name) {
+      if (origin !== "host" &amp;&amp; !clients[origin]) return { code: "disconnected", reason: "not connected" };
+      if (!can(origin, roleFor(name))) return { code: "role", reason: "needs the " + roleFor(name) + " role" };
+      if (name === "input.interrupt") return { code: "nothing", reason: "nothing to stop" };
+      if (!modelReady()) return { code: "model", reason: "the model isn't ready: paste an API key or switch to the simulation" };
+      if (!In("idle")) return { code: "busy", reason: "a turn is running; the message stays queued" };
+      return { code: "other", reason: "not possible right now" };
+    }
+    function retryDelayMs(error) {
+      if (error &amp;&amp; typeof error.retryAfterMs === "number") return error.retryAfterMs;
+      return Math.min(30000, 1000 * Math.pow(2, attempts - 1));
+    }
+  </script>
+
+  <parallel id="host">
+
+    <!-- ── which model answers ──────────────────────────────────────────── -->
+    <state id="model" initial="simulated">
+      <state id="simulated">
+        <transition event="mode.claude" cond="_event.origin === 'host' &amp;&amp; In('idle')" target="claude"/>
+      </state>
+
+      <state id="claude" initial="locked">
+        <transition event="mode.simulated" cond="_event.origin === 'host' &amp;&amp; In('idle')" target="simulated"/>
+
+        <state id="locked">
+          <transition event="key.set" cond="_event.origin === 'host'" target="verifying"/>
+        </state>
+
+        <state id="verifying">
+          <invoke type="key-check" id="keycheck"/>
+          <transition event="done.invoke.keycheck" cond="_event.data.ok" target="unlocked"/>
+          <transition event="done.invoke.keycheck" target="locked">
+            <send type="log" event="notice">
+              <param name="level" expr="'error'"/>
+              <param name="text" expr="'The API key was not accepted: ' + _event.data.message"/>
+            </send>
+          </transition>
+          <transition event="key.set" cond="_event.origin === 'host'" target="verifying"/>
+        </state>
+
+        <state id="unlocked">
+          <transition event="key.forget" cond="_event.origin === 'host'" target="locked"/>
+          <!-- raised by the conversation when a request fails with 401 -->
+          <transition event="key.rejected" target="locked"/>
+        </state>
+      </state>
+    </state>
+
+    <!-- ── the conversation ─────────────────────────────────────────────── -->
+    <state id="conversation" initial="idle">
+      <!-- any input nobody below accepted is refused, with the reason -->
+      <transition event="input.*">
+        <send type="bus" targetexpr="_event.origin" event="input.rejected">
+          <param name="inputId" expr="_event.data &amp;&amp; _event.data.inputId"/>
+          <param name="code" expr="whyNot(_event.origin, _event.name).code"/>
+          <param name="reason" expr="whyNot(_event.origin, _event.name).reason"/>
+        </send>
+      </transition>
+      <!-- a result that arrives after its call was settled (timeout, provider left, stop) -->
+      <transition event="tool.result">
+        <send type="log" event="notice">
+          <param name="level" expr="'info'"/>
+          <param name="text" expr="'Ignored a late result for ' + _event.data.callId + ' from ' + authorOf(_event.origin)"/>
+        </send>
+      </transition>
+
+      <state id="idle">
+        <!-- tell the clients: a queued message can go now (unless its author just stopped the turn) -->
+        <onentry>
+          <send type="bus" target="*" event="host.idle">
+            <param name="stoppedBy" expr="stoppedBy"/>
+          </send>
+        </onentry>
+        <!-- a steer with nothing running is just a message -->
+        <transition event="input.submit input.steer"
+                    cond="can(_event.origin, roleFor(_event.name)) &amp;&amp; modelReady()" target="turn">
+          <script>hold(incoming, _event.origin, _event.data)</script>
+          <send type="bus" targetexpr="_event.origin" event="input.accepted">
+            <param name="inputId" expr="_event.data.inputId"/>
+            <param name="queued" expr="false"/>
+          </send>
+        </transition>
+      </state>
+
+      <state id="turn" initial="requesting">
+        <onentry>
+          <assign location="turn" expr="turn + 1"/>
+          <assign location="stoppedBy" expr="null"/>
+          <send type="bus" target="*" event="host.busy"/>
+          <assign location="toolset" expr="freezeTools()"/>
+          <send type="log" event="user.append">
+            <param name="turn" expr="turn"/>
+            <param name="entries" expr="take()"/>
+          </send>
+          <raise event="queue.changed"/>
+        </onentry>
+
+        <!-- a submit now is refused as "busy" (it raced another client): its client queues it
+             again. A steer is held for the next boundary. -->
+        <transition event="input.steer" cond="can(_event.origin, 'control')">
+          <script>hold(steers, _event.origin, _event.data)</script>
+          <send type="bus" targetexpr="_event.origin" event="input.accepted">
+            <param name="inputId" expr="_event.data.inputId"/>
+            <param name="queued" expr="true"/>
+            <param name="steer" expr="true"/>
+          </send>
+          <raise event="queue.changed"/>
+        </transition>
+
+        <state id="requesting" initial="connecting">
+          <onentry>
+            <assign location="request" expr="request + 1"/>
+          </onentry>
+          <invoke type="llm" id="llm">
+            <param name="request" expr="request"/>
+            <param name="model" expr="In('simulated') ? 'simulated' : 'claude'"/>
+            <param name="tools" expr="toolset"/>
+          </invoke>
+
+          <!-- what the stream is doing right now (type="internal": the invoke keeps running) -->
+          <state id="connecting"/>
+          <state id="thinking"/>
+          <state id="writing"/>
+          <state id="calling"/>
+          <transition event="llm.block.start" cond="_event.data.kind === 'thinking'" type="internal" target="thinking"/>
+          <transition event="llm.block.start" cond="_event.data.kind === 'text'" type="internal" target="writing"/>
+          <transition event="llm.block.start" cond="_event.data.kind === 'tool_use'" type="internal" target="calling"/>
+
+          <transition event="done.invoke.llm" cond="_event.data.ok &amp;&amp; _event.data.stop === 'tool_use'" target="tools">
+            <assign location="attempts" expr="0"/>
+            <assign location="calls" expr="route(_event.data.toolCalls)"/>
+            <send type="log" event="assistant.commit">
+              <param name="request" expr="request"/>
+              <param name="stop" expr="_event.data.stop"/>
+            </send>
+          </transition>
+          <transition event="done.invoke.llm" cond="_event.data.ok" target="settling">
+            <assign location="attempts" expr="0"/>
+            <send type="log" event="assistant.commit">
+              <param name="request" expr="request"/>
+              <param name="stop" expr="_event.data.stop"/>
+            </send>
+            <if cond="_event.data.stop === 'max_tokens'">
+              <send type="log" event="notice">
+                <param name="level" expr="'warning'"/>
+                <param name="text" expr="'The answer was cut off at the output limit.'"/>
+              </send>
+            </if>
+          </transition>
+          <transition event="done.invoke.llm"
+                      cond="_event.data.error.retryable &amp;&amp; attempts &lt; maxAttempts" target="backoff">
+            <assign location="attempts" expr="attempts + 1"/>
+            <assign location="retryInMs" expr="retryDelayMs(_event.data.error)"/>
+            <send type="log" event="assistant.discard">
+              <param name="request" expr="request"/>
+              <param name="reason" expr="_event.data.error.message"/>
+            </send>
+          </transition>
+          <transition event="done.invoke.llm" target="settling">
+            <assign location="attempts" expr="0"/>
+            <send type="log" event="assistant.discard">
+              <param name="request" expr="request"/>
+              <param name="reason" expr="_event.data.error.message"/>
+            </send>
+            <send type="log" event="notice">
+              <param name="level" expr="'error'"/>
+              <param name="text" expr="'The request failed: ' + _event.data.error.message"/>
+            </send>
+            <if cond="_event.data.error.kind === 'auth'">
+              <raise event="key.rejected"/>
+            </if>
+          </transition>
+
+          <!-- stop: leaving this state cancels the invoke, which aborts the stream -->
+          <transition event="input.interrupt" cond="can(_event.origin, 'control')" target="idle">
+            <assign location="stoppedBy" expr="_event.origin"/>
+            <send type="log" event="assistant.discard">
+              <param name="request" expr="request"/>
+              <param name="reason" expr="'stopped by ' + authorOf(_event.origin)"/>
+            </send>
+          </transition>
+        </state>
+
+        <state id="backoff">
+          <onentry>
+            <send event="retry" id="retryTimer" delayexpr="retryInMs + 'ms'"/>
+            <send type="log" event="notice">
+              <param name="level" expr="'warning'"/>
+              <param name="text" expr="'Retrying in ' + Math.round(retryInMs / 1000) + ' s (attempt ' + (attempts + 1) + ' of ' + (maxAttempts + 1) + ')'"/>
+            </send>
+          </onentry>
+          <onexit>
+            <cancel sendid="retryTimer"/>
+          </onexit>
+          <transition event="retry" target="requesting"/>
+          <transition event="input.interrupt" cond="can(_event.origin, 'control')" target="idle">
+            <assign location="stoppedBy" expr="_event.origin"/>
+          </transition>
+        </state>
+
+        <!-- run every tool call of the response at once, each on the client that provides it -->
+        <state id="tools">
+          <onentry>
+            <assign location="results" expr="[]"/>
+            <assign location="pending" expr="({})"/>
+            <foreach array="calls" item="call">
+              <!-- input that failed the tool's schema is answered here, never run -->
+              <if cond="call.invalid">
+                <script>settle(call.id, true, "Invalid input: " + call.invalid + ". Call the tool again with valid input.")</script>
+              <elseif cond="call.provider &amp;&amp; clients[call.provider]"/>
+                <assign location="pending[call.id]" expr="call.provider"/>
+                <send type="bus" targetexpr="call.provider" event="tool.call">
+                  <param name="callId" expr="call.id"/>
+                  <param name="name" expr="call.name"/>
+                  <param name="input" expr="call.input"/>
+                </send>
+              <else/>
+                <script>settle(call.id, true, "No connected client provides the tool " + call.name + ".")</script>
+              </if>
+            </foreach>
+            <send type="log" event="tools.dispatched">
+              <param name="request" expr="request"/>
+              <param name="calls" expr="calls"/>
+            </send>
+            <send event="tools.timeout" id="toolsTimer" delayexpr="toolTimeoutMs + 'ms'"/>
+            <send type="log" event="tools.timer">
+              <param name="request" expr="request"/>
+              <param name="ms" expr="toolTimeoutMs"/>
+            </send>
+          </onentry>
+          <onexit>
+            <cancel sendid="toolsTimer"/>
+          </onexit>
+
+          <!-- every call answered: results (and any steers) go back to the model -->
+          <transition cond="pendingFrom(null).length === 0" target="requesting">
+            <send type="log" event="tool.results">
+              <param name="request" expr="request"/>
+              <param name="results" expr="results"/>
+              <param name="steers" expr="steers"/>
+            </send>
+            <assign location="steers" expr="[]"/>
+            <raise event="queue.changed"/>
+          </transition>
+
+          <!-- the provider is still getting ready (downloading real tools): wait longer -->
+          <transition event="tool.delayed" cond="pending[_event.data.callId] === _event.origin">
+            <cancel sendid="toolsTimer"/>
+            <send event="tools.timeout" id="toolsTimer" delayexpr="toolTimeoutMs + 'ms'"/>
+            <send type="log" event="tools.timer">
+              <param name="request" expr="request"/>
+              <param name="ms" expr="toolTimeoutMs"/>
+            </send>
+            <send type="log" event="notice">
+              <param name="level" expr="'info'"/>
+              <param name="text" expr="authorOf(_event.origin) + ' is ' + _event.data.reason + '; waiting longer for it.'"/>
+            </send>
+          </transition>
+
+          <!-- a provider that was offline is back (it asks for a snapshot): whatever it still owes
+               us may never have reached it, so it gets those calls again, and the full timeout.
+               Calls are idempotent on the client: a running one is ignored, a finished one is
+               answered again from its stored result. -->
+          <transition event="client.resync" cond="pendingFrom(_event.origin).length > 0">
+            <foreach array="pendingFrom(_event.origin)" item="callId">
+              <send type="bus" targetexpr="_event.origin" event="tool.call">
+                <param name="callId" expr="callId"/>
+                <param name="name" expr="callById(callId).name"/>
+                <param name="input" expr="callById(callId).input"/>
+              </send>
+            </foreach>
+            <cancel sendid="toolsTimer"/>
+            <send event="tools.timeout" id="toolsTimer" delayexpr="toolTimeoutMs + 'ms'"/>
+            <send type="log" event="tools.timer">
+              <param name="request" expr="request"/>
+              <param name="ms" expr="toolTimeoutMs"/>
+            </send>
+            <send type="log" event="notice">
+              <param name="level" expr="'info'"/>
+              <param name="text" expr="authorOf(_event.origin) + ' is back: sent it its ' + pendingFrom(_event.origin).length + ' outstanding tool call(s) again.'"/>
+            </send>
+          </transition>
+
+          <transition event="tool.result" cond="pending[_event.data.callId] === _event.origin">
+            <script>settle(_event.data.callId, _event.data.isError, _event.data.content)</script>
+          </transition>
+
+          <transition event="client.bye">
+            <foreach array="pendingFrom(_event.origin)" item="callId">
+              <script>settle(callId, true, authorOf(_event.origin) + " disconnected before answering.")</script>
+            </foreach>
+          </transition>
+
+          <transition event="tools.timeout">
+            <foreach array="pendingFrom(null)" item="callId">
+              <send type="bus" targetexpr="pending[callId]" event="tool.cancel">
+                <param name="callId" expr="callId"/>
+              </send>
+              <script>settle(callId, true, "Timed out after " + toolTimeoutMs / 1000 + "s.")</script>
+            </foreach>
+          </transition>
+
+          <!-- stop: every tool_use still needs a tool_result, so cancelled calls get one -->
+          <transition event="input.interrupt" cond="can(_event.origin, 'control')" target="idle">
+            <assign location="stoppedBy" expr="_event.origin"/>
+            <foreach array="pendingFrom(null)" item="callId">
+              <send type="bus" targetexpr="pending[callId]" event="tool.cancel">
+                <param name="callId" expr="callId"/>
+              </send>
+              <script>settle(callId, true, "Cancelled: " + authorOf(_event.origin) + " stopped the turn.")</script>
+            </foreach>
+            <send type="log" event="tool.results">
+              <param name="request" expr="request"/>
+              <param name="results" expr="results"/>
+              <param name="steers" expr="[]"/>
+            </send>
+          </transition>
+        </state>
+
+        <!-- the model finished: held steers start the next turn; otherwise idle, and the clients
+             send their queued messages -->
+        <state id="settling">
+          <transition cond="steers.length > 0 &amp;&amp; modelReady()" target="turn"/>
+          <transition target="idle"/>
+        </state>
+      </state>
+    </state>
+
+    <!-- ── held steers (the picture; the data is steers) ──────────────── -->
+    <state id="inbox" initial="empty">
+      <transition event="queue.changed">
+        <send type="log" event="queue.changed">
+          <param name="steers" expr="steers"/>
+        </send>
+      </transition>
+      <state id="empty">
+        <transition cond="steers.length > 0" target="holding"/>
+      </state>
+      <state id="holding">
+        <transition cond="steers.length === 0" target="empty"/>
+      </state>
+    </state>
+
+    <!-- ── who is connected (last, so on client.bye the regions above still see the client) ── -->
+    <state id="roster">
+      <transition event="client.hello">
+        <assign location="clients[_event.origin]" expr="admit(_event.origin, _event.data)"/>
+        <send type="bus" targetexpr="_event.origin" event="welcome">
+          <param name="clientId" expr="_event.origin"/>
+          <param name="granted" expr="clients[_event.origin].roles"/>
+          <param name="tools" expr="clients[_event.origin].tools.map(function (t) { return t.name; })"/>
+          <param name="refused" expr="clients[_event.origin].refused.map(function (t) { return t.name; })"/>
+          <param name="busy" expr="!In('idle')"/>
+        </send>
+        <send type="log" event="snapshot.send"><param name="to" expr="_event.origin"/></send>
+        <send type="log" event="roster.changed"><param name="clients" expr="rosterView()"/></send>
+      </transition>
+
+      <transition event="client.resync" cond="!!clients[_event.origin]">
+        <send type="log" event="snapshot.send"><param name="to" expr="_event.origin"/></send>
+        <!-- it may have missed host.idle / host.busy while away -->
+        <send type="bus" targetexpr="_event.origin" eventexpr="In('idle') ? 'host.idle' : 'host.busy'"/>
+      </transition>
+
+      <transition event="client.bye" cond="!!clients[_event.origin]">
+        <script>delete clients[_event.origin];</script>
+        <send type="log" event="roster.changed"><param name="clients" expr="rosterView()"/></send>
+      </transition>
+
+      <!-- from the control panel: grant or revoke roles live -->
+      <transition event="roles.set" cond="_event.origin === 'host' &amp;&amp; !!clients[_event.data.clientId]">
+        <assign location="clients[_event.data.clientId].roles"
+                expr="_event.data.roles.filter(function (r) { return ROLES.indexOf(r) >= 0; })"/>
+        <send type="bus" targetexpr="_event.data.clientId" event="roles.changed">
+          <param name="granted" expr="clients[_event.data.clientId].roles"/>
+        </send>
+        <send type="log" event="roster.changed"><param name="clients" expr="rosterView()"/></send>
+      </transition>
+    </state>
+  </parallel>
+</scxml>

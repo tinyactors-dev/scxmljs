@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  llm-chat: the shared WebAssembly workspace behind the real tools. One per tab. The Terminal,
+  Python and psql share its filesystem (/workspace); PostgreSQL (PGlite) runs beside it.
+
+  It invokes one package.scxml per package, so every download is a machine of its own (see the
+  explorer's System view). Clients ask for what they need; a package already on its way or
+  installed is never fetched twice: the second client just waits for the same machine.
+
+  I/O processor type="workspace" (see PROTOCOL.md §5):
+    in   need { packages: string[] }        from a client (origin = its id)
+    out  workspace.progress { packages }    to a waiting client, when one of its packages changes step
+         workspace.ready { packages }       all of its packages are installed
+         workspace.failed { key, error }    one failed; the client may ask again (retry)
+
+  The page creates the session with `data`: catalog = { key → { label, approxBytes } }.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="llm-chat-workspace" initial="open">
+  <datamodel>
+    <data id="catalog" expr="({})"/>
+    <!-- key → the package machine's last status -->
+    <data id="packages" expr="({})"/>
+    <!-- clientId → { keys: [...], answered: bool } -->
+    <data id="clients" expr="({})"/>
+    <!-- key → the client that asked first (the others find it "shared") -->
+    <data id="firstBy" expr="({})"/>
+    <!-- key → last phase told to clients (progress is sent on phase changes, not every byte) -->
+    <data id="told" expr="({})"/>
+    <!-- whether the last package.changed moved a package to another step -->
+    <data id="phaseChanged" expr="false"/>
+  </datamodel>
+
+  <script>
+    function keysOf(list) { return ["sdk"].concat((list || []).filter(function (k) { return k !== "sdk"; })); }
+    function phaseOf(k) { return packages[k] ? packages[k].phase : "waiting"; }
+    function view(keys) { return keys.map(function (k) { return packages[k] || { key: k, phase: "waiting" }; }); }
+    /** Packages that are waiting for the runtime (to release once it is up). */
+    function waitingForRuntime() {
+      return Object.keys(packages).filter(function (k) { return k !== "sdk" &amp;&amp; packages[k].needed &amp;&amp; packages[k].phase === "waiting"; });
+    }
+    /** What to tell which clients now: [{ to, event, data }]. */
+    function replies(changedKey, phaseChanged) {
+      var out = [];
+      for (var id in clients) {
+        var c = clients[id];
+        if (c.answered || (changedKey &amp;&amp; c.keys.indexOf(changedKey) &lt; 0)) continue;
+        var failed = c.keys.filter(function (k) { return phaseOf(k) === "failed"; })[0];
+        if (failed) {
+          c.answered = true;
+          out.push({ to: id, event: "workspace.failed", data: { key: failed, error: packages[failed].error } });
+        } else if (c.keys.every(function (k) { return phaseOf(k) === "ready"; })) {
+          c.answered = true;
+          out.push({ to: id, event: "workspace.ready", data: { packages: view(c.keys) } });
+        } else if (phaseChanged) {
+          out.push({ to: id, event: "workspace.progress", data: { packages: view(c.keys) } });
+        }
+      }
+      return out;
+    }
+  </script>
+
+  <state id="open">
+    <invoke type="scxml" id="pkg-sdk" src="package.scxml">
+      <param name="key" expr="'sdk'"/>
+      <param name="label" expr="catalog.sdk.label"/>
+      <param name="approxBytes" expr="catalog.sdk.approxBytes"/>
+      <param name="needsRuntime" expr="false"/>
+    </invoke>
+    <invoke type="scxml" id="pkg-bash" src="package.scxml">
+      <param name="key" expr="'bash'"/>
+      <param name="label" expr="catalog.bash.label"/>
+      <param name="approxBytes" expr="catalog.bash.approxBytes"/>
+    </invoke>
+    <invoke type="scxml" id="pkg-coreutils" src="package.scxml">
+      <param name="key" expr="'coreutils'"/>
+      <param name="label" expr="catalog.coreutils.label"/>
+      <param name="approxBytes" expr="catalog.coreutils.approxBytes"/>
+    </invoke>
+    <invoke type="scxml" id="pkg-python" src="package.scxml">
+      <param name="key" expr="'python'"/>
+      <param name="label" expr="catalog.python.label"/>
+      <param name="approxBytes" expr="catalog.python.approxBytes"/>
+    </invoke>
+    <invoke type="scxml" id="pkg-pglite" src="package.scxml">
+      <param name="key" expr="'pglite'"/>
+      <param name="label" expr="catalog.pglite.label"/>
+      <param name="approxBytes" expr="catalog.pglite.approxBytes"/>
+    </invoke>
+    <invoke type="scxml" id="pkg-psql" src="package.scxml">
+      <param name="key" expr="'psql'"/>
+      <param name="label" expr="catalog.psql.label"/>
+      <param name="approxBytes" expr="catalog.psql.approxBytes"/>
+    </invoke>
+
+    <!-- a client needs packages (again, after a failure: that retries them) -->
+    <transition event="need">
+      <assign location="clients[_event.origin]" expr="({ keys: keysOf(_event.data.packages), answered: false })"/>
+      <foreach array="clients[_event.origin].keys" item="k">
+        <!-- asked again after a failure: that package starts over (don't answer with the old failure) -->
+        <if cond="packages[k] &amp;&amp; packages[k].phase === 'failed'">
+          <script>packages[k].phase = "waiting"; told[k] = "waiting";</script>
+        </if>
+        <if cond="!firstBy[k]">
+          <assign location="firstBy[k]" expr="_event.origin"/>
+        </if>
+        <send targetexpr="'#_pkg-' + k" event="need"/>
+      </foreach>
+      <!-- the runtime may already be up: release what is waiting for it -->
+      <if cond="phaseOf('sdk') === 'ready'">
+        <foreach array="clients[_event.origin].keys" item="k">
+          <send targetexpr="'#_pkg-' + k" event="runtime.ready"/>
+        </foreach>
+      </if>
+      <foreach array="replies(null, true)" item="r">
+        <send type="workspace" targetexpr="r.to" eventexpr="r.event"><content expr="r.data"/></send>
+      </foreach>
+    </transition>
+
+    <!-- a package machine moved on -->
+    <transition event="package.changed">
+      <script>
+        var k = _event.data.key;
+        packages[k] = _event.data.status;
+        phaseChanged = told[k] !== packages[k].phase;
+        told[k] = packages[k].phase;
+      </script>
+      <if cond="_event.data.key === 'sdk' &amp;&amp; phaseOf('sdk') === 'ready'">
+        <foreach array="waitingForRuntime()" item="k">
+          <send targetexpr="'#_pkg-' + k" event="runtime.ready"/>
+        </foreach>
+      </if>
+      <foreach array="replies(_event.data.key, phaseChanged)" item="r">
+        <send type="workspace" targetexpr="r.to" eventexpr="r.event"><content expr="r.data"/></send>
+      </foreach>
+    </transition>
+  </state>
+</scxml>

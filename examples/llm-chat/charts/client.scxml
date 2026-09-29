@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  llm-chat: one client (a person, a tool provider or a viewer), connected to the host
+  over the bus. Every client runs this chart; what it may do comes from its roles.
+
+  The page creates the session with `data` set: clientId, name, kind, wants, tools.
+
+  I/O processors (see PROTOCOL.md):
+    type="bus"    messages to the host (target="host"). Inbound events come from the host,
+                  or from this client's own panel (origin "ui"): ui.submit, ui.steer,
+                  ui.interrupt, ui.queue.remove, ui.queue.edit, ui.leave, ui.offline, ui.online.
+    type="tool"   this client's tool runtime (simulated or real): run, cancel → tool.done.
+    type="panel"  this client's own panel: restore { text } puts text back into the editor
+                  (appended; typed input is never thrown away).
+    type="workspace"  the shared WebAssembly workspace (workspace.scxml): need { packages } →
+                  workspace.progress / workspace.ready / workspace.failed.
+
+  Regions of `member`:
+    sync      has this client seen every log entry? live, or catching up from a snapshot
+    composer  can this client type (the input role), and why the host last refused it
+    outbox    this client's own queue: a message goes out only while the host is idle;
+              the rest wait here, visible, editable and deletable
+    work      tool calls running here (the tools role)
+    tools     simulated, or real: loading its packages (calls wait here, and the host is told
+              they are delayed), ready, or failed (retry)
+  and `link`, the network toggle: while offline the bus drops everything to and from this client.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="llm-chat-client" initial="client">
+  <datamodel>
+    <data id="clientId" expr="''"/>
+    <data id="name" expr="''"/>
+    <data id="kind" expr="'person'"/>
+    <!-- roles asked for: input, control, tools -->
+    <data id="wants" expr="[]"/>
+    <!-- ToolDef[] this client offers -->
+    <data id="tools" expr="[]"/>
+    <!-- roles the host granted, and the tool names it accepted -->
+    <data id="granted" expr="[]"/>
+    <data id="accepted" expr="[]"/>
+    <!-- whether the host was running a turn when we joined -->
+    <data id="hostBusy" expr="false"/>
+    <!-- the last log sequence number applied -->
+    <data id="seq" expr="0"/>
+    <!-- callId → tool name, for calls running here -->
+    <data id="running" expr="({})"/>
+    <!-- the WebAssembly packages this client's real tools need (none: no Real mode) -->
+    <data id="needs" expr="[]"/>
+    <!-- tool calls waiting for the real tools to finish loading: { callId, name, input } -->
+    <data id="held" expr="[]"/>
+    <data id="toolsError" expr="null"/>
+    <!-- callId → { isError, content } of calls answered lately: a repeated call gets the same answer -->
+    <data id="finished" expr="({})"/>
+    <!-- Real asked for before this client had joined: applied once it is in -->
+    <data id="wantsReal" expr="false"/>
+    <!-- messages waiting for the host to be idle: { id, text }, oldest first -->
+    <data id="queue" expr="[]"/>
+    <!-- inputId → { kind: "submit" | "steer", text }: sent, not yet accepted or refused -->
+    <data id="awaiting" expr="({})"/>
+    <!-- the submit this client is waiting on (state `sending`) -->
+    <data id="lastSubmit" expr="null"/>
+    <data id="nextInput" expr="1"/>
+    <data id="rejection" expr="null"/>
+    <data id="joinAttempts" expr="0"/>
+  </datamodel>
+
+  <script>
+    function has(role) { return granted.indexOf(role) >= 0; }
+    function runningCount() { return Object.keys(running).length; }
+    /** A new input id, remembered with its text until the host answers. */
+    function track(kind, text) {
+      var id = clientId + "-" + nextInput++;
+      awaiting[id] = { kind: kind, text: String(text) };
+      if (kind === "submit") lastSubmit = id;
+      return id;
+    }
+    function settle(inputId) {
+      var a = awaiting[inputId];
+      delete awaiting[inputId];
+      return a;
+    }
+    function enqueue(text) { queue.push({ id: clientId + "-q" + nextInput++, text: String(text) }); }
+    /** Remove a queued message by id; returns it, or null. */
+    function unqueue(id) {
+      for (var i = 0; i &lt; queue.length; i++) if (queue[i].id === id) return queue.splice(i, 1)[0];
+      return null;
+    }
+    function canSend() { return has("input") &amp;&amp; In("online"); }
+    function provides(tool) { return has("tools") &amp;&amp; accepted.indexOf(tool) >= 0; }
+  </script>
+
+  <parallel id="client">
+
+    <!-- ── the network, as the panel's toggle sets it ──────────────────── -->
+    <state id="link" initial="online">
+      <state id="online">
+        <transition event="ui.offline" target="offline"/>
+      </state>
+      <state id="offline">
+        <transition event="ui.online" target="online">
+          <raise event="link.restored"/>
+        </transition>
+      </state>
+    </state>
+
+    <state id="membership" initial="joining">
+      <state id="joining">
+        <onentry>
+          <assign location="joinAttempts" expr="joinAttempts + 1"/>
+          <send type="bus" target="host" event="client.hello">
+            <param name="name" expr="name"/>
+            <param name="kind" expr="kind"/>
+            <param name="wants" expr="wants"/>
+            <param name="tools" expr="tools"/>
+          </send>
+          <send event="join.timeout" id="joinTimer" delay="2s"/>
+        </onentry>
+        <onexit>
+          <cancel sendid="joinTimer"/>
+        </onexit>
+        <transition event="welcome" target="member">
+          <assign location="granted" expr="_event.data.granted"/>
+          <assign location="accepted" expr="_event.data.tools"/>
+          <assign location="hostBusy" expr="!!_event.data.busy"/>
+        </transition>
+        <transition event="join.timeout" target="joining"/>
+        <transition event="ui.leave" target="left"/>
+        <!-- Simulated/Real chosen before we're in: remembered, applied once we are -->
+        <transition event="ui.tools.real ui.tools.retry">
+          <assign location="wantsReal" expr="true"/>
+        </transition>
+        <transition event="ui.tools.simulated">
+          <assign location="wantsReal" expr="false"/>
+        </transition>
+        <!-- typed before we're in: queued, never dropped (it goes out once the host is idle) -->
+        <transition event="ui.submit ui.steer">
+          <script>enqueue(_event.data.text)</script>
+        </transition>
+      </state>
+
+      <parallel id="member">
+        <transition event="roles.changed">
+          <assign location="granted" expr="_event.data.granted"/>
+        </transition>
+        <transition event="ui.leave" target="left">
+          <send type="bus" target="host" event="client.bye"/>
+          <foreach array="Object.keys(running)" item="callId">
+            <send type="tool" event="cancel"><param name="callId" expr="callId"/></send>
+          </foreach>
+        </transition>
+
+        <!-- ── following the log ─────────────────────────────────────── -->
+        <state id="sync" initial="syncing">
+          <!-- waiting for a snapshot: the host sends one after welcome and after client.resync -->
+          <state id="syncing">
+            <onentry>
+              <send event="sync.timeout" id="syncTimer" delay="2s"/>
+            </onentry>
+            <onexit>
+              <cancel sendid="syncTimer"/>
+            </onexit>
+            <transition event="snapshot" target="live">
+              <assign location="seq" expr="_event.data.seq"/>
+            </transition>
+            <transition event="sync.timeout" target="syncing">
+              <send type="bus" target="host" event="client.resync">
+                <param name="fromSeq" expr="seq"/>
+              </send>
+            </transition>
+          </state>
+
+          <state id="live">
+            <transition event="snapshot">
+              <assign location="seq" expr="_event.data.seq"/>
+            </transition>
+            <!-- already seen -->
+            <transition event="log.batch" cond="_event.data.last &lt;= seq"/>
+            <!-- continues (or overlaps) what we have -->
+            <transition event="log.batch" cond="_event.data.first &lt;= seq + 1">
+              <assign location="seq" expr="_event.data.last"/>
+            </transition>
+            <!-- a gap: something was lost -->
+            <transition event="log.batch" target="syncing">
+              <send type="bus" target="host" event="client.resync">
+                <param name="fromSeq" expr="seq"/>
+              </send>
+            </transition>
+            <transition event="link.restored" target="syncing">
+              <send type="bus" target="host" event="client.resync">
+                <param name="fromSeq" expr="seq"/>
+              </send>
+            </transition>
+          </state>
+        </state>
+
+        <!-- ── may this client type, and why was it last refused ─────── -->
+        <state id="composer" initial="readonly">
+          <state id="readonly">
+            <transition cond="has('input')" target="ready"/>
+          </state>
+          <state id="ready">
+            <transition cond="!has('input')" target="readonly"/>
+            <!-- "busy" is not shown: the outbox just queues the message again -->
+            <transition event="input.rejected" cond="_event.data.code !== 'busy'" target="rejected">
+              <assign location="rejection" expr="_event.data.reason"/>
+            </transition>
+          </state>
+          <!-- shows the host's reason for a few seconds, or until the person types again -->
+          <state id="rejected">
+            <onentry>
+              <send event="rejection.seen" id="rejectionTimer" delay="4s"/>
+            </onentry>
+            <onexit>
+              <cancel sendid="rejectionTimer"/>
+              <assign location="rejection" expr="null"/>
+            </onexit>
+            <transition cond="!has('input')" target="readonly"/>
+            <transition event="rejection.seen ui.submit ui.steer ui.interrupt" target="ready"/>
+          </state>
+        </state>
+
+        <!-- ── this client's own queue ───────────────────────────────── -->
+        <state id="outbox" initial="outbox-start">
+          <!-- anywhere in the outbox -->
+          <transition event="ui.steer">
+            <send type="bus" target="host" event="input.steer">
+              <param name="inputId" expr="track('steer', _event.data.text)"/>
+              <param name="text" expr="_event.data.text"/>
+            </send>
+          </transition>
+          <transition event="ui.interrupt">
+            <send type="bus" target="host" event="input.interrupt"/>
+          </transition>
+          <transition event="ui.queue.remove">
+            <script>unqueue(_event.data.id)</script>
+          </transition>
+          <!-- edit = take it out of the queue and append it to the editor -->
+          <transition event="ui.queue.edit" cond="queue.some(function (q) { return q.id === _event.data.id; })">
+            <send type="panel" event="restore">
+              <param name="text" expr="unqueue(_event.data.id).text"/>
+            </send>
+          </transition>
+          <transition event="input.accepted">
+            <script>settle(_event.data.inputId)</script>
+          </transition>
+          <!-- a refused steer (or a submit refused for a reason other than busy) goes back to the editor -->
+          <transition event="input.rejected" cond="!!awaiting[_event.data.inputId]">
+            <send type="panel" event="restore">
+              <param name="text" expr="settle(_event.data.inputId).text"/>
+            </send>
+          </transition>
+
+          <state id="outbox-start">
+            <transition cond="hostBusy" target="host-busy"/>
+            <transition target="host-idle"/>
+          </state>
+
+          <!-- the host is idle: the next message goes out now -->
+          <state id="host-idle">
+            <transition cond="queue.length > 0 &amp;&amp; canSend()" target="sending">
+              <send type="bus" target="host" event="input.submit">
+                <param name="inputId" expr="track('submit', queue[0].text)"/>
+                <param name="text" expr="queue.shift().text"/>
+              </send>
+            </transition>
+            <transition event="ui.submit" cond="queue.length === 0 &amp;&amp; canSend()" target="sending">
+              <send type="bus" target="host" event="input.submit">
+                <param name="inputId" expr="track('submit', _event.data.text)"/>
+                <param name="text" expr="_event.data.text"/>
+              </send>
+            </transition>
+            <transition event="ui.submit">
+              <script>enqueue(_event.data.text)</script>
+            </transition>
+            <transition event="host.busy" target="host-busy"/>
+          </state>
+
+          <!-- a message is out; anything typed meanwhile is queued -->
+          <state id="sending">
+            <onentry>
+              <send event="send.timeout" id="sendTimer" delay="3s"/>
+            </onentry>
+            <onexit>
+              <cancel sendid="sendTimer"/>
+            </onexit>
+            <transition event="ui.submit">
+              <script>enqueue(_event.data.text)</script>
+            </transition>
+            <transition event="input.accepted" cond="_event.data.inputId === lastSubmit" target="host-busy">
+              <script>settle(lastSubmit)</script>
+            </transition>
+            <!-- another client's message got there first: ours goes back to the head of the queue -->
+            <transition event="input.rejected" cond="_event.data.inputId === lastSubmit &amp;&amp; _event.data.code === 'busy'" target="host-busy">
+              <script>queue.unshift({ id: lastSubmit, text: settle(lastSubmit).text })</script>
+            </transition>
+            <transition event="input.rejected" cond="_event.data.inputId === lastSubmit" target="host-idle">
+              <send type="panel" event="restore">
+                <param name="text" expr="settle(lastSubmit).text"/>
+              </send>
+            </transition>
+            <!-- no answer (offline?): queue it again and try when possible -->
+            <transition event="send.timeout" target="host-idle">
+              <script>if (awaiting[lastSubmit]) queue.unshift({ id: lastSubmit, text: settle(lastSubmit).text })</script>
+            </transition>
+          </state>
+
+          <!-- a turn is running: messages wait in the queue -->
+          <state id="host-busy">
+            <transition event="ui.submit">
+              <script>enqueue(_event.data.text)</script>
+            </transition>
+            <!-- this client stopped the turn: its queue goes back into the editor instead of out -->
+            <transition event="host.idle" cond="_event.data.stoppedBy === clientId &amp;&amp; queue.length > 0" target="host-idle">
+              <send type="panel" event="restore">
+                <param name="text" expr="queue.map(function (q) { return q.text; }).join('\n\n')"/>
+              </send>
+              <assign location="queue" expr="[]"/>
+            </transition>
+            <transition event="host.idle" target="host-idle"/>
+          </state>
+        </state>
+
+        <!-- ── tool calls from the host ──────────────────────────────── -->
+        <state id="work" initial="waiting">
+          <!-- the host may send a call again (we were offline): never run it twice -->
+          <transition event="tool.call" cond="!!running[_event.data.callId]"/>
+          <transition event="tool.call" cond="!!finished[_event.data.callId]">
+            <send type="bus" target="host" event="tool.result">
+              <param name="callId" expr="_event.data.callId"/>
+              <param name="isError" expr="finished[_event.data.callId].isError"/>
+              <param name="content" expr="finished[_event.data.callId].content"/>
+            </send>
+          </transition>
+          <!-- real tools still downloading: the call waits, and the host is told why it takes longer -->
+          <transition event="tool.call" cond="provides(_event.data.name) &amp;&amp; In('real-loading')">
+            <assign location="running[_event.data.callId]" expr="_event.data.name"/>
+            <script>held.push({ callId: _event.data.callId, name: _event.data.name, input: _event.data.input })</script>
+            <send type="bus" target="host" event="tool.delayed">
+              <param name="callId" expr="_event.data.callId"/>
+              <param name="reason" expr="'downloading its WebAssembly packages'"/>
+            </send>
+          </transition>
+          <transition event="tool.call" cond="provides(_event.data.name) &amp;&amp; In('real-failed')">
+            <send type="bus" target="host" event="tool.result">
+              <param name="callId" expr="_event.data.callId"/>
+              <param name="isError" expr="true"/>
+              <param name="content" expr="name + ' could not load its real tools: ' + toolsError"/>
+            </send>
+          </transition>
+          <transition event="tool.call" cond="provides(_event.data.name)">
+            <assign location="running[_event.data.callId]" expr="_event.data.name"/>
+            <send type="tool" event="run">
+              <param name="callId" expr="_event.data.callId"/>
+              <param name="name" expr="_event.data.name"/>
+              <param name="input" expr="_event.data.input"/>
+              <param name="real" expr="In('real-ready')"/>
+            </send>
+          </transition>
+          <transition event="tool.call">
+            <send type="bus" target="host" event="tool.result">
+              <param name="callId" expr="_event.data.callId"/>
+              <param name="isError" expr="true"/>
+              <param name="content" expr="name + ' does not provide ' + _event.data.name + '.'"/>
+            </send>
+          </transition>
+          <transition event="tool.cancel" cond="held.some(function (c) { return c.callId === _event.data.callId; })">
+            <script>held = held.filter(function (c) { return c.callId !== _event.data.callId; }); delete running[_event.data.callId];</script>
+          </transition>
+          <transition event="tool.cancel" cond="!!running[_event.data.callId]">
+            <send type="tool" event="cancel"><param name="callId" expr="_event.data.callId"/></send>
+            <script>delete running[_event.data.callId];</script>
+          </transition>
+          <!-- from the runtime; results of cancelled calls are dropped -->
+          <transition event="tool.done" cond="!!running[_event.data.callId]">
+            <send type="bus" target="host" event="tool.result">
+              <param name="callId" expr="_event.data.callId"/>
+              <param name="isError" expr="!!_event.data.isError"/>
+              <param name="content" expr="_event.data.content"/>
+            </send>
+            <script>
+              delete running[_event.data.callId];
+              finished[_event.data.callId] = { isError: !!_event.data.isError, content: _event.data.content };
+              var ids = Object.keys(finished);
+              if (ids.length > 20) delete finished[ids[0]];
+            </script>
+          </transition>
+
+          <state id="waiting">
+            <transition cond="runningCount() > 0" target="working"/>
+          </state>
+          <state id="working">
+            <transition cond="runningCount() === 0" target="waiting"/>
+          </state>
+        </state>
+
+        <!-- ── simulated or real (WebAssembly) tools ─────────────────── -->
+        <state id="tools" initial="tools-start">
+          <state id="tools-start">
+            <transition cond="wantsReal &amp;&amp; needs.length > 0" target="real"/>
+            <transition target="simulated"/>
+          </state>
+          <state id="simulated">
+            <transition event="ui.tools.real" cond="needs.length > 0" target="real"/>
+          </state>
+
+          <state id="real" initial="real-loading">
+            <!-- back to the simulation: held calls run simulated -->
+            <transition event="ui.tools.simulated" target="simulated">
+              <foreach array="held" item="call">
+                <send type="tool" event="run">
+                  <param name="callId" expr="call.callId"/>
+                  <param name="name" expr="call.name"/>
+                  <param name="input" expr="call.input"/>
+                  <param name="real" expr="false"/>
+                </send>
+              </foreach>
+              <assign location="held" expr="[]"/>
+            </transition>
+
+            <!-- asks the workspace for its packages; each is a package.scxml machine there -->
+            <state id="real-loading">
+              <onentry>
+                <assign location="toolsError" expr="null"/>
+                <send type="workspace" target="workspace" event="need">
+                  <param name="packages" expr="needs"/>
+                </send>
+              </onentry>
+              <transition event="workspace.ready" target="real-ready"/>
+              <transition event="workspace.failed" target="real-failed">
+                <assign location="toolsError" expr="_event.data.key + ': ' + (_event.data.error || 'failed')"/>
+              </transition>
+              <!-- a package moved on: tell the host again that held calls are still coming -->
+              <transition event="workspace.progress" cond="held.length > 0">
+                <foreach array="held" item="call">
+                  <send type="bus" target="host" event="tool.delayed">
+                    <param name="callId" expr="call.callId"/>
+                    <param name="reason" expr="'still downloading its WebAssembly packages'"/>
+                  </send>
+                </foreach>
+              </transition>
+            </state>
+
+            <!-- everything installed: held calls run now -->
+            <state id="real-ready">
+              <onentry>
+                <foreach array="held" item="call">
+                  <send type="tool" event="run">
+                    <param name="callId" expr="call.callId"/>
+                    <param name="name" expr="call.name"/>
+                    <param name="input" expr="call.input"/>
+                    <param name="real" expr="true"/>
+                  </send>
+                </foreach>
+                <assign location="held" expr="[]"/>
+              </onentry>
+            </state>
+
+            <!-- a download failed: held calls fail with the reason; asking again retries -->
+            <state id="real-failed">
+              <onentry>
+                <foreach array="held" item="call">
+                  <send type="bus" target="host" event="tool.result">
+                    <param name="callId" expr="call.callId"/>
+                    <param name="isError" expr="true"/>
+                    <param name="content" expr="name + ' could not load its real tools: ' + toolsError"/>
+                  </send>
+                  <script>delete running[call.callId];</script>
+                </foreach>
+                <assign location="held" expr="[]"/>
+              </onentry>
+              <transition event="ui.tools.real ui.tools.retry" target="real-loading"/>
+            </state>
+          </state>
+        </state>
+      </parallel>
+
+      <final id="left"/>
+    </state>
+  </parallel>
+</scxml>

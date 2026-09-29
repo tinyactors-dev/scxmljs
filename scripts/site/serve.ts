@@ -3,6 +3,9 @@
  * when that's a directory, missing files → `/404.html` with status 404.
  *
  *   bun scripts/site/serve.ts [--port 4400]      (mise run site:serve)
+ *
+ * /demos/llm-chat/ is served cross-origin isolated (COOP/COEP), as its service worker makes it
+ * on GitHub Pages. SITE_COI_HEADERS=0 leaves the headers out, to exercise that service worker.
  */
 import { stat } from "node:fs/promises";
 import { join, normalize } from "node:path";
@@ -10,6 +13,12 @@ import { join, normalize } from "node:path";
 const root = new URL("../../_site", import.meta.url).pathname;
 const i = process.argv.indexOf("--port");
 const port = Number(i > 0 ? process.argv[i + 1] : (process.env.PORT ?? 4400));
+
+const coiHeaders = process.env.SITE_COI_HEADERS !== "0";
+const isolated = (path: string) =>
+  coiHeaders && path.startsWith("/demos/llm-chat/")
+    ? { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp" }
+    : undefined;
 
 const isDir = (p: string) =>
   stat(p).then(
@@ -29,7 +38,7 @@ const server = Bun.serve({
       file = join(file, "index.html");
     }
     const f = Bun.file(file);
-    if (await f.exists()) return new Response(f);
+    if (await f.exists()) return new Response(f, { headers: isolated(path) });
     return new Response(Bun.file(join(root, "404.html")), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
   },
 });

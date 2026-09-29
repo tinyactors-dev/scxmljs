@@ -4,9 +4,14 @@
  *   1. build the stage (stage.html: the elements from source, local fonts, the playground's charts);
  *   2. render every entry of docs/media.json with render.mjs inside the pinned Playwright image;
  *   3. hash each entry: its spec, its encode settings and its frames' pixels → <name>-<hash8>;
- *   4. compare with docs/media.lock.json. --check stops here (exit 1 when anything is stale);
- *   5. encode the changed entries (ffmpeg), push them to the media branch, prune it, point the docs
- *      at the new names, update the lock, commit and push main, and redeploy the website.
+ *   4. compare with docs/media.lock.json. A different hash alone doesn't make an entry stale: a
+ *      render on another architecture differs in anti-aliasing noise. Unless the spec or encoding
+ *      changed, the fresh render is encoded and compared with the published files, pixel by pixel
+ *      (compare.ts); only a perceptual difference makes it stale. --check stops here (exit 1 when
+ *      anything is stale);
+ *   5. encode the stale entries (ffmpeg), push them to the media branch, prune it, point the docs
+ *      at the new names, update the lock, commit and push main, and redeploy the website. An
+ *      entry that isn't stale keeps its published file and name.
  */
 import { copyFile, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,22 +19,25 @@ import { join, relative } from "node:path";
 import { $ } from "bun";
 import { DOC_GLOBS, MEDIA, MEDIA_BRANCH } from "../../docs/config.ts";
 import { markdownFiles } from "../../docs/markdown.ts";
+import { compareStills, compareVideos, TOLERANCE, type Verdict } from "./compare.ts";
 
 const root = join(import.meta.dir, "../../..");
 const IMAGE = "mcr.microsoft.com/playwright:v1.63.0-noble"; // keep in step with @playwright/test (and scripts/visual.sh)
-// Pixels are only reproducible on one architecture, and Chromium crashes under emulation (qemu),
-// so media are rendered on arm64 only: Apple-silicon laptops and GitHub's ubuntu-24.04-arm runners.
-const PLATFORM = "linux/arm64";
+// The image runs natively on the host's architecture (never emulated: Chromium crashes under qemu).
+// amd64 and arm64 renders differ only in anti-aliasing noise, which the staleness check tolerates.
+const HOST_ARCH = (await $`uname -m`.text()).trim();
+const PLATFORM = process.env.SCXML_MEDIA_PLATFORM || (["arm64", "aarch64"].includes(HOST_ARCH) ? "linux/arm64" : "linux/amd64");
 const SPEC = "docs/media.json";
 const LOCK = "docs/media.lock.json";
-const SKIPPED = 3; // exit code: this host can't render (no Docker, or not arm64)
+const SKIPPED = 3; // exit code: this host can't render (no Docker)
+const FPS = 30; // the video's frame rate
 
 /** ffmpeg arguments per output format; part of the hash, so changing them renames the files. */
 const ENCODE = {
   video: {
     webm: [
       "-vf",
-      "fps=30,format=yuv420p",
+      `fps=${FPS},format=yuv420p`,
       "-c:v",
       "libvpx-vp9",
       "-crf",
@@ -75,7 +83,8 @@ interface Entry {
   scale: number;
   formats: string[];
 }
-type Lock = Record<string, { hash: string; files: string[] }>;
+/** hash: of the pixels (and recipe) published; recipe: of the spec and encode settings alone. */
+type Lock = Record<string, { hash: string; recipe?: string; files: string[] }>;
 
 const argv = process.argv.slice(2);
 const flag = (f: string) => argv.includes(f);
@@ -98,6 +107,8 @@ const entries = spec.media.filter((e) => !only || only.includes(e.name));
 if (only && entries.length !== only.length) fail(`--only: unknown media (known: ${spec.media.map((e) => e.name).join(", ")})`);
 for (const e of spec.media) {
   const kind = e.scene === "explorer-tour" ? "video" : "still";
+  // the lossless PNG is what staleness is decided on (compare.ts), so every entry publishes one
+  if (!e.formats.includes("png")) fail(`${SPEC}: ${e.name} needs a png (staleness is decided on it)`);
   for (const f of e.formats)
     if (!(f in ENCODE[kind])) fail(`${SPEC}: ${e.name} can't be ${f} (a ${kind} is ${Object.keys(ENCODE[kind]).join(", ")})`);
 }
@@ -105,14 +116,8 @@ const lockFile = Bun.file(join(root, LOCK));
 const { $comment: _comment, ...lock }: Lock & { $comment?: unknown } = (await lockFile.exists()) ? await lockFile.json() : {};
 
 // ── can this host render? ──────────────────────────────────────────────────
-const why =
-  (await $`docker info`.quiet().nothrow()).exitCode !== 0
-    ? "Docker isn't available"
-    : !["arm64", "aarch64"].includes((await $`uname -m`.text()).trim())
-      ? `media render on ${PLATFORM} only (Chromium crashes under emulation), and this host is ${(await $`uname -m`.text()).trim()}`
-      : undefined;
-if (why) {
-  const msg = `media: can't render here: ${why}. They render on the media workflow (ubuntu-24.04-arm) and on Apple-silicon laptops.`;
+if ((await $`docker info`.quiet().nothrow()).exitCode !== 0) {
+  const msg = "media: can't render here: Docker isn't available. They render wherever Docker runs (and on the media workflow).";
   if (process.env.SCXML_MEDIA_REQUIRED === "1") fail(msg);
   console.log(`media: skipped. ${msg}`);
   process.exit(SKIPPED);
@@ -120,8 +125,9 @@ if (why) {
 
 // ── build the stage, render the frames ──────────────────────────────────────
 const work = join(root, ".media");
-await rm(work, { recursive: true, force: true });
 await mkdir(work, { recursive: true });
+// published/ caches downloads of the published media (their names are content hashes)
+for (const d of await readdir(work)) if (d !== "published") await rm(join(work, d), { recursive: true, force: true });
 const t0 = performance.now();
 step("stage (Bun.build)");
 const stage = join(work, "stage");
@@ -131,18 +137,38 @@ await mkdir(join(stage, "charts"), { recursive: true });
 for (const dir of ["examples/playground/charts", "docs/examples"])
   for (const f of await readdir(join(root, dir))) if (f.endsWith(".scxml")) await copyFile(join(root, dir, f), join(stage, "charts", f));
 
-const hashes = await renderAndHash("frames");
+const { hashes, recipes } = await renderAndHash("frames");
 if (twice) {
-  const again = await renderAndHash("frames-2");
+  const again = (await renderAndHash("frames-2")).hashes;
   const differ = entries.filter((e) => again[e.name] !== hashes[e.name]);
   if (differ.length) fail(`not deterministic: ${differ.map((e) => `${e.name} ${hashes[e.name]} ≠ ${again[e.name]}`).join(", ")}`);
   log(`✓ rendered twice, identical: ${entries.map((e) => `${e.name}-${hashes[e.name]}`).join(", ")}`);
 }
 
-const changed = entries.filter((e) => lock[e.name]?.hash !== hashes[e.name]);
-step("compare with docs/media.lock.json");
-for (const e of entries)
-  log(`  ${lock[e.name]?.hash === hashes[e.name] ? "=" : "≠"} ${e.name}: ${lock[e.name]?.hash ?? "(new)"} → ${hashes[e.name]}`);
+// ── stale? ──────────────────────────────────────────────────────────────────
+const files = new Map<string, string>(); // published name → local path
+step(`compare with ${LOCK} and the published media (${MEDIA_BRANCH})`);
+/** the hash each entry is published under: the lock's while the published files still show it */
+const current: Record<string, string> = {};
+const changed: Entry[] = [];
+for (const e of entries) {
+  const old = lock[e.name];
+  const fresh = hashes[e.name]!;
+  let why: string | undefined;
+  if (!old) why = "new";
+  else if (old.hash === fresh) log(`  = ${e.name}: ${fresh}`);
+  else if (old.recipe && old.recipe !== recipes[e.name]) why = "its spec or encoding changed";
+  else {
+    const v = await looksPublished(e, old);
+    if (v.same) log(`  ≈ ${e.name}: ${old.hash} (this render is ${fresh}: at most ${v.worst} px differ in ${v.frames} frame(s))`);
+    else why = v.reason ?? `${v.worst === Number.POSITIVE_INFINITY ? "it" : `${v.worst} px`} differ`;
+  }
+  if (why) {
+    log(`  ≠ ${e.name}: ${old?.hash ?? "(new)"} → ${fresh} (${why})`);
+    changed.push(e);
+    current[e.name] = fresh;
+  } else current[e.name] = old!.hash;
+}
 const orphans = Object.keys(lock).filter((n) => !spec.media.some((e) => e.name === n));
 if (check) {
   const seconds = ((performance.now() - t0) / 1000).toFixed(0);
@@ -156,26 +182,16 @@ if (check) {
 }
 
 // ── encode ──────────────────────────────────────────────────────────────────
+// the comparison encoded renders that look like what's published: those aren't published again
+const publishing = (name: string) => dryRun || changed.some((e) => name.startsWith(`${e.name}-${hashes[e.name]}.`));
+for (const name of [...files.keys()]) if (!publishing(name)) files.delete(name);
 const toEncode = dryRun ? entries : changed;
-const files = new Map<string, string>(); // published name → local path
 if (toEncode.length) step(`encode (ffmpeg): ${toEncode.map((e) => e.name).join(", ")}`);
-for (const e of toEncode) {
-  const dir = join(work, "frames", e.name);
-  const kind = e.scene === "explorer-tour" ? "video" : "still";
+for (const e of toEncode)
   for (const format of e.formats) {
-    const name = `${e.name}-${hashes[e.name]}.${format}`;
-    const dest = join(work, "out", name);
-    await mkdir(join(work, "out"), { recursive: true });
-    const args = (ENCODE[kind] as Record<string, readonly string[]>)[format]!;
-    if (args[0] === "copy") await copyFile(join(dir, "still.png"), dest);
-    else if (kind === "video") {
-      await Bun.write(join(dir, "frames.ffconcat"), await concat(dir));
-      await ffmpeg(["-f", "concat", "-safe", "0", "-i", join(dir, "frames.ffconcat"), ...args, dest]);
-    } else await ffmpeg(["-i", join(dir, "still.png"), ...args, dest]);
-    files.set(name, dest);
-    log(`  ${name.padEnd(34)} ${(Bun.file(dest).size / 1024).toFixed(0).padStart(6)} KB`);
+    const name = await encode(e, format);
+    log(`  ${name.padEnd(34)} ${(Bun.file(files.get(name)!).size / 1024).toFixed(0).padStart(6)} KB`);
   }
-}
 
 if (dryRun) {
   const dest = opt("--out") ?? "media-out";
@@ -200,8 +216,9 @@ if (branch !== "main") fail(`publish from main (this is ${branch || "a detached 
 
 const newLock: Lock = {};
 for (const e of spec.media) {
-  const hash = hashes[e.name] ?? lock[e.name]?.hash;
-  if (hash) newLock[e.name] = { hash, files: e.formats.map((f) => `${e.name}-${hash}.${f}`) };
+  const hash = current[e.name] ?? lock[e.name]?.hash;
+  const recipe = recipes[e.name] ?? lock[e.name]?.recipe;
+  if (hash) newLock[e.name] = { hash, recipe, files: e.formats.map((f) => `${e.name}-${hash}.${f}`) };
 }
 step(`media branch (${MEDIA_BRANCH})`);
 await publishBranch(newLock);
@@ -239,8 +256,8 @@ else fail(`couldn't start site.yml: ${site.stderr.toString().trim()}`);
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
-/** Renders the entries into .media/<dir> (inside Docker) and returns each entry's hash. */
-async function renderAndHash(dir: string): Promise<Record<string, string>> {
+/** Renders the entries into .media/<dir> (inside Docker) and returns each entry's hash and recipe. */
+async function renderAndHash(dir: string) {
   step(`render (${IMAGE}, ${PLATFORM})`);
   const uid = (await $`id -u`.text()).trim();
   const gid = (await $`id -g`.text()).trim();
@@ -276,19 +293,91 @@ async function renderAndHash(dir: string): Promise<Record<string, string>> {
     { stdout: "inherit", stderr: "inherit" },
   );
   if (res.exitCode !== 0) fail("rendering failed");
-  const result: Record<string, string> = {};
+  const hashes: Record<string, string> = {};
+  const recipes: Record<string, string> = {};
   for (const e of entries) {
     const d = join(out, e.name);
     const kind = e.scene === "explorer-tour" ? "video" : "still";
     const frames: { file: string; ms: number }[] = await Bun.file(join(d, "frames.json")).json();
     const h = new Bun.CryptoHasher("sha256");
     const { about: _, ...what } = e;
-    h.update(JSON.stringify({ what, encode: Object.fromEntries(e.formats.map((f) => [f, (ENCODE[kind] as Record<string, unknown>)[f]])) }));
+    const recipe = JSON.stringify({
+      what,
+      encode: Object.fromEntries(e.formats.map((f) => [f, (ENCODE[kind] as Record<string, unknown>)[f]])),
+    });
+    recipes[e.name] = sha256(new TextEncoder().encode(recipe)).slice(0, 8);
+    h.update(recipe);
     for (const f of frames) h.update(`${f.ms}:${sha256(await Bun.file(join(d, f.file)).bytes())}\n`);
     h.update(`still:${sha256(await Bun.file(join(d, "still.png")).bytes())}`);
-    result[e.name] = h.digest("hex").slice(0, 8);
+    hashes[e.name] = h.digest("hex").slice(0, 8);
   }
-  return result;
+  return { hashes, recipes };
+}
+
+/** Encodes one format of a rendered entry into .media/out; returns its published name. */
+async function encode(e: Entry, format: string): Promise<string> {
+  const name = `${e.name}-${hashes[e.name]}.${format}`;
+  if (files.has(name)) return name;
+  const dir = join(work, "frames", e.name);
+  const kind = e.scene === "explorer-tour" ? "video" : "still";
+  const dest = join(work, "out", name);
+  await mkdir(join(work, "out"), { recursive: true });
+  const args = (ENCODE[kind] as Record<string, readonly string[]>)[format]!;
+  if (args[0] === "copy") await copyFile(join(dir, "still.png"), dest);
+  else if (kind === "video") {
+    await Bun.write(join(dir, "frames.ffconcat"), await concat(dir));
+    await ffmpeg(["-f", "concat", "-safe", "0", "-i", join(dir, "frames.ffconcat"), ...args, dest]);
+  } else await ffmpeg(["-i", join(dir, "still.png"), ...args, dest]);
+  files.set(name, dest);
+  return name;
+}
+
+/**
+ * Does this render look like the published files? The PNG (lossless: every entry has one) is
+ * compared with the published PNG, and a video's webm, encoded like the published one, with it
+ * (lossy against lossy): at the middle of every rendered frame, after its size and duration. The
+ * webp files are made from the same pixels (and ffmpeg can't decode an animated one), so they
+ * follow.
+ */
+async function looksPublished(e: Entry, old: Lock[string]): Promise<Verdict> {
+  const compared = ["png", "webm"].filter((f) => e.formats.includes(f)); // the quick one first
+  let verdict: Verdict = { same: false, worst: Number.POSITIVE_INFINITY, frames: 0, reason: "nothing to compare" };
+  for (const format of compared) {
+    const published = old.files.find((f) => f.endsWith(`.${format}`));
+    if (!published) return { same: false, worst: Number.POSITIVE_INFINITY, frames: 0, reason: `${format} isn't published` };
+    const theirs = await download(published);
+    const ours = files.get(await encode(e, format))!;
+    const tolerance = format === "webm" ? TOLERANCE.video : TOLERANCE.lossless;
+    const v =
+      format === "webm"
+        ? await compareVideos(ours, theirs, await midFrames(e), FPS, tolerance)
+        : await compareStills(ours, theirs, tolerance);
+    if (!v.same) return { ...v, reason: `${format}: ${v.reason ?? `${v.worst} px differ in a frame (> ${tolerance.maxDiffPixels})`}` };
+    verdict = { same: true, worst: Math.max(v.worst, verdict.same ? verdict.worst : 0), frames: verdict.frames + v.frames };
+  }
+  return verdict;
+}
+
+/** The video frame at the middle of each rendered frame's display time. */
+async function midFrames(e: Entry): Promise<number[]> {
+  const frames: { ms: number }[] = await Bun.file(join(work, "frames", e.name, "frames.json")).json();
+  let t = 0;
+  return frames.map((f) => {
+    const n = Math.floor(((t + f.ms / 2) / 1000) * FPS);
+    t += f.ms;
+    return n;
+  });
+}
+
+/** A published media file, from the cache in .media/published or the media branch. */
+async function download(name: string): Promise<string> {
+  const path = join(work, "published", name);
+  if (await Bun.file(path).exists()) return path;
+  const res = await fetch(`${MEDIA}/${name}`);
+  if (!res.ok) fail(`couldn't download ${MEDIA}/${name}: ${res.status} (is it on ${MEDIA_BRANCH}?)`);
+  await Bun.write(`${path}.part`, await res.arrayBuffer());
+  await $`mv ${`${path}.part`} ${path}`.quiet();
+  return path;
 }
 
 function sha256(bytes: Uint8Array) {
@@ -374,7 +463,7 @@ async function pointDocsAt(next: Lock): Promise<string[]> {
   }
   await Bun.write(
     join(root, LOCK),
-    `${JSON.stringify({ $comment: "Generated by scripts/media from docs/media.json: the current hash of every media file. Don't edit.", ...next }, null, 2)}\n`,
+    `${JSON.stringify({ $comment: "Generated by scripts/media from docs/media.json: the published hash of every media entry (and of its spec and encoding: recipe). Don't edit.", ...next }, null, 2)}\n`,
   );
   return touched;
 }

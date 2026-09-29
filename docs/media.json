@@ -19,7 +19,7 @@
       "scheme": "light",
       "viewport": [1352, 860],
       "scale": 2,
-      "formats": ["webp"]
+      "formats": ["webp", "png"]
     },
     {
       "name": "explorer-dark",
@@ -29,7 +29,7 @@
       "scheme": "dark",
       "viewport": [1352, 860],
       "scale": 2,
-      "formats": ["webp"]
+      "formats": ["webp", "png"]
     },
     {
       "name": "view-light",
@@ -39,7 +39,7 @@
       "scheme": "light",
       "viewport": [880, 600],
       "scale": 2,
-      "formats": ["webp"]
+      "formats": ["webp", "png"]
     },
     {
       "name": "view-dark",
@@ -49,7 +49,7 @@
       "scheme": "dark",
       "viewport": [880, 600],
       "scale": 2,
-      "formats": ["webp"]
+      "formats": ["webp", "png"]
     }
   ]
 }

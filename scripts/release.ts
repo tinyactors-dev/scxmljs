@@ -100,11 +100,11 @@ if (blockers.every((b) => !b.startsWith("package.json") && !b.startsWith("publis
   pass("required fields present");
 
 // ── docs media ─────────────────────────────────────────────────────────────
-// every screenshot and video must show what this code renders (scripts/media; arm64 + Docker only)
+// every screenshot and video must show what this code renders (scripts/media; needs Docker)
 section("docs media");
 const media = Bun.spawnSync([join(root, "scripts/media"), "--check"], { cwd: root, stdout: "inherit", stderr: "inherit" });
 if (media.exitCode === 0) pass("docs media are current");
-else if (media.exitCode === 3) warn("docs media weren't checked: this host can't render them (needs Docker on arm64)");
+else if (media.exitCode === 3) warn("docs media weren't checked: this host can't render them (no Docker)");
 else block("docs media are stale or didn't render: run scripts/media (the media workflow does it on main)");
 
 // ── checks ─────────────────────────────────────────────────────────────────

@@ -54,25 +54,57 @@ they show (the library, the playground samples and charts, the tokens, the list 
 
 - **Entries:** `explorer-tour` (the README hero: a ~20 s tour of `<scxml-explorer>` with the
   Tinyactors theme, as `.webm` 2880×1800, animated `.webp` 1600 wide, `.png` poster),
-  `explorer-light` / `explorer-dark` and `view-light` / `view-dark` (the neutral theme).
-- **Deterministic:** rendered in the pinned Playwright image on linux/arm64 (Apple-silicon laptops
-  and GitHub's `ubuntu-24.04-arm`; Chromium crashes under amd64 emulation), on a paused clock moved
-  one fixed step at a time, with reduced motion, a seeded `Math.random`, a fixed `Date` and fonts
-  from local packages. Each file is `<name>-<hash8>.<ext>`, the hash taken from its frames' pixels
-  and the encode settings, so a name changes exactly when what it shows changes.
+  `explorer-light` / `explorer-dark` and `view-light` / `view-dark` (the neutral theme; `.webp`
+  for the docs, `.png` as the lossless reference).
+- **Deterministic:** rendered in the pinned Playwright image, natively on the host's architecture
+  (linux/amd64 or linux/arm64 from `uname -m`; `SCXML_MEDIA_PLATFORM` overrides; never emulated,
+  where Chromium crashes), on a paused clock moved one fixed step at a time, with reduced motion,
+  a seeded `Math.random`, a fixed `Date` and fonts from local packages. Each file is
+  `<name>-<hash8>.<ext>`, the hash taken from its frames' pixels and the encode settings.
   `scripts/media --twice` renders twice and fails unless both are identical.
+- **Stale means it looks different.** Each architecture reproduces its own pixels exactly, but
+  amd64 and arm64 Skia anti-alias edges a little differently, so their hashes never match. When a
+  render's hash isn't the published one (and its spec and encoding haven't changed, which is
+  stale by definition: `recipe` in the lock), `scripts/media` compares it with the published files
+  (downloaded from the branch, cached in `.media/published/`): the entry's `.png` with the
+  published `.png`, and the tour's `.webm`, encoded the same way, with the published `.webm` at
+  the middle of every rendered frame (after size and duration); the `.webp` files are made from
+  the same pixels. The comparator is pixelmatch (behind Playwright's `toHaveScreenshot`), with its
+  anti-aliasing detection; a frame may have at most 20 other pixels further apart than the colour
+  threshold, 0.01 for PNG against PNG and 0.2 for the lossy webm (`scripts/lib/media/compare.ts`).
+  An entry that looks the same keeps its published file and name, so a laptop and CI of either
+  architecture agree. Calibration (differing pixels in the worst frame; whole pictures, arm64
+  published against the render named):
+
+  | Pair | Compared | Differing pixels | Verdict |
+  |---|---|---|---|
+  | amd64 render, each of the 5 entries | `.png` (0.01) | 0 (bytes differ in 3.9k–316k pixels) | same |
+  | amd64 render, the tour | `.webm` (0.2), 133 frames | 2 | same |
+  | neutral accent `#3d5bd9` → `#4563d0` (dark `#8fa3ff` → `#97abff`), `view-*` | `.png` | 7,783 / 7,764 | stale |
+  | a state box moved 1px right, `view-*` | `.png` | 8,609 / 8,679 | stale |
+  | its bottom shadow line 1px lower, `view-*` | `.png` | 929 / 935 | stale |
+  | "Step" button reads "Next", `explorer-*` / tour | `.png` | 1,122 / 1,133 / 1,418 | stale |
+  | the same, the tour | `.webm` | 1,339 | stale |
+  | the explorer sampled 300 ms earlier, `explorer-*` | `.png` | 95 / 93 | stale |
+  | the tour sampled 400 ms earlier | `.png` / `.webm` | 227 / 134,578 | stale |
+
+  The accent change is the subtlest: its pixels are between 0.02 and 0.05 apart, so looser
+  thresholds miss it, and lossy `.webp` against `.webp` barely separates it from compression noise
+  (180 against 51 pixels at the best threshold), which is why stills are decided on a `.png`. `scripts/lib/media/compare.test.ts` pins this on
+  192×192 crops of these pairs (`fixtures/`).
 - **Hosting:** the orphan branch `readme-media` (one force-pushed commit), linked as
   `https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/<name>-<hash8>.<ext>`. A
   GitHub release doesn't work: its assets download as attachments instead of rendering. The branch
   keeps what `main`'s docs link now, what they linked before the last refresh, and everything any
   `v*` tag's docs link (npm shows every published README forever); the rest is pruned.
-- **When something changed**, `scripts/media` encodes the new files (ffmpeg, pinned in `mise.toml`),
+- **When something is stale**, `scripts/media` encodes the new files (ffmpeg, pinned in `mise.toml`),
   pushes them, rewrites the links in the docs whose hash changed, writes `docs/media.lock.json`,
   commits and pushes `main` (rebasing and retrying on a race) and starts `site.yml`, so the
   website shows the same media as the docs on `main`. Otherwise it changes nothing.
 - **Safety net:** `scripts/media --check` (`mise run media:check`) fails when the docs are stale;
-  it runs in `scripts/ci --full` and in `scripts/release` (a blocker; on hosts that can't render,
-  such as amd64 CI, it's skipped with a notice). The link checker (`mise run docs:links`, light
+  it runs in `scripts/ci --full` and in `scripts/release` (a blocker) on either architecture. Only
+  a host without Docker skips it, with a notice (in `scripts/ci --full` on Linux, Docker is
+  required). The link checker (`mise run docs:links`, light
   CI) requires every media link to match `docs/media.lock.json` and to exist on the branch.
 - **Adding an image:** add an entry to `docs/media.json` (and its scene to
   `scripts/lib/media/render.mjs`), link it with any 8-hex hash, and run `scripts/media` on `main`

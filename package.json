@@ -27,12 +27,15 @@
     "@lezer/highlight": "1.2.5",
     "@playwright/test": "1.63.0",
     "@types/bun": "1.4.2",
+    "@types/pngjs": "6.0.5",
     "axe-core": "4.13.0",
     "codemirror": "6.0.2",
     "elkjs": "0.10.0",
     "happy-dom": "20.14.5",
     "marked": "18.0.14",
     "pagefind": "1.5.2",
+    "pixelmatch": "7.2.0",
+    "pngjs": "7.0.0",
     "shiki": "4.4.3",
     "typescript": "7.0.2"
   }

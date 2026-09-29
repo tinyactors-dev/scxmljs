@@ -1,9 +1,11 @@
 # Keeps every screenshot and video in the docs current: on each push to main that can change what
 # they show (and on "Run workflow"). All the work happens in scripts/media, which runs the same way
-# locally: it renders docs/media.json, and only when a hash changed does it push the new files to
-# the readme-media branch, commit the new links to main and start site.yml. Its own commit doesn't
-# start this workflow again (pushes made with GITHUB_TOKEN never trigger workflows).
-# arm64: media render on linux/arm64 only (the same pixels as an Apple-silicon laptop).
+# locally: it renders docs/media.json, and only when a render looks different from what's published
+# does it push the new files to the readme-media branch, commit the new links to main and start
+# site.yml. Its own commit doesn't start this workflow again (GITHUB_TOKEN pushes never trigger
+# workflows).
+# Any runner works: renders are compared with the published media by how they look, so an amd64
+# render of unchanged code matches the arm64 one it would replace, and nothing is published.
 name: media
 on:
   push:
@@ -29,7 +31,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   media:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: scripts/media

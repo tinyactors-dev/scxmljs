@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tour 3, "Survives crashes": the post's job-42. The process dies during a tool round (one safe
+  call, one not), and again while the final answer streams. A follow-up waits in the inbox
+  through both. The client retries job-42 with the same requestId each time it reconnects.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · survives crashes" initial="setup">
+  <datamodel>
+    <data id="bashResults" expr="0"/>
+    <data id="toldDuplicate" expr="false"/>
+  </datamodel>
+
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'You'"/></send>
+    </onentry>
+    <transition event="client.you.live" target="submit"/>
+  </state>
+
+  <state id="submit">
+    <onentry><send event="go" delay="1s"/></onentry>
+    <transition event="go" target="round">
+      <send type="stage" event="type">
+        <param name="text" expr="'Fix the flaky login test'"/>
+        <param name="requestId" expr="'job-42'"/>
+      </send>
+      <send type="stage" event="note">
+        <param name="text" expr="'The job is submitted with requestId job-42.'"/>
+        <param name="cite" expr="'crashes'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="round">
+    <transition event="tool.bash.run" target="queue">
+      <send type="stage" event="note">
+        <param name="text" expr="'Two tool calls: search_issues (replay: safe) and bash (not safe). Each stored its intent (phase execute) before it started. bash streams its output into storage.'"/>
+        <param name="cite" expr="'tools'"/>
+      </send>
+      <send type="stage" event="inspect"><param name="kind" expr="'pi.tool'"/><param name="label" expr="'bash'"/></send>
+    </transition>
+  </state>
+
+  <state id="queue">
+    <onentry><send event="go" delay="1.2s"/></onentry>
+    <transition event="go" target="crash1">
+      <send type="stage" event="type"><param name="text" expr="'Then update the changelog.'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'A follow-up, typed while the agent works: it waits in the inbox (pi.inbox).'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="crash1">
+    <onentry><send event="kill" delay="1.3s"/></onentry>
+    <transition event="kill" target="dead1">
+      <send type="stage" event="kill"/>
+      <send type="stage" event="note">
+        <param name="text" expr="'The process dies, mid tool round. Every session, timer and promise is gone. Storage is not: two tasks are running in phase execute, the generation is waiting, the follow-up is queued.'"/>
+        <param name="cite" expr="'crashes'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+
+  <state id="dead1">
+    <onentry><send event="start" delay="3s"/></onentry>
+    <transition event="start" target="recovering">
+      <send type="stage" event="start"/>
+      <send type="stage" event="inspect"><param name="kind" expr="'harness'"/></send>
+    </transition>
+  </state>
+
+  <!-- from the first restart on: whenever the client retries job-42 -->
+  <state id="afterCrash" initial="recovering">
+    <transition event="submit.duplicate" cond="!toldDuplicate">
+      <assign location="toldDuplicate" expr="true"/>
+      <send type="stage" event="note">
+        <param name="text" expr="'The client reconnected and sent job-42 again: same requestId, so the harness returned the original submission instead of asking twice.'"/>
+        <param name="cite" expr="'crashes'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+    <state id="recovering">
+      <transition event="harness.open">
+        <send type="stage" event="note">
+          <param name="text" expr="'A new process opens the same storage. Reconciling is one commit and runs no task code: the running tasks go back to pending, with their checkpoints. Then resume().'"/>
+          <param name="cite" expr="'crashes'"/>
+          <param name="panel" expr="'process'"/>
+        </send>
+      </transition>
+      <transition event="tool.bash.resume" target="resumed">
+        <send type="stage" event="inspect"><param name="kind" expr="'pi.tool'"/><param name="label" expr="'bash'"/></send>
+      </transition>
+    </state>
+
+    <state id="resumed">
+      <transition event="commit.tool.interrupted" target="retried">
+        <send type="stage" event="note">
+          <param name="text" expr="'Each tool task resumes in phase execute. search_issues is safe: it runs again with its stored arguments. bash is not: the model is told it was interrupted, with the output stored so far.'"/>
+          <param name="cite" expr="'crashes'"/>
+          <param name="panel" expr="'process'"/>
+        </send>
+      </transition>
+    </state>
+
+    <state id="retried">
+      <!-- the rerun bash fails the test; the next one (after the edit) passes -->
+      <transition event="commit.tool.result.bash">
+        <assign location="bashResults" expr="bashResults + 1"/>
+      </transition>
+      <transition cond="bashResults >= 2" target="answering"/>
+    </state>
+
+    <state id="answering">
+      <transition event="pi.generation.request" target="streaming"/>
+    </state>
+
+    <state id="streaming">
+      <onentry><send event="kill" delay="2.6s"/></onentry>
+      <transition event="kill" target="dead2">
+        <send type="stage" event="kill"/>
+        <send type="stage" event="note">
+          <param name="text" expr="'The tests pass, the answer starts streaming, and the process dies again. The streamed part was committed as it arrived (pi.live).'"/>
+          <param name="cite" expr="'crashes'"/>
+          <param name="panel" expr="'process'"/>
+        </send>
+      </transition>
+    </state>
+
+    <state id="dead2">
+      <onentry><send event="start" delay="2.5s"/></onentry>
+      <transition event="start" target="resent"><send type="stage" event="start"/></transition>
+    </state>
+
+    <state id="resent">
+      <transition event="pi.generation.request">
+        <send type="stage" event="note">
+          <param name="text" expr="'The request was cut off, so it is sent again. The partial answer stays in the transcript, marked aborted; the model never sees it.'"/>
+          <param name="cite" expr="'crashes'"/>
+          <param name="panel" expr="'process'"/>
+        </send>
+        <send type="stage" event="inspect"><param name="kind" expr="'pi.generation'"/></send>
+      </transition>
+      <transition event="commit.generation.answer" target="followUp"/>
+    </state>
+
+    <state id="followUp">
+      <transition event="commit.generation.answer" target="done">
+        <send type="stage" event="note">
+          <param name="text" expr="'job-42 is answered, exactly once, and the follow-up was still queued: it ran as the next run. Two crashes, nothing lost, nothing done twice that wasn’t safe to.'"/>
+          <param name="cite" expr="'crashes'"/>
+        </send>
+      </transition>
+    </state>
+  </state>
+
+  <final id="done"/>
+</scxml>

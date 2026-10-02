@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  shop.payment: one card's charge, from the post.
+
+  charge   bank.charge(card, "payment-" + task.id): the key makes the charge idempotent, so a
+           rerun after a crash charges once. The outcome is "completed" with the receipt, or
+           "failed".
+  abort    another payment failed, or the checkout was aborted: refund this one, then commit
+           "aborted". It runs only after the work this task owns has ended (it owns none).
+
+  The lifecycle around the phases is the same in every task chart; see tool.scxml.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="shop.payment" initial="recover">
+  <datamodel>
+    <data id="task" expr="null"/>
+    <data id="now" expr="0"/>
+    <data id="cp" expr="null"/>
+  </datamodel>
+
+  <state id="recover">
+    <onentry><assign location="cp" expr="task.state.checkpoint || null"/></onentry>
+    <transition cond="task.state.status === 'terminal'" target="terminal"/>
+    <transition cond="task.state.status === 'completing'" target="completing"/>
+    <transition cond="task.abortRequested" target="aborting"/>
+    <transition cond="task.state.status === 'waiting'" target="waiting"/>
+    <transition target="running"/>
+  </state>
+
+  <state id="live" initial="running">
+    <transition event="task.abort" target="aborting"/>
+
+    <state id="running" initial="charge">
+      <state id="charge">
+        <invoke type="bank" id="charge">
+          <param name="op" expr="'charge'"/>
+          <param name="card" expr="task.input.card"/>
+          <param name="key" expr="'payment-' + task.id"/>
+        </invoke>
+        <transition event="done.invoke.charge" cond="_event.data.ok" target="completing">
+          <send type="durable" event="task.complete"><param name="result" expr="_event.data.receipt"/></send>
+        </transition>
+        <transition event="done.invoke.charge" target="completing">
+          <send type="durable" event="task.fail"><param name="message" expr="_event.data.error"/></send>
+        </transition>
+      </state>
+    </state>
+
+    <state id="waiting">
+      <transition event="task.wake" target="running"/>
+    </state>
+
+    <state id="completing">
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <state id="aborting" initial="draining">
+    <state id="draining">
+      <transition event="task.drained" target="refund"/>
+    </state>
+    <!-- the abort handler: undo this payment -->
+    <state id="refund">
+      <invoke type="bank" id="refund">
+        <param name="op" expr="'refund'"/>
+        <param name="key" expr="'payment-' + task.id"/>
+      </invoke>
+      <transition event="done.invoke.refund" target="handled">
+        <send type="durable" event="task.aborted">
+          <param name="reason" expr="_event.data.refunded ? 'refunded' : 'nothing to refund'"/>
+        </send>
+      </transition>
+    </state>
+    <state id="handled">
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <final id="terminal"/>
+</scxml>

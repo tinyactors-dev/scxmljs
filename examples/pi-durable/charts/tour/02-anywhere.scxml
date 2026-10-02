@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 2, "Long runs anywhere": a storage backend, one owner at a time, an environment per conversation. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · long runs anywhere" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'You'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'A harness opens over a storage backend. This one is in memory; its commit log (right) is what the JSONL backend would write, one line per commit. Process 1 owns it.'"/>
+        <param name="cite" expr="'anywhere'"/>
+        <param name="panel" expr="'storage'"/>
+        </send>
+    </onentry>
+    <transition event="client.you.live" target="second"/>
+  </state>
+
+  <state id="second">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'reviewer'"/><param name="name" expr="'Reviewer'"/></send>
+      <send event="go" delay="1s"/>
+    </onentry>
+    <transition event="go" target="both">
+      <send type="stage" event="conversation.create">
+        <param name="client" expr="'reviewer'"/>
+        <param name="title" expr="'review'"/>
+        <param name="agent" expr="({ cwd: '/work/review', model: 'sim-luna' })"/>
+      </send>
+      <send type="stage" event="note">
+        <param name="text" expr="'A second conversation, for a reviewer: its own working directory (/work/review) and a cheaper model. The env function builds each tool call’s environment from the conversation’s cwd.'"/>
+        <param name="cite" expr="'anywhere'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="both">
+    <onentry><send event="go" delay="1.5s"/></onentry>
+    <transition event="go" target="running">
+      <send type="stage" event="type"><param name="text" expr="'What is your working directory?'"/></send>
+      <send type="stage" event="type"><param name="client" expr="'reviewer'"/><param name="text" expr="'What is your working directory?'"/></send>
+    </transition>
+  </state>
+
+  <state id="running">
+    <transition event="commit.generation.answer" target="oneDone"/>
+  </state>
+  <state id="oneDone">
+    <transition event="commit.generation.answer" target="handover"/>
+  </state>
+
+  <state id="handover">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Same question, two places. Now the process dies, and process 2 opens the same storage: one process owns a storage at a time, and the clients attach to whichever process is up.'"/>
+        <param name="cite" expr="'anywhere'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+      <send event="kill" delay="2s"/>
+      <send event="start" delay="4s"/>
+    </onentry>
+    <transition event="kill"><send type="stage" event="kill"/></transition>
+    <transition event="start" target="reopened">
+      <send type="stage" event="start"/>
+      <send type="stage" event="inspect"><param name="kind" expr="'harness'"/></send>
+    </transition>
+  </state>
+
+  <state id="reopened">
+    <transition event="harness.scheduling" target="done"/>
+  </state>
+
+  <final id="done">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Process 2 took ownership (the commit log shows harness.acquire), reconciled nothing, and both clients reattached. The working set (Storage) is what a SQLite harness keeps in memory: active transcripts, live tasks, pending submissions.'"/>
+        <param name="cite" expr="'anywhere'"/>
+        <param name="panel" expr="'storage'"/>
+        </send>
+    </onentry>
+  </final>
+</scxml>

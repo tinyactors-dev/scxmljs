@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  pi.compaction: summarize older messages, as a durable task
+  (packages/durable/src/harness/compaction.ts).
+
+  Checkpoints: {phase: "select"} | {phase: "summarize", firstKept}
+
+  Who owns it decides how it runs:
+    background threshold   owned by the conversation, background: the conversation keeps going;
+                           the summary is a write submission, placed at the next turn boundary
+    blocking threshold     owned by the generation that needs it, which waits
+    manual (compact())     owned by the conversation, foreground: Esc aborts it
+  The older messages always stay in storage; the summary is a head marker.
+
+  The lifecycle around the phases is the same in every task chart; see tool.scxml.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="pi.compaction" initial="recover">
+  <datamodel>
+    <data id="task" expr="null"/>
+    <data id="now" expr="0"/>
+    <data id="cp" expr="null"/>
+  </datamodel>
+
+  <state id="recover">
+    <onentry><assign location="cp" expr="task.state.checkpoint || null"/></onentry>
+    <transition cond="task.state.status === 'terminal'" target="terminal"/>
+    <transition cond="task.state.status === 'completing'" target="completing"/>
+    <transition cond="task.abortRequested" target="aborting"/>
+    <transition cond="task.state.status === 'waiting'" target="waiting"/>
+    <transition target="running"/>
+  </state>
+
+  <state id="live" initial="running">
+    <transition event="task.abort" target="aborting"/>
+
+    <state id="running" initial="route">
+      <state id="route">
+        <transition cond="cp.phase === 'summarize'" target="summarize"/>
+        <transition target="select"/>
+      </state>
+
+      <!-- where to cut: keep the most recent messages, summarize the rest -->
+      <state id="select">
+        <invoke type="compaction-select" id="select"/>
+        <transition event="done.invoke.select" cond="!_event.data.firstKept" target="completing">
+          <send type="durable" event="compaction.nothing"/>
+        </transition>
+        <transition event="done.invoke.select" target="summarize">
+          <send type="durable" event="task.checkpoint">
+            <param name="checkpoint" expr="({ phase: 'summarize', firstKept: _event.data.firstKept })"/>
+          </send>
+          <assign location="cp" expr="({ phase: 'summarize', firstKept: _event.data.firstKept })"/>
+        </transition>
+      </state>
+
+      <state id="summarize">
+        <invoke type="model" id="summary">
+          <param name="firstKept" expr="cp.firstKept"/>
+        </invoke>
+        <transition event="done.invoke.summary" cond="_event.data.ok" target="completing">
+          <send type="durable" event="compaction.place">
+            <param name="summary" expr="_event.data.text"/>
+            <param name="firstKept" expr="cp.firstKept"/>
+          </send>
+        </transition>
+        <transition event="done.invoke.summary" target="completing">
+          <send type="durable" event="task.fail"><param name="message" expr="_event.data.error"/></send>
+        </transition>
+      </state>
+    </state>
+
+    <state id="waiting">
+      <transition event="task.wake" target="running">
+        <assign location="cp" expr="_event.data.checkpoint"/>
+      </transition>
+    </state>
+
+    <state id="completing">
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <state id="aborting" initial="draining">
+    <state id="draining">
+      <transition event="task.drained" target="handler"/>
+    </state>
+    <state id="handler">
+      <onentry><send type="durable" event="task.aborted"/></onentry>
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <final id="terminal"/>
+</scxml>

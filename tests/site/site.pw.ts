@@ -381,6 +381,69 @@ test.describe("playground at 390px", () => {
   });
 });
 
+test("pi durable: a crash mid-run; the new process continues every task from its checkpoint", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/demos/pi-durable/?chapter=&speed=4&autoplay=1");
+  const you = page.locator("[data-client=you]");
+  await expect(you.locator("header .pd-pill")).toHaveText("live");
+  await you.locator("textarea").fill("Fix the flaky login test");
+  await you.getByRole("button", { name: "Send" }).click();
+  // bash is running (its intent stored): kill the process
+  await expect(you.locator(".pd-slot", { hasText: "bash" })).toContainText("running", { timeout: 20_000 });
+  await expect(you.locator(".pd-slot pre").last()).toContainText("bun test", { timeout: 20_000 });
+  await page.click("#pd-kill");
+  await expect(page.locator("#pd-process-status")).toContainText("no process");
+  await expect(page.locator(".pd-dead")).toBeVisible();
+  await expect(you.locator("header .pd-pill")).toHaveText("offline");
+  await page.click("#pd-start");
+  await expect(page.locator("#pd-process-status")).toContainText("process 2");
+  // bash isn't safe to rerun: the model is told; search_issues is, and runs again
+  await expect(you.locator(".pd-tool-result", { hasText: "interrupted" })).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => page.evaluate(() => (window as any).piDurable().storage.submissions.size)).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test("pi durable: every chapter's ¶ opens the post's passage", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/demos/pi-durable/?chapter=crashes");
+  const cite = page.locator(".pd-chapter-head .pd-cite-btn");
+  await cite.click();
+  const pop = page.locator("#cite-crashes");
+  await expect(pop).toBeVisible();
+  await expect(pop.locator("a.pd-quote")).toHaveCount(3);
+  const href = await pop.locator("a.pd-quote").first().getAttribute("href");
+  expect(href).toMatch(/^https:\/\/earendil\.com\/posts\/pi-durable\/#:~:text=/);
+  await page.keyboard.press("Escape");
+  await expect(pop).toBeHidden();
+  // the Try… menu is hidden until opened, and picking an item fills the message box
+  const tryList = page.locator("[id^=try-]").first();
+  await expect(tryList).toBeHidden();
+  await page.locator("[popovertarget^=try-]").first().click();
+  await expect(tryList).toBeVisible();
+  await tryList.getByRole("menuitem", { name: "Deploy v1.5.1" }).click();
+  await expect(tryList).toBeHidden();
+  await expect(page.locator("[data-client] textarea").first()).toHaveValue("Deploy v1.5.1");
+  // a chapter opens paused, and pauses at every caption until Next
+  await page.goto("/demos/pi-durable/?chapter=harness&speed=4");
+  const notes = () => page.evaluate(() => (window as any).piDurable()?.notes.length ?? 0);
+  await expect(page.locator("#pd-next")).toHaveText("Start");
+  await expect.poll(notes).toBe(1);
+  await page.click("#pd-next");
+  await expect(page.locator("#pd-next")).toHaveText("Next", { timeout: 30_000 });
+  await expect.poll(notes).toBe(2);
+  // the tour points at a chart: the inspector is a mode of its own
+  for (let i = 0; i < 2 && (await page.locator("#pd-chart-hint").isHidden()); i++) {
+    await page.click("#pd-next");
+    await expect(page.locator("#pd-next")).toBeVisible({ timeout: 30_000 });
+  }
+  await page.click("#pd-chart-hint");
+  await expect(page.locator("#pd-inspector")).toBeVisible();
+  await expect(page.locator("#pd-main")).toBeHidden();
+  await page.click("#pd-back");
+  await expect(page.locator("#pd-main")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 const PAGES = [
   "/",
   "/docs/",
@@ -389,6 +452,7 @@ const PAGES = [
   "/demos/explorer/",
   "/demos/gallery/",
   "/demos/llm-chat/",
+  "/demos/pi-durable/",
   "/playground/",
   "/search/?q=clock",
   "/404.html",

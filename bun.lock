@@ -44,6 +44,15 @@
         "happy-dom": "20.14.5",
       },
     },
+    "examples/pi-durable": {
+      "name": "@tinyactors/scxmljs-pi-durable",
+      "dependencies": {
+        "@tinyactors/scxmljs": "workspace:*",
+      },
+      "devDependencies": {
+        "happy-dom": "20.14.5",
+      },
+    },
     "examples/playground": {
       "name": "@tinyactors/scxmljs-playground",
       "dependencies": {
@@ -145,6 +154,8 @@
     "@tinyactors/scxmljs": ["@tinyactors/scxmljs@workspace:packages/scxmljs"],
 
     "@tinyactors/scxmljs-llm-chat": ["@tinyactors/scxmljs-llm-chat@workspace:examples/llm-chat"],
+
+    "@tinyactors/scxmljs-pi-durable": ["@tinyactors/scxmljs-pi-durable@workspace:examples/pi-durable"],
 
     "@tinyactors/scxmljs-playground": ["@tinyactors/scxmljs-playground@workspace:examples/playground"],
 

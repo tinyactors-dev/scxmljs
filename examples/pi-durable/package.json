@@ -1,0 +1,11 @@
+{
+  "name": "@tinyactors/scxmljs-pi-durable",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@tinyactors/scxmljs": "workspace:*"
+  },
+  "devDependencies": {
+    "happy-dom": "20.14.5"
+  }
+}

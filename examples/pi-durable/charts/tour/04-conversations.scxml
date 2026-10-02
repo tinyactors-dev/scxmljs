@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 4, "Many conversations at once": the post's Slack channel and its thread. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · many conversations" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'Ada'"/></send>
+      <send type="stage" event="client.add"><param name="client" expr="'bo'"/><param name="name" expr="'Bo'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'Think of a Slack channel: the root conversation. Ada and Bo both watch it.'"/>
+        <param name="cite" expr="'conversations'"/>
+      </send>
+    </onentry>
+    <transition event="client.bo.live" target="ask"/>
+  </state>
+
+  <state id="ask">
+    <onentry><send event="go" delay="1s"/></onentry>
+    <transition event="go" target="answering">
+      <send type="stage" event="type"><param name="text" expr="'@agent why did the deploy fail?'"/></send>
+    </transition>
+  </state>
+
+  <state id="answering">
+    <transition event="commit.generation.answer" target="fork"/>
+  </state>
+
+  <state id="fork">
+    <onentry><send event="go" delay="1.5s"/></onentry>
+    <transition event="go" target="forked">
+      <send type="stage" event="fork"><param name="title" expr="'thread'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'Ada replies in a thread: a fork of the channel at the agent’s answer, ownerless. It sees the channel’s history up to that entry by reference (the inherited entries); nothing is copied.'"/>
+        <param name="cite" expr="'conversations'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="forked">
+    <transition event="client.you.live" target="configure">
+      <send type="stage" event="configure">
+        <param name="conversation" expr="'last'"/>
+        <param name="change" expr="({ model: 'sim-luna', tools: { remove: ['deploy'] } })"/>
+      </send>
+      <send type="stage" event="note">
+        <param name="text" expr="'The thread stores its own agent: a cheaper model, and every tool but deploy. It may search, not deploy.'"/>
+        <param name="cite" expr="'conversations'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="configure">
+    <onentry><send event="go" delay="2s"/></onentry>
+    <transition event="go" target="both">
+      <send type="stage" event="type"><param name="text" expr="'@agent can we roll it back?'"/></send>
+      <send type="stage" event="type"><param name="client" expr="'bo'"/><param name="text" expr="'@agent who is on call today?'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'Ada asks in the thread, Bo in the channel, at the same moment. Two runs, two generation tasks, side by side; neither waits for the other.'"/>
+        <param name="cite" expr="'conversations'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+
+  <state id="both">
+    <transition event="commit.generation.answer" target="one"/>
+  </state>
+  <state id="one">
+    <transition event="commit.generation.answer" target="done"/>
+  </state>
+
+  <final id="done">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Both answered. In the thread the agent couldn’t roll back: deploy isn’t among its tools there. Switch between the conversations in each client.'"/>
+      </send>
+    </onentry>
+  </final>
+</scxml>

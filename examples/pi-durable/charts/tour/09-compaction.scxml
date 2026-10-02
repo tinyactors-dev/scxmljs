@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 9, "Compaction": a tiny context window; background, manual, then a handoff and a search of what came before. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · compaction" initial="setup">
+  <datamodel>
+    <data id="questions" expr="['Tell me about durability', 'And about tasks?', 'What about storage?', 'And forks?', 'And clients?', 'And extensions?']"/>
+    <data id="asked" expr="0"/>
+  </datamodel>
+
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'You'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'This chapter’s model has a context window of 900 tokens (reserve 150, background 300), so it fills up fast. Watch the context meter in the conversation.'"/>
+        <param name="cite" expr="'compaction'"/>
+      </send>
+    </onentry>
+    <transition event="client.you.live" target="chat"/>
+  </state>
+
+  <state id="chat">
+    <onentry><send event="ask" delay="800ms"/></onentry>
+    <transition event="ask" cond="asked &lt; questions.length" target="waitAnswer">
+      <send type="stage" event="type"><param name="text" expr="questions[asked]"/></send>
+      <assign location="asked" expr="asked + 1"/>
+    </transition>
+    <transition event="ask" target="manual"/>
+    <transition event="pi.compaction.select">
+      <send type="stage" event="note">
+        <param name="text" expr="'Close to the limit: a background compaction (owned by the conversation, background) summarizes the older messages while the conversation keeps going. Its summary is a write, placed at the next turn boundary.'"/>
+        <param name="cite" expr="'compaction'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+      <send type="stage" event="inspect"><param name="kind" expr="'pi.compaction'"/></send>
+    </transition>
+  </state>
+  <state id="waitAnswer">
+    <transition event="commit.generation.answer" target="chat"/>
+    <transition event="pi.compaction.select">
+      <send type="stage" event="note">
+        <param name="text" expr="'Close to the limit: a background compaction (owned by the conversation, background) summarizes the older messages while the conversation keeps going. Its summary is a write, placed at the next turn boundary.'"/>
+        <param name="cite" expr="'compaction'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+      <send type="stage" event="inspect"><param name="kind" expr="'pi.compaction'"/></send>
+    </transition>
+  </state>
+
+  <state id="manual">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'The older messages are greyed: the model no longer sees them, but they are all still in storage. Now a manual compaction, with instructions.'"/>
+        <param name="cite" expr="'compaction'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+      <send type="stage" event="compact"><param name="instructions" expr="'Keep the names of the topics'"/></send>
+    </onentry>
+    <transition event="commit.compaction.place" target="handoff"/>
+    <transition event="commit.compaction.nothing" target="handoff"/>
+  </state>
+
+  <state id="handoff">
+    <onentry><send event="go" delay="1.5s"/></onentry>
+    <transition event="go" target="handingOff">
+      <send type="stage" event="type"><param name="text" expr="'Hand off and start over'"/></send>
+    </transition>
+  </state>
+
+  <state id="handingOff">
+    <transition event="commit.generation.answer" target="search">
+      <send type="stage" event="note">
+        <param name="text" expr="'The handoff tool returned control: { handoff }. That ended the run with a pi.reset entry: a new context, starting from the note. It also queued &quot;Continue.&quot;, which started the next run in the new context.'"/>
+        <param name="cite" expr="'compaction'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="search">
+    <onentry><send event="go" delay="2s"/></onentry>
+    <transition event="go" target="searching">
+      <send type="stage" event="type"><param name="text" expr="'What did we say about durability earlier?'"/></send>
+    </transition>
+  </state>
+
+  <state id="searching">
+    <transition event="commit.generation.answer" target="done">
+      <send type="stage" event="note">
+        <param name="text" expr="'search_history read the conversation’s entries through a transaction: everything, from before the summaries and the handoff too.'"/>
+        <param name="cite" expr="'compaction'"/>
+      </send>
+    </transition>
+  </state>
+
+  <final id="done"/>
+</scxml>

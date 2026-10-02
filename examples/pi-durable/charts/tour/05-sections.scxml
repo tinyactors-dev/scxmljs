@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 5, "Extensions › System prompt sections": AGENTS.md changes; the next request records the change. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · system prompt sections" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'You'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'The project-context extension renders a section, agents_md, from the AGENTS.md in the conversation’s environment, before every request.'"/>
+        <param name="cite" expr="'sections'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </onentry>
+    <transition event="client.you.live" target="ask"/>
+  </state>
+
+  <state id="ask">
+    <onentry><send event="go" delay="1s"/></onentry>
+    <transition event="go" target="first">
+      <send type="stage" event="type"><param name="text" expr="'Add a house rule to AGENTS.md'"/></send>
+    </transition>
+  </state>
+
+  <state id="first">
+    <transition event="commit.generation.request" target="editing">
+      <send type="stage" event="note">
+        <param name="text" expr="'The first request records the whole system prompt as a pi.system entry, at its position in the transcript.'"/>
+        <param name="cite" expr="'sections'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="editing">
+    <transition event="commit.tool.result.edit" target="next"/>
+  </state>
+
+  <state id="next">
+    <transition event="commit.generation.request" target="done">
+      <send type="stage" event="note">
+        <param name="text" expr="'The edit changed AGENTS.md. The very next request rendered the sections again and recorded only what changed: a second pi.system entry, right after the tool result. A restart or a fork replays these entries and sees exactly what the model saw.'"/>
+        <param name="cite" expr="'sections'"/>
+      </send>
+    </transition>
+  </state>
+
+  <final id="done"/>
+</scxml>

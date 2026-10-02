@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  pi.tool: one tool call, as a durable task (packages/durable/src/harness/tool.ts).
+
+  Checkpoints: {phase: "call"} | {phase: "execute", arguments, replay}.
+
+  Every task chart has the same outer shape, the task's lifecycle:
+    recover     where a (re)started session begins: it routes to the stored status and phase
+    live        running (the phases) · waiting (parked on other tasks) · completing (an outcome
+                is decided; the work the task owns is finishing)
+    aborting    the abort mark arrived: wait for owned work to end (bottom-up), then the
+                abort handler commits an outcome
+    terminal    the permanent receipt
+
+  The phases inside `running` are this task's definition. Every step is a commit through the
+  `durable` I/O processor (PROTOCOL.md): the checkpoint and what the step produced are stored
+  together, so a new process continues from the last one.
+
+  `call` resolves the tool, runs the beforeTool hook chain, then stores the intent: the
+  checkpoint becomes `execute` with the final arguments and the tool's replay policy, BEFORE
+  the tool runs. `execute` is only ever entered from storage by a new process: the call was
+  cut off. If the stored and the current policy are both "safe", it reruns with the stored
+  arguments (no beforeTool); otherwise the model is told it was interrupted.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="pi.tool" initial="recover">
+  <datamodel>
+    <!-- the task record as stored; `now` = the clock when this session started -->
+    <data id="task" expr="null"/>
+    <data id="now" expr="0"/>
+    <data id="cp" expr="null"/>
+    <data id="args" expr="null"/>
+    <data id="replay" expr="'unsafe'"/>
+    <data id="result" expr="null"/>
+  </datamodel>
+
+  <state id="recover">
+    <onentry>
+      <assign location="cp" expr="task.state.checkpoint || null"/>
+      <assign location="args" expr="task.input.args"/>
+    </onentry>
+    <transition cond="task.state.status === 'terminal'" target="terminal"/>
+    <transition cond="task.state.status === 'completing'" target="completing"/>
+    <transition cond="task.abortRequested" target="aborting"/>
+    <transition cond="task.state.status === 'waiting'" target="waiting"/>
+    <transition target="running"/>
+  </state>
+
+  <state id="live" initial="running">
+    <transition event="task.abort" target="aborting"/>
+
+    <state id="running" initial="route">
+      <state id="route">
+        <transition cond="cp.phase === 'execute'" target="resume"/>
+        <transition target="call"/>
+      </state>
+
+      <!-- phase "call": resolve → beforeTool → store the intent -->
+      <state id="call" initial="resolve">
+        <state id="resolve">
+          <invoke type="resolve-tool" id="resolve"/>
+          <transition event="done.invoke.resolve" cond="!_event.data.found" target="completing">
+            <send type="durable" event="tool.unavailable"/>
+          </transition>
+          <transition event="done.invoke.resolve" target="beforeTool">
+            <assign location="replay" expr="_event.data.replay"/>
+          </transition>
+        </state>
+        <state id="beforeTool">
+          <invoke type="hooks" id="beforeTool">
+            <param name="point" expr="'beforeTool'"/>
+            <param name="args" expr="args"/>
+          </invoke>
+          <transition event="done.invoke.beforeTool" cond="_event.data.block" target="completing">
+            <send type="durable" event="tool.blocked"><param name="reason" expr="_event.data.block"/></send>
+          </transition>
+          <transition event="done.invoke.beforeTool" target="intent">
+            <assign location="args" expr="_event.data.args"/>
+          </transition>
+        </state>
+        <!-- the intent commit: from here on, a crash means "this call may have partly run" -->
+        <state id="intent">
+          <onentry>
+            <send type="durable" event="tool.intent">
+              <param name="args" expr="args"/>
+              <param name="replay" expr="replay"/>
+            </send>
+            <assign location="cp" expr="({ phase: 'execute', arguments: args, replay: replay })"/>
+          </onentry>
+          <transition target="run"/>
+        </state>
+      </state>
+
+      <!-- phase "execute" -->
+      <state id="execute" initial="resume">
+        <!-- reached only from storage: the call was cut off by a crash -->
+        <state id="resume">
+          <invoke type="resolve-tool" id="recheck"/>
+          <transition event="done.invoke.recheck" cond="cp.replay === 'safe' &amp;&amp; _event.data.found &amp;&amp; _event.data.replay === 'safe'" target="run">
+            <assign location="args" expr="cp.arguments"/>
+          </transition>
+          <transition event="done.invoke.recheck" target="completing">
+            <send type="durable" event="tool.interrupted"/>
+          </transition>
+        </state>
+        <state id="run">
+          <invoke type="tool" id="run">
+            <param name="args" expr="args"/>
+          </invoke>
+          <transition event="done.invoke.run" cond="!_event.data.ok" target="completing">
+            <send type="durable" event="tool.error"><param name="message" expr="_event.data.error"/></send>
+          </transition>
+          <transition event="done.invoke.run" target="afterTool">
+            <assign location="result" expr="_event.data.result"/>
+          </transition>
+        </state>
+        <state id="afterTool">
+          <invoke type="hooks" id="afterTool">
+            <param name="point" expr="'afterTool'"/>
+            <param name="args" expr="args"/>
+            <param name="result" expr="result"/>
+          </invoke>
+          <transition event="done.invoke.afterTool" target="completing">
+            <send type="durable" event="tool.result"><param name="result" expr="_event.data.result"/></send>
+          </transition>
+        </state>
+      </state>
+    </state>
+
+    <state id="waiting">
+      <transition event="task.wake" target="running">
+        <assign location="cp" expr="_event.data.checkpoint"/>
+      </transition>
+    </state>
+
+    <!-- the outcome is stored; owned work (a subagent, a checkout) may still be finishing -->
+    <state id="completing">
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <state id="aborting" initial="draining">
+    <state id="draining">
+      <transition event="task.drained" target="handler"/>
+    </state>
+    <state id="handler">
+      <onentry><send type="durable" event="tool.aborted"/></onentry>
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <final id="terminal"/>
+</scxml>

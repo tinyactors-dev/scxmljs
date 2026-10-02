@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 1, "What is a harness?": storage, a conversation, an agent, tools, an environment, tasks. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · what is a harness" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'You'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'The harness (Process) opened over a storage (Storage): it took ownership, found nothing to recover, and resumed. Your screen is a client attached to the root conversation.'"/>
+        <param name="cite" expr="'harness'"/>
+        <param name="panel" expr="'storage'"/>
+        </send>
+      <send type="stage" event="inspect"><param name="kind" expr="'harness'"/></send>
+    </onentry>
+    <transition event="client.you.live" target="ask"/>
+  </state>
+
+  <state id="ask">
+    <onentry><send event="go" delay="1.5s"/></onentry>
+    <transition event="go" target="admitted">
+      <send type="stage" event="type"><param name="text" expr="'What’s in the repo?'"/></send>
+    </transition>
+  </state>
+
+  <state id="admitted">
+    <transition event="pi.generation.request" target="generating">
+      <send type="stage" event="note">
+        <param name="text" expr="'One commit admitted your message: the submission, the pi.user entry, and a pi.generation task. Everything the harness runs is a task; this one asks the model.'"/>
+        <param name="cite" expr="'harness'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+      <send type="stage" event="inspect"><param name="kind" expr="'pi.generation'"/></send>
+    </transition>
+  </state>
+
+  <state id="generating">
+    <transition event="pi.tool.run" target="tools">
+      <send type="stage" event="note">
+        <param name="text" expr="'The model called two tools. Each call is a pi.tool task owned by the generation, which waits for both (allSettled). The tools run in the conversation’s execution environment, /work/repo.'"/>
+        <param name="cite" expr="'harness'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+      <send type="stage" event="inspect"><param name="kind" expr="'pi.tool'"/></send>
+    </transition>
+  </state>
+
+  <state id="tools">
+    <transition event="commit.generation.answer" target="done"/>
+  </state>
+
+  <final id="done">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Answered. The transcript, the tasks and their checkpoints are all in storage, one commit at a time (the commit log). Pick a task to see its chart, or try the next chapter.'"/>
+        <param name="panel" expr="'storage'"/>
+        </send>
+    </onentry>
+  </final>
+</scxml>

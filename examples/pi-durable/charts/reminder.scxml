@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  app.reminder: a background task with a timer that survives restarts.
+
+  Created by the remind_me tool with { ownership: { kind: "conversation" }, background: true }:
+  the conversation goes idle while it sleeps, and an ordinary abort (Esc) leaves it alone.
+
+  sleep    the deadline is in the checkpoint ({phase: "sleep", until}); a new process sleeps
+           for whatever is left.
+  remind   submit the reminder to the conversation as a follow-up. Its requestId,
+           "reminder:" + task.id, makes that exactly-once if a crash makes this phase rerun.
+
+  The lifecycle around the phases is the same in every task chart; see tool.scxml.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="app.reminder" initial="recover">
+  <datamodel>
+    <data id="task" expr="null"/>
+    <data id="now" expr="0"/>
+    <data id="cp" expr="null"/>
+  </datamodel>
+
+  <state id="recover">
+    <onentry><assign location="cp" expr="task.state.checkpoint || null"/></onentry>
+    <transition cond="task.state.status === 'terminal'" target="terminal"/>
+    <transition cond="task.state.status === 'completing'" target="completing"/>
+    <transition cond="task.abortRequested" target="aborting"/>
+    <transition cond="task.state.status === 'waiting'" target="waiting"/>
+    <transition target="running"/>
+  </state>
+
+  <state id="live" initial="running">
+    <transition event="task.abort" target="aborting"/>
+
+    <state id="running" initial="route">
+      <state id="route">
+        <transition cond="cp.phase === 'remind'" target="remind"/>
+        <transition target="sleep"/>
+      </state>
+
+      <state id="sleep">
+        <onentry><send event="due" delayexpr="Math.max(0, cp.until - now) + 'ms'"/></onentry>
+        <transition event="due" target="remind">
+          <send type="durable" event="task.checkpoint"><param name="checkpoint" expr="({ phase: 'remind' })"/></send>
+        </transition>
+      </state>
+
+      <state id="remind">
+        <onentry><send type="durable" event="reminder.deliver"/></onentry>
+        <transition target="completing"/>
+      </state>
+    </state>
+
+    <state id="waiting">
+      <transition event="task.wake" target="running">
+        <assign location="cp" expr="_event.data.checkpoint"/>
+      </transition>
+    </state>
+
+    <state id="completing">
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <state id="aborting" initial="draining">
+    <state id="draining">
+      <transition event="task.drained" target="handler"/>
+    </state>
+    <state id="handler">
+      <onentry><send type="durable" event="task.aborted"/></onentry>
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <final id="terminal"/>
+</scxml>

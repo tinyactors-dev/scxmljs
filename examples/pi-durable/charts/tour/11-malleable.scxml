@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 11, "Malleable": replace an extension while a call of it runs. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · malleable" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'You'"/></send>
+    </onentry>
+    <transition event="client.you.live" target="ask"/>
+  </state>
+
+  <state id="ask">
+    <onentry><send event="go" delay="1s"/></onentry>
+    <transition event="go" target="running">
+      <send type="stage" event="type"><param name="text" expr="'Deploy v1.6.0'"/></send>
+    </transition>
+  </state>
+
+  <state id="running">
+    <transition event="tool.deploy.run" target="install"/>
+  </state>
+
+  <state id="install">
+    <onentry><send event="go" delay="2s"/></onentry>
+    <transition event="go" target="finishing">
+      <send type="stage" event="install"><param name="extension" expr="'ops@2'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'ops@2 is installed while the deploy runs: same name, so it replaces ops@1 in one step. The running call finishes on the code it started with (see its output: ops@1).'"/>
+        <param name="cite" expr="'malleable'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+
+  <state id="finishing">
+    <transition event="commit.generation.answer" target="again"/>
+  </state>
+
+  <state id="again">
+    <onentry><send event="go" delay="1.5s"/></onentry>
+    <transition event="go" target="second">
+      <send type="stage" event="type"><param name="text" expr="'Deploy v1.6.1'"/></send>
+    </transition>
+  </state>
+
+  <state id="second">
+    <transition event="tool.deploy.run">
+      <send type="stage" event="note">
+        <param name="text" expr="'The next call resolves deploy again and gets ops@2: a canary first.'"/>
+        <param name="cite" expr="'malleable'"/>
+      </send>
+    </transition>
+    <transition event="commit.generation.answer" target="restart"/>
+  </state>
+
+  <state id="restart">
+    <onentry>
+      <send type="stage" event="kill"/>
+      <send event="go" delay="1.5s"/>
+    </onentry>
+    <transition event="go" target="done">
+      <send type="stage" event="start"/>
+      <send type="stage" event="note">
+        <param name="text" expr="'The conversation stores the names &quot;ops&quot; and &quot;deploy&quot;, never code. A new process installs whatever is deployed now (ops@2; see Process › Registry) and the conversation picks it up.'"/>
+        <param name="cite" expr="'malleable'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+
+  <final id="done"/>
+</scxml>

@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A client: a person's screen on another machine, attached to one conversation.
+
+    const view = await thread.viewState(context);   render(view.value);
+    view.subscribe((value) => render(value));
+    await thread.submit({ type: "input", content, whenBusy: "steer" }, context);
+
+  link        offline (no process is up) → attaching (asks for the current view: the transcript,
+              the answer being streamed, running tools and their output, queued messages, the
+              agent, usage) → live (after that, only each commit's operations). A client that
+              joins late or reconnects starts from the current view; nothing is replayed.
+  composer    every message carries a requestId. Whatever was sent but not answered is sent
+              again, with the same requestId, whenever the link comes back: the harness returns
+              the original submission instead of asking twice.
+
+  I/O processor `wire` (src/wire.ts): attach, submit, abort, compact, fork → the process;
+  view, ops, submitted, rejected, forked ← the process; wire.up / wire.down ← the link.
+  The page sends ui.* events (the person's clicks).
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="client" initial="client">
+  <datamodel>
+    <data id="clientId" expr="'you'"/>
+    <data id="name" expr="'You'"/>
+    <data id="conversationId" expr="'c1'"/>
+    <!-- the conversation as this client knows it: the attach view, plus every op since -->
+    <data id="view" expr="null"/>
+    <data id="frames" expr="0"/>
+    <data id="ops" expr="0"/>
+    <!-- requestId → { requestId, text, whenBusy, status: sending | admitted | rejected, submissionId?, duplicate?, reason? } -->
+    <data id="requests" expr="[]"/>
+    <data id="counter" expr="0"/>
+  </datamodel>
+
+  <script>
+    function apply(list) {
+      for (var i = 0; i &lt; list.length; i++) {
+        var op = list[i];
+        if (op.op === "entry") view.entries.push(op.entry);
+        else if (op.op === "doc") view.docs[op.name] = op.value;
+        else if (op.op === "head") {
+          var at = -1;
+          for (var j = 0; j &lt; view.entries.length; j++) if (view.entries[j].id === op.first) at = j;
+          for (var k = 0; k &lt; view.entries.length; k++) view.entries[k].active = op.first === null || k >= at;
+        } else if (op.op === "submission") {
+          var found = false;
+          for (var s = 0; s &lt; view.submissions.length; s++)
+            if (view.submissions[s].id === op.record.id) { view.submissions[s] = op.record; found = true; }
+          if (!found) view.submissions.push(op.record);
+        }
+      }
+    }
+    function request(id) {
+      for (var i = 0; i &lt; requests.length; i++) if (requests[i].requestId === id) return requests[i];
+      return null;
+    }
+    /** Answered (or given up on) by the harness: nothing left to wait for. */
+    function settled(r) {
+      if (r.status === "rejected") return true;
+      if (!r.submissionId || !view) return false;
+      for (var i = 0; i &lt; view.submissions.length; i++) {
+        var s = view.submissions[i];
+        if (s.id === r.submissionId) return s.status === "done" || s.status === "unanswered";
+      }
+      return false;
+    }
+    function unanswered() {
+      return requests.filter(function (r) { return r.conversationId === conversationId &amp;&amp; !settled(r); });
+    }
+  </script>
+
+  <parallel id="client">
+    <state id="link" initial="offline">
+      <transition event="wire.down" target="offline"/>
+
+      <state id="offline">
+        <transition event="wire.up" target="attaching"/>
+      </state>
+
+      <state id="attaching">
+        <onentry>
+          <send type="wire" event="attach"><param name="conversationId" expr="conversationId"/></send>
+        </onentry>
+        <transition event="view" target="live">
+          <assign location="view" expr="_event.data.view"/>
+          <assign location="frames" expr="frames + 1"/>
+        </transition>
+      </state>
+
+      <state id="live">
+        <!-- (re)attached: retry what was never answered, with the same requestId -->
+        <onentry>
+          <foreach array="unanswered()" item="r">
+            <send type="wire" event="submit">
+              <param name="conversationId" expr="r.conversationId"/>
+              <param name="requestId" expr="r.requestId"/>
+              <param name="text" expr="r.text"/>
+              <param name="whenBusy" expr="r.whenBusy"/>
+              <param name="author" expr="name"/>
+            </send>
+          </foreach>
+        </onentry>
+        <transition event="ops">
+          <script>apply(_event.data.ops);</script>
+          <assign location="view.seq" expr="_event.data.seq"/>
+          <assign location="frames" expr="frames + 1"/>
+          <assign location="ops" expr="ops + _event.data.ops.length"/>
+        </transition>
+        <transition event="ui.switch" target="attaching">
+          <assign location="conversationId" expr="_event.data.conversationId"/>
+          <assign location="view" expr="null"/>
+        </transition>
+        <transition event="forked" target="attaching">
+          <assign location="conversationId" expr="_event.data.conversationId"/>
+          <assign location="view" expr="null"/>
+        </transition>
+        <transition event="ui.abort">
+          <send type="wire" event="abort"><param name="conversationId" expr="conversationId"/></send>
+        </transition>
+        <transition event="ui.compact">
+          <send type="wire" event="compact">
+            <param name="conversationId" expr="conversationId"/>
+            <param name="instructions" expr="_event.data.instructions"/>
+          </send>
+        </transition>
+        <transition event="ui.fork">
+          <send type="wire" event="fork">
+            <param name="conversationId" expr="conversationId"/>
+            <param name="at" expr="_event.data.at"/>
+            <param name="title" expr="_event.data.title"/>
+          </send>
+        </transition>
+      </state>
+    </state>
+
+    <state id="composer">
+      <transition event="ui.submit">
+        <assign location="counter" expr="counter + 1"/>
+        <script>
+          requests.push({
+            requestId: _event.data.requestId || (clientId + "-" + counter),
+            conversationId: conversationId,
+            text: _event.data.text,
+            whenBusy: _event.data.whenBusy || "followUp",
+            status: "sending"
+          });
+        </script>
+        <if cond="In('live')">
+          <send type="wire" event="submit">
+            <param name="conversationId" expr="conversationId"/>
+            <param name="requestId" expr="requests[requests.length - 1].requestId"/>
+            <param name="text" expr="_event.data.text"/>
+            <param name="whenBusy" expr="_event.data.whenBusy || 'followUp'"/>
+            <param name="author" expr="name"/>
+          </send>
+        </if>
+      </transition>
+      <transition event="submitted">
+        <script>
+          var r = request(_event.data.requestId);
+          if (r) { r.status = "admitted"; r.submissionId = _event.data.submissionId; r.duplicate = r.duplicate || _event.data.duplicate; }
+        </script>
+      </transition>
+      <transition event="rejected">
+        <script>
+          var r = request(_event.data.requestId);
+          if (r) { r.status = "rejected"; r.reason = _event.data.reason; }
+        </script>
+      </transition>
+    </state>
+  </parallel>
+</scxml>

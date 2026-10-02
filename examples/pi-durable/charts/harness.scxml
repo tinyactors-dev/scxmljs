@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The harness: one process's life over a storage.
+
+    const harness = await Harness.open(storage, { models, registry, env }, context);
+    harness.resume();
+
+  opening       take ownership of the storage: one process owns a storage at a time
+  reconciling   one commit, and no task code: every task the dead process left "running" goes
+                back to "pending" with its checkpoint, abort marks stay
+  open          paused until resume(); then the scheduler runs tasks (runs pending ones,
+                wakes waiting ones whose tasks are done, cascades aborts)
+
+  A crash is not a state of this chart: the process, and every session in it, is simply gone.
+  The storage is not.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="harness" initial="opening">
+  <datamodel>
+    <data id="process" expr="''"/>
+    <data id="previousOwner" expr="null"/>
+    <data id="recovered" expr="0"/>
+  </datamodel>
+
+  <state id="opening">
+    <onentry><send type="durable" event="harness.acquire"/></onentry>
+    <transition event="harness.acquired" target="reconciling">
+      <assign location="previousOwner" expr="_event.data.previousOwner"/>
+    </transition>
+  </state>
+
+  <state id="reconciling">
+    <onentry><send type="durable" event="harness.reconcile"/></onentry>
+    <transition event="harness.reconciled" target="open">
+      <assign location="recovered" expr="_event.data.recovered"/>
+    </transition>
+  </state>
+
+  <state id="open" initial="paused">
+    <state id="paused">
+      <transition event="resume" target="scheduling"/>
+    </state>
+    <state id="scheduling">
+      <onentry><send type="durable" event="harness.resume"/></onentry>
+    </state>
+  </state>
+</scxml>

@@ -27,6 +27,13 @@ Layout:
   scenario charts, `PROTOCOL.md` (every processor/invoker's messages; keep `src/protocol.ts` in step),
   a simulated model and tools on one clock, Claude via the SDK with the visitor's key (loaded lazily).
   `site/client/llm-chat.ts` renders it. Tests: `examples/llm-chat/test/` (headless) and `tests/site/`.
+- `examples/pi-durable/`: Earendil's Pi Durable as statecharts (`/demos/pi-durable/`): one chart per task
+  kind (`pi.generation`, `pi.tool`, `pi.compaction`, `shop.checkout`, `shop.payment`, `app.reminder`), `harness.scxml`,
+  `client.scxml`; storage survives "Kill process", a new process resumes every task from its checkpoint. The tour
+  (`charts/tour/`, one chapter per section of the post; `src/post.ts` holds the verbatim quotes the ¶ popovers show)
+  drives it through the `stage` processor. `PROTOCOL.md` lists every commit, invoker and event: keep it in step with
+  `src/harness.ts`. `site/client/pi-durable.ts` renders it. Tests: `examples/pi-durable/test/` (every chapter runs to
+  its end) and `tests/site/`.
 - `conformance/`: W3C SCXML IRP suite. `fetch.ts` downloads and converts it, `run.ts` runs it.
 - `tests/browser/`: Playwright tests (Chromium, Firefox, WebKit) against `server.ts`, which serves
   the playground pages and `fixtures/*.html` (the BUILT package via an import map; `?csp=` adds a

@@ -1,4 +1,6 @@
 /** Page bodies that aren't rendered from Markdown: landing, demos, playground placeholder, search, 404. */
+import { CITATIONS, EXTERNAL_SVG, PI_LOGO_SVG, POST_URL, quoteLink } from "../../examples/pi-durable/src/post.ts";
+import { CHAPTERS } from "../../examples/pi-durable/src/tour.ts";
 import { REPO } from "../../scripts/docs/config.ts";
 import { esc } from "./layout.ts";
 import { EXAMPLES } from "./playground-examples.ts";
@@ -91,6 +93,7 @@ export function demosIndex(): string {
     <a class="card" href="/demos/explorer/"><h2>Explorer</h2><p>Three systems — an order pipeline with invoked payment and shipping machines, a 333-state support desk, and a GitHub gatekeeper — with playback controls.</p></a>
     <a class="card" href="/demos/gallery/"><h2>Chart gallery</h2><p>Classic statecharts drawn by <code>&lt;scxml-view&gt;</code>: parallel regions, history, delayed events, guards. Click a transition to send its event.</p></a>
     <a class="card" href="/demos/llm-chat/"><h2>LLM chat</h2><p>A group chat with a language model, run by statecharts: streaming, parallel tool calls from several clients, queueing, steering and stopping. Simulated by default; bring your own API key for Claude.</p></a>
+    <a class="card pd-card" href="/demos/pi-durable/"><span class="pd-card-logo">${PI_LOGO_SVG}</span><h2>Pi Durable</h2><p>A tour of Earendil’s Pi Durable, section by section: a harness whose every task is a statechart. Kill the process mid-run and watch tasks resume from their checkpoints; forks, subagents, hooks, compaction and multiplayer clients.</p></a>
     <a class="card" href="/playground/"><h2>Playground</h2><p>Edit a chart and watch it re-run as you type, in the sandboxed engine: diagnostics in the editor, playback controls, share links.</p></a>
   </div>
 </div>`;
@@ -198,6 +201,114 @@ export function llmChatDemo(): string {
     </section>
   </div>
   <p>The charts, protocols and simulated model and tools are in <a href="${REPO}/tree/main/examples/llm-chat">examples/llm-chat</a>. Built with <a href="/docs/explorer/"><code>&lt;scxml-explorer&gt;</code></a>, a <a href="/docs/playback/"><code>PlaybackClock</code></a>, <a href="/docs/io-processors/">custom I/O processors</a> and <a href="/docs/invokers/">invokers</a>.</p>
+</div>`;
+}
+
+/** A button that opens the post's passage for a part of the demo (`popovertarget` → the popover below). */
+export function citeButton(id: string, label?: string): string {
+  const c = CITATIONS[id];
+  if (!c) throw new Error(`no citation ${id}`);
+  return `<button type="button" class="pd-cite-btn" popovertarget="cite-${id}" aria-label="From the post: ${esc(c.section)}" title="From the post: ${esc(c.section)}"><span aria-hidden="true">¶</span>${label ? ` ${esc(label)}` : ""}</button>`;
+}
+
+function citePopovers(): string {
+  return Object.values(CITATIONS)
+    .map(
+      (c) => `<div popover id="cite-${c.id}" class="pd-cite" role="dialog" aria-label="From the post: ${esc(c.section)}">
+    <p class="pd-cite-head">From <a href="${POST_URL}">“Pi Durable”</a> · <strong>${esc(c.section)}</strong></p>
+    ${c.quotes.map((q) => `<a class="pd-quote" href="${esc(quoteLink(q))}" target="_blank" rel="noopener" title="Read it in the post">${esc(q)}<span class="pd-quote-arrow">${EXTERNAL_SVG}</span><span class="visually-hidden"> (opens the post)</span></a>`).join("\n    ")}
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-${c.id}" popovertargetaction="hide">Close</button>
+  </div>`,
+    )
+    .join("\n  ");
+}
+
+export function piDurableDemo(): string {
+  const speeds = [
+    ["0.25", "¼×"],
+    ["0.5", "½×"],
+    ["1", "1×"],
+    ["2", "2×"],
+    ["4", "4×"],
+  ];
+  return `<div class="chat-demo pd-demo">
+  <h1 class="page-title">Pi Durable, as statecharts</h1>
+  <p class="lede">A working model of <a href="${POST_URL}">Pi Durable</a>, Earendil’s durable agent harness, where every task is a statechart that commits each step to storage. Kill the process whenever you like: a new one continues every task from its checkpoint. Each chapter follows a section of the post; <span class="pd-cite-btn pd-cite-sample" aria-hidden="true">¶</span> opens the passage.</p>
+  <nav class="pd-chapters" aria-label="Chapters">
+    <ol>
+      ${CHAPTERS.map((c, i) => `<li><button type="button" data-chapter="${c.id}" aria-pressed="false"><span class="pd-chapter-n">${i + 1}</span> ${esc(c.title)}</button></li>`).join("\n      ")}
+      <li><button type="button" data-chapter="" aria-pressed="false"><span class="pd-chapter-n">∞</span> Free play</button></li>
+    </ol>
+  </nav>
+  <div class="chat-toolbar pd-toolbar">
+    <div class="chat-playback" role="group" aria-label="Playback">
+      <button id="pd-play" type="button" class="chat-play" aria-label="Play"></button>
+      <fieldset class="chat-speed">
+        <legend class="visually-hidden">Speed</legend>
+        ${speeds.map(([v, label]) => `<label><input type="radio" name="pd-speed" value="${v}"><span>${label}</span></label>`).join("")}
+      </fieldset>
+      <label class="chat-speed-compact"><span class="visually-hidden">Speed</span><select id="pd-speed-select">${speeds.map(([v, label]) => `<option value="${v}">${label}</option>`).join("")}</select></label>
+      <button id="pd-step" type="button" class="chat-step" aria-label="Step"><span class="chat-step-label">Step</span></button>
+      <span class="chat-time" id="pd-time" aria-label="Simulated time">0.0 s</span>
+    </div>
+    <div class="pd-process-controls" role="group" aria-label="Process">
+      <span class="pd-process-status" id="pd-process-status" aria-live="polite"></span>
+      <button id="pd-kill" type="button" class="pd-kill">Kill process</button>
+      <button id="pd-start" type="button" class="chat-primary">Start process</button>
+    </div>
+  </div>
+  <div class="pd-story">
+    <header class="pd-chapter-head">
+      <h2 id="pd-chapter-title">Free play</h2>
+      <span id="pd-chapter-cite"></span>
+      <button id="pd-replay" type="button" class="chat-quiet pd-mini">Restart chapter</button>
+      <p id="pd-chapter-blurb" class="pd-small"></p>
+    </header>
+    <div class="pd-caption-row">
+      <p class="chat-caption pd-caption" id="pd-caption" aria-live="polite"></p>
+      <button id="pd-chart-hint" type="button" class="pd-mini" hidden></button>
+      <button id="pd-next" type="button" class="chat-primary" hidden>Next</button>
+    </div>
+  </div>
+  <div class="pd-main" id="pd-main" data-panel="process">
+    <section class="pd-stage" aria-labelledby="pd-clients-title">
+      <h2 id="pd-clients-title" class="visually-hidden">Clients</h2>
+      <div class="pd-clients" id="pd-clients"></div>
+      <button id="pd-add-client" type="button" class="pd-add-client" title="Another person on another machine, attached to the same harness">+ Add a client</button>
+    </section>
+  </div>
+  <section class="pd-inspector" id="pd-inspector" aria-labelledby="pd-inspector-title" hidden>
+    <div class="pd-inspector-bar">
+      <button id="pd-back" type="button" class="chat-primary">← Back to the simulation</button>
+      <h2 id="pd-inspector-title">Statechart</h2>
+      <label class="pd-small" for="pd-session">Session</label>
+      <select id="pd-session"></select>
+      <span class="pd-small">The simulation keeps running; Esc goes back.</span>
+    </div>
+    <scxml-explorer></scxml-explorer>
+  </section>
+  <p class="pd-small pd-footer">The charts, the harness model and the tour are in <a href="${REPO}/tree/main/examples/pi-durable">examples/pi-durable</a>; Pi Durable itself is in <a href="https://github.com/earendil-works/pi/tree/main/packages/durable">earendil-works/pi</a>. Built with <a href="/docs/explorer/"><code>&lt;scxml-explorer&gt;</code></a>, a <a href="/docs/playback/"><code>PlaybackClock</code></a>, <a href="/docs/io-processors/">custom I/O processors</a> and <a href="/docs/invokers/">invokers</a>.</p>
+  <aside class="pd-sidebar" id="pd-sidebar" data-open="true" aria-label="Inside the harness">
+    <div class="pd-sidebar-resize" id="pd-sidebar-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize the sidebar" aria-valuemin="300" aria-valuemax="760" aria-valuenow="440"></div>
+    <div class="pd-sidebar-head">
+      <div role="tablist" aria-label="Inside the harness" aria-orientation="horizontal">
+        <button type="button" role="tab" id="pd-tab-process" data-panel="process" aria-selected="true" aria-controls="pd-process-panel" title="Process: memory, lost when it dies"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg><span class="pd-tab-label">Process</span></button>
+        <button type="button" role="tab" id="pd-tab-storage" data-panel="storage" aria-selected="false" aria-controls="pd-storage-panel" title="Storage: survives the process"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg><span class="pd-tab-label">Storage</span></button>
+      </div>
+      <button type="button" id="pd-side-toggle" class="pd-side-toggle" aria-expanded="true" aria-controls="pd-side-body" aria-label="Collapse the sidebar">»</button>
+    </div>
+    <div class="pd-side-body" id="pd-side-body">
+      <section id="pd-process-panel" role="tabpanel" aria-labelledby="pd-tab-process">
+        <p class="pd-side-note">${citeButton("harness")} The process: everything in memory. Lost when it dies.</p>
+        <div id="pd-process"></div>
+      </section>
+      <section id="pd-storage-panel" role="tabpanel" aria-labelledby="pd-tab-storage" hidden>
+        <p class="pd-side-note">${citeButton("anywhere")} The storage: survives the process.</p>
+        <div id="pd-storage"></div>
+      </section>
+    </div>
+  </aside>
+  ${citePopovers()}
 </div>`;
 }
 

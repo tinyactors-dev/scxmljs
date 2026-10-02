@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  shop.checkout: the post's checkout that splits the bill across several cards.
+
+    defineTask({ name: "shop.checkout", version: 1, initial: () => ({ phase: "pay" }), phases: { pay, decide }, abort })
+
+  pay      in one commit: one shop.payment task per card, owned by this task, and the state
+           "waiting" on all of them with policy failFast. No code runs until every payment
+           is done; the first failed payment aborts the others, which refund themselves.
+  decide   runtime.outcomes(payments): all completed → "Order placed.", else failed.
+
+  The lifecycle around the phases is the same in every task chart; see tool.scxml.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="shop.checkout" initial="recover">
+  <datamodel>
+    <data id="task" expr="null"/>
+    <data id="now" expr="0"/>
+    <data id="cp" expr="null"/>
+  </datamodel>
+
+  <state id="recover">
+    <onentry><assign location="cp" expr="task.state.checkpoint || null"/></onentry>
+    <transition cond="task.state.status === 'terminal'" target="terminal"/>
+    <transition cond="task.state.status === 'completing'" target="completing"/>
+    <transition cond="task.abortRequested" target="aborting"/>
+    <transition cond="task.state.status === 'waiting'" target="waiting"/>
+    <transition target="running"/>
+  </state>
+
+  <state id="live" initial="running">
+    <transition event="task.abort" target="aborting"/>
+
+    <state id="running" initial="route">
+      <state id="route">
+        <transition cond="cp.phase === 'decide'" target="decide"/>
+        <transition target="pay"/>
+      </state>
+
+      <state id="pay">
+        <onentry>
+          <send type="durable" event="checkout.pay"><param name="policy" expr="'failFast'"/></send>
+        </onentry>
+        <transition target="waiting"/>
+      </state>
+
+      <state id="decide">
+        <invoke type="outcomes" id="outcomes">
+          <param name="ids" expr="cp.payments"/>
+        </invoke>
+        <transition event="done.invoke.outcomes" cond="_event.data.every(function (o) { return o.status === 'completed'; })" target="completing">
+          <send type="durable" event="task.complete"><param name="result" expr="'Order placed.'"/></send>
+        </transition>
+        <transition event="done.invoke.outcomes" target="completing">
+          <send type="durable" event="task.fail"><param name="message" expr="'A payment failed.'"/></send>
+        </transition>
+      </state>
+    </state>
+
+    <state id="waiting">
+      <transition event="task.wake" target="running">
+        <assign location="cp" expr="_event.data.checkpoint"/>
+      </transition>
+    </state>
+
+    <state id="completing">
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <!-- aborted (the call that owns it was): the payments abort first and refund, then this -->
+  <state id="aborting" initial="draining">
+    <state id="draining">
+      <transition event="task.drained" target="handler"/>
+    </state>
+    <state id="handler">
+      <onentry><send type="durable" event="task.aborted"/></onentry>
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <final id="terminal"/>
+</scxml>

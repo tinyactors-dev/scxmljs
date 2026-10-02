@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  pi.generation: one model request, as a durable task (packages/durable/src/harness/generation.ts).
+
+  Checkpoints: {phase: "prepare", attempt, compacted?} | {phase: "request", attempt}
+             | {phase: "retry", attempt, until} | {phase: "tools", assistant}
+
+  prepare   render the system prompt sections and count the context. Close to the window: a
+            blocking compaction (owned by this task; it waits for it), or a background one
+            (owned by the conversation; nobody waits). Then commit "request".
+  request   stream the answer; partials are committed to pi.live as they arrive. A request cut
+            off by a crash is sent again; the partial answer stays in the transcript, marked
+            aborted. The response decides: tool calls (a tool round: one pi.tool task per
+            call, owned by this task, waited on with allSettled), an answer (the run's final
+            boundary), a retryable error (a timer stored in the checkpoint), or failure.
+  tools     the round is over: the postTools boundary places queued steers, and the next
+            generation continues the run.
+
+  The lifecycle around the phases is the same in every task chart; see tool.scxml.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="pi.generation" initial="recover">
+  <datamodel>
+    <data id="task" expr="null"/>
+    <data id="now" expr="0"/>
+    <data id="cp" expr="null"/>
+    <data id="maxAttempts" expr="3"/>
+  </datamodel>
+
+  <script>
+    function backoff(attempt) { return 1500 * attempt; }
+    /** A retry timer survives restarts: its deadline is in the checkpoint. */
+    function retryDelay() { return cp.until ? Math.max(0, cp.until - now) : backoff(cp.attempt); }
+  </script>
+
+  <state id="recover">
+    <onentry><assign location="cp" expr="task.state.checkpoint || null"/></onentry>
+    <transition cond="task.state.status === 'terminal'" target="terminal"/>
+    <transition cond="task.state.status === 'completing'" target="completing"/>
+    <transition cond="task.abortRequested" target="aborting"/>
+    <transition cond="task.state.status === 'waiting'" target="waiting"/>
+    <transition target="running"/>
+  </state>
+
+  <state id="live" initial="running">
+    <transition event="task.abort" target="aborting"/>
+
+    <state id="running" initial="route">
+      <state id="route">
+        <transition cond="cp.phase === 'request'" target="request"/>
+        <transition cond="cp.phase === 'retry'" target="retry"/>
+        <transition cond="cp.phase === 'tools'" target="tools"/>
+        <transition target="prepare"/>
+      </state>
+
+      <state id="prepare">
+        <invoke type="prepare" id="prepare"/>
+        <transition event="done.invoke.prepare" cond="_event.data.blocking &amp;&amp; !cp.compacted" target="waiting">
+          <send type="durable" event="generation.compactBlocking"><param name="attempt" expr="cp.attempt"/></send>
+        </transition>
+        <transition event="done.invoke.prepare" target="request">
+          <send type="durable" event="generation.request">
+            <param name="attempt" expr="cp.attempt"/>
+            <param name="background" expr="_event.data.background"/>
+          </send>
+          <assign location="cp" expr="({ phase: 'request', attempt: cp.attempt })"/>
+        </transition>
+      </state>
+
+      <state id="request">
+        <!-- after a crash: the committed partial becomes an aborted pi.assistant entry -->
+        <onentry><send type="durable" event="generation.convertPartial"/></onentry>
+        <invoke type="model" id="model"/>
+        <transition event="done.invoke.model" cond="_event.data.ok &amp;&amp; _event.data.toolCalls.length" target="waiting">
+          <send type="durable" event="generation.toolRound">
+            <param name="text" expr="_event.data.text"/>
+            <param name="toolCalls" expr="_event.data.toolCalls"/>
+          </send>
+        </transition>
+        <transition event="done.invoke.model" cond="_event.data.ok" target="completing">
+          <send type="durable" event="generation.answer"><param name="text" expr="_event.data.text"/></send>
+        </transition>
+        <transition event="done.invoke.model" cond="_event.data.retryable &amp;&amp; cp.attempt &lt; maxAttempts" target="retry">
+          <send type="durable" event="generation.retry">
+            <param name="attempt" expr="cp.attempt"/>
+            <param name="delayMs" expr="backoff(cp.attempt)"/>
+            <param name="error" expr="_event.data.error"/>
+          </send>
+          <assign location="cp" expr="({ phase: 'retry', attempt: cp.attempt })"/>
+        </transition>
+        <transition event="done.invoke.model" target="completing">
+          <send type="durable" event="generation.failed"><param name="error" expr="_event.data.error"/></send>
+        </transition>
+      </state>
+
+      <state id="retry">
+        <onentry><send event="retry.due" delayexpr="retryDelay() + 'ms'"/></onentry>
+        <transition event="retry.due" target="prepare">
+          <send type="durable" event="task.checkpoint">
+            <param name="checkpoint" expr="({ phase: 'prepare', attempt: cp.attempt + 1 })"/>
+          </send>
+          <assign location="cp" expr="({ phase: 'prepare', attempt: cp.attempt + 1 })"/>
+        </transition>
+      </state>
+
+      <!-- woken: every tool call of the round is terminal -->
+      <state id="tools">
+        <onentry><send type="durable" event="generation.postTools"/></onentry>
+        <transition target="completing"/>
+      </state>
+    </state>
+
+    <!-- parked, no code running: on its tool calls (allSettled), or on a blocking compaction -->
+    <state id="waiting">
+      <transition event="task.wake" target="running">
+        <assign location="cp" expr="_event.data.checkpoint"/>
+      </transition>
+    </state>
+
+    <state id="completing">
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <!-- Esc: the tool calls abort first (bottom-up); then the inputs are settled "aborted" -->
+  <state id="aborting" initial="draining">
+    <state id="draining">
+      <transition event="task.drained" target="handler"/>
+    </state>
+    <state id="handler">
+      <onentry><send type="durable" event="generation.aborted"/></onentry>
+      <transition event="task.terminal" target="terminal"/>
+    </state>
+  </state>
+
+  <final id="terminal"/>
+</scxml>

@@ -4,7 +4,7 @@
  *   bun scripts/site/build.ts            (mise run site:build)
  *
  *   /                      landing page (a live <scxml-view>, the explorer tour, features)
- *   /demos/                demos index · /demos/explorer/ · /demos/gallery/ · /demos/llm-chat/
+ *   /demos/                demos index · /demos/explorer/ · /demos/gallery/ · /demos/llm-chat/ · /demos/pi-durable/
  *   /playground/           the live editor (sandboxed engine, CodeMirror, share links)
  *   /docs/…                docs/*.md, SECURITY.md, CHANGELOG.md rendered (sidebar, TOC, pager)
  *   /api/                  the TypeDoc reference (`mise run docs:api`; built here if missing)
@@ -41,7 +41,7 @@ await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 
 // ── client bundles ────────────────────────────────────────────────────────
-const entries = ["common", "landing", "gallery", "explorer", "search", "playground", "llm-chat"].map((n) =>
+const entries = ["common", "landing", "gallery", "explorer", "search", "playground", "llm-chat", "pi-durable"].map((n) =>
   join(root, "site/client", `${n}.ts`),
 );
 const bundle = await Bun.build({
@@ -168,6 +168,14 @@ await emit(
   await cp(join(sdk, "pkg"), join(dest, "pkg"), { recursive: true, filter: (f) => browserOnly(f) });
   await cp(join(sdk, "LICENSE"), join(dest, "LICENSE.txt"));
 }
+await emit(
+  "/demos/pi-durable/",
+  "demos",
+  "Pi Durable, as statecharts",
+  "Earendil’s Pi Durable, section by section, as running statecharts: kill the process mid-run and watch every task continue from its checkpoint. Forks, subagents, hooks, compaction and multiplayer clients, simulated in your browser.",
+  pages.piDurableDemo(),
+  { scripts: ["pi-durable"] },
+);
 await emit(
   "/demos/gallery/",
   "demos",

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 10, "Durable application state": the todo document, committed with the transcript; a fork's todos as of its fork entry. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · durable application state" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'You'"/></send>
+    </onentry>
+    <transition event="client.you.live" target="first"/>
+  </state>
+
+  <state id="first">
+    <onentry><send event="go" delay="1s"/></onentry>
+    <transition event="go" target="adding">
+      <send type="stage" event="type"><param name="text" expr="'Add to my list: buy milk and call Bo'"/></send>
+    </transition>
+  </state>
+
+  <state id="adding">
+    <transition event="commit.todo.add" target="added">
+      <send type="stage" event="note">
+        <param name="text" expr="'The todo tool changes the app.todos document in a commit: the same kind of atomic commit that stores the transcript. The list (in the conversation) is a client subscribing to the committed value; the todos section shows it to the model before every request.'"/>
+        <param name="cite" expr="'documents'"/>
+      </send>
+    </transition>
+  </state>
+  <state id="added">
+    <transition event="commit.generation.answer" target="second"/>
+  </state>
+
+  <state id="second">
+    <onentry><send event="go" delay="1.5s"/></onentry>
+    <transition event="go" target="more">
+      <send type="stage" event="type"><param name="text" expr="'Add to my list: water the plants'"/></send>
+    </transition>
+  </state>
+
+  <state id="more">
+    <transition event="commit.generation.answer" target="fork"/>
+  </state>
+
+  <state id="fork">
+    <onentry><send event="go" delay="2s"/></onentry>
+    <transition event="go" target="forked">
+      <send type="stage" event="fork">
+        <param name="title" expr="'what if'"/>
+        <param name="at" expr="'firstAnswer'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="forked">
+    <transition event="client.you.live" target="done">
+      <send type="stage" event="note">
+        <param name="text" expr="'A fork at the first answer. app.todos is defined with fork: &quot;asOf&quot;, so the fork starts with the two todos its parent had at that entry, not three. pi.inbox and pi.usage are &quot;initial&quot;: empty.'"/>
+        <param name="cite" expr="'documents'"/>
+      </send>
+    </transition>
+  </state>
+
+  <final id="done"/>
+</scxml>

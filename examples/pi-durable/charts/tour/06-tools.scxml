@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 6, "Extensions › Tools": a subagent owned by a tool call (and a crash under it), then an override and a wrap. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · tools" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'You'"/></send>
+    </onentry>
+    <transition event="client.you.live" target="ask"/>
+  </state>
+
+  <state id="ask">
+    <onentry><send event="go" delay="1s"/></onentry>
+    <transition event="go" target="subagent">
+      <send type="stage" event="type"><param name="text" expr="'Triage this issue: the app crashes when I log out'"/></send>
+    </transition>
+  </state>
+
+  <state id="subagent">
+    <transition event="commit.triage.subagent" target="crash">
+      <send type="stage" event="note">
+        <param name="text" expr="'The triage tool created a conversation it owns: a subagent with a smaller model, no tools and one instruction. It submitted the issue there (requestId triage:&lt;call&gt;) and waits for the answer.'"/>
+        <param name="cite" expr="'tools'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+
+  <state id="crash">
+    <transition event="pi.generation.request" target="dying"/>
+  </state>
+  <state id="dying">
+    <onentry><send event="kill" delay="700ms"/></onentry>
+    <transition event="kill" target="dead">
+      <send type="stage" event="kill"/>
+      <send type="stage" event="note">
+        <param name="text" expr="'The process dies while the subagent thinks.'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+  <state id="dead">
+    <onentry><send event="start" delay="2s"/></onentry>
+    <transition event="start" target="rerun"><send type="stage" event="start"/></transition>
+  </state>
+
+  <state id="rerun">
+    <transition event="commit.tool.result.triage" target="override">
+      <send type="stage" event="note">
+        <param name="text" expr="'triage is safe to rerun: it found its subagent again (owned by the same call), resubmitted with the same requestId, got the same submission, and waited for its answer. The subagent continued from its own checkpoint.'"/>
+        <param name="cite" expr="'crashes'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+
+  <state id="override">
+    <onentry><send event="go" delay="3s"/></onentry>
+    <transition event="go" target="wrapped">
+      <send type="stage" event="install"><param name="extension" expr="'venv@1'"/></send>
+      <send type="stage" event="install"><param name="extension" expr="'timing@1'"/></send>
+      <send type="stage" event="note">
+        <param name="text" expr="'Two more extensions: venv brings its own bash (same name, later extension: it replaces coding’s), and timing wraps whichever bash won.'"/>
+        <param name="cite" expr="'tools'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+      <send type="stage" event="type"><param name="text" expr="'What is your working directory?'"/></send>
+    </transition>
+  </state>
+
+  <state id="wrapped">
+    <transition event="commit.tool.result.bash" target="done">
+      <send type="stage" event="note">
+        <param name="text" expr="'The call ran venv’s bash (the (venv) prefix), timed by the wrap (timing, in the tool’s details).'"/>
+        <param name="cite" expr="'tools'"/>
+      </send>
+    </transition>
+  </state>
+
+  <final id="done"/>
+</scxml>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 12, "Multiplayer": a late joiner gets the view, then ops; a steer joins the run after the tool round. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · multiplayer" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'Ada'"/></send>
+    </onentry>
+    <transition event="client.you.live" target="ask"/>
+  </state>
+
+  <state id="ask">
+    <onentry><send event="go" delay="1s"/></onentry>
+    <transition event="go" target="working">
+      <send type="stage" event="type"><param name="text" expr="'Why is checkout slow?'"/></send>
+    </transition>
+  </state>
+
+  <state id="working">
+    <transition event="tool.bash.run" target="join"/>
+  </state>
+
+  <state id="join">
+    <onentry><send event="go" delay="800ms"/></onentry>
+    <transition event="go" target="joining">
+      <send type="stage" event="client.add"><param name="client" expr="'bo'"/><param name="name" expr="'Bo'"/></send>
+    </transition>
+  </state>
+
+  <state id="joining">
+    <transition event="client.bo.live" target="steer">
+      <send type="stage" event="note">
+        <param name="text" expr="'Bo joins while the agent works. His client got the current view first, the running bash and its output included, and from now on only each commit’s ops (see the frame and op counts in his client).'"/>
+        <param name="cite" expr="'multiplayer'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="steer">
+    <onentry><send event="go" delay="700ms"/></onentry>
+    <transition event="go" target="steered">
+      <send type="stage" event="type">
+        <param name="client" expr="'bo'"/>
+        <param name="text" expr="'Check the staging logs first'"/>
+        <param name="whenBusy" expr="'steer'"/>
+      </send>
+      <send type="stage" event="type">
+        <param name="client" expr="'bo'"/>
+        <param name="text" expr="'Then summarise it for the team'"/>
+        <param name="whenBusy" expr="'followUp'"/>
+      </send>
+      <send type="stage" event="type">
+        <param name="text" expr="'Are you done yet?'"/>
+        <param name="whenBusy" expr="'reject'"/>
+      </send>
+      <send type="stage" event="note">
+        <param name="text" expr="'Bo steers (whenBusy: steer) and queues a follow-up; both wait in the inbox. Ada asks with whenBusy: reject, and is refused: ConversationBusy, nothing written.'"/>
+        <param name="cite" expr="'multiplayer'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="steered">
+    <transition event="commit.generation.postTools" target="followUp">
+      <send type="stage" event="note">
+        <param name="text" expr="'The tool round is over: at the postTools boundary the steer was placed and joined the running work. The follow-up waits for the answer.'"/>
+        <param name="cite" expr="'multiplayer'"/>
+      </send>
+    </transition>
+  </state>
+
+  <state id="followUp">
+    <transition event="commit.generation.answer" target="last"/>
+  </state>
+  <state id="last">
+    <transition event="commit.generation.answer" target="done">
+      <send type="stage" event="note">
+        <param name="text" expr="'The answer took the steer into account; then the follow-up ran as its own run. Both clients saw every step.'"/>
+        <param name="cite" expr="'multiplayer'"/>
+      </send>
+    </transition>
+  </state>
+
+  <final id="done"/>
+</scxml>

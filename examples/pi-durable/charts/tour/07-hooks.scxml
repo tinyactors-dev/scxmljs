@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tour 7, "Extensions › Hooks": a beforeTool chain (approval, then freeze); the approval is a memo that survives a crash. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="tour · hooks" initial="setup">
+  <state id="setup">
+    <onentry>
+      <send type="stage" event="client.add"><param name="client" expr="'you'"/><param name="name" expr="'You'"/></send>
+    </onentry>
+    <transition event="client.you.live" target="ask"/>
+  </state>
+
+  <state id="ask">
+    <onentry><send event="go" delay="1s"/></onentry>
+    <transition event="go" target="asking">
+      <send type="stage" event="type"><param name="text" expr="'Deploy v1.5.1'"/></send>
+    </transition>
+  </state>
+
+  <state id="asking">
+    <transition event="approval.asked" target="approve">
+      <send type="stage" event="note">
+        <param name="text" expr="'The deploy call runs the beforeTool chain of its conversation’s extensions, in order: approval, then freeze. approval asks a person (the card in the conversation).'"/>
+        <param name="cite" expr="'hooks'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+      <send type="stage" event="inspect"><param name="kind" expr="'pi.tool'"/><param name="label" expr="'deploy'"/></send>
+    </transition>
+  </state>
+
+  <state id="approve">
+    <onentry><send event="go" delay="2.5s"/></onentry>
+    <transition event="go" target="memo"><send type="stage" event="approve"/></transition>
+  </state>
+
+  <state id="memo">
+    <transition event="hook.beforeTool.freeze" target="freeze">
+      <send type="stage" event="note">
+        <param name="text" expr="'Approved, and stored as a memo on the task (approval:deploy = true): the first write wins. Now freeze checks the change calendar, which takes a while.'"/>
+        <param name="cite" expr="'hooks'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+
+  <state id="freeze">
+    <onentry><send event="kill" delay="1.2s"/></onentry>
+    <transition event="kill" target="dead">
+      <send type="stage" event="kill"/>
+      <send type="stage" event="note">
+        <param name="text" expr="'The process dies in the middle of the chain. The call’s checkpoint is still call: nothing has run yet.'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+
+  <state id="dead">
+    <onentry><send event="start" delay="2s"/></onentry>
+    <transition event="start" target="again"><send type="stage" event="start"/></transition>
+  </state>
+
+  <state id="again">
+    <transition event="hook.beforeTool.freeze" target="deploying">
+      <send type="stage" event="note">
+        <param name="text" expr="'The call phase runs again, hooks and all. approval found its memo and didn’t ask anybody; freeze checks again.'"/>
+        <param name="cite" expr="'hooks'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </transition>
+  </state>
+
+  <state id="deploying">
+    <transition event="commit.generation.answer" target="done"/>
+  </state>
+
+  <final id="done">
+    <onentry>
+      <send type="stage" event="note">
+        <param name="text" expr="'Deployed, with one approval. Hooks can run again after a crash; decisions belong in memos.'"/>
+        <param name="panel" expr="'process'"/>
+        </send>
+    </onentry>
+  </final>
+</scxml>

@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GitHub issue gatekeeper.
+
+  Every newly opened (or reopened) issue is triaged:
+    * authors on the `allowlist` get their issue labelled `triage` and kept open;
+    * everybody else gets a polite comment + an `auto-closed` label (in parallel),
+      after which the issue is closed, retrying with backoff on API errors.
+
+  One issue is handled at a time. Issues that arrive meanwhile wait in `queue`
+  and are taken in arrival order once the machine is back in `ready`.
+
+  GitHub is an Event I/O Processor (type "github", see
+  src/scxml/github-ioprocessor.ts):
+
+    outbound  <send type="github" targetexpr="issue.repo" event="<verb>">
+              performs the API call and answers with `github.<verb>.done`
+              or `github.<verb>.error` (_event.origintype = the processor URI);
+    inbound   webhook deliveries become `issues.<action>` events carrying
+              `{ repo, number, title, author, url }`.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="github-issue-gatekeeper" initial="gatekeeper">
+
+  <datamodel>
+    <!-- GitHub logins whose issues stay open. Everybody else is closed. -->
+    <data id="allowlist" expr="['dhamidi', 'octocat']"/>
+    <data id="issue" expr="null"/>
+    <!-- Issues that arrived while another one was being handled, oldest first. -->
+    <data id="queue" expr="[]"/>
+    <data id="attempts" expr="0"/>
+    <data id="maxAttempts" expr="3"/>
+    <data id="backoffMs" expr="1000"/>
+    <data id="closeComment">"Thanks for taking the time! This repository only accepts issues from maintainers, so this one was closed automatically."</data>
+  </datamodel>
+
+  <state id="gatekeeper" initial="ready">
+
+    <!-- The allowlist can be edited at any time without disturbing the current issue. -->
+    <transition event="allowlist.add" type="internal">
+      <if cond="!allowlist.includes(_event.data.login)">
+        <script>allowlist.push(_event.data.login)</script>
+      </if>
+    </transition>
+    <transition event="allowlist.remove" type="internal">
+      <assign location="allowlist" expr="allowlist.filter(function (l) { return l !== _event.data.login })"/>
+    </transition>
+
+    <!-- Busy with another issue (ready handles these itself when idle): queue it. -->
+    <transition event="issues.opened issues.reopened" type="internal">
+      <script>queue.push(_event.data)</script>
+      <log label="queued" expr="'#' + _event.data.number + ' (' + queue.length + ' waiting)'"/>
+    </transition>
+
+    <!-- Resting states: waiting for the next issue. -->
+    <state id="ready" initial="idle">
+      <transition event="issues.opened issues.reopened" target="triaging">
+        <assign location="issue" expr="_event.data"/>
+        <assign location="attempts" expr="0"/>
+      </transition>
+      <!-- Back from an issue with more waiting: take the oldest. -->
+      <transition cond="queue.length &gt; 0" target="triaging">
+        <assign location="issue" expr="queue.shift()"/>
+        <assign location="attempts" expr="0"/>
+      </transition>
+
+      <state id="idle"/>
+      <state id="kept">
+        <onentry><log label="kept open" expr="'#' + issue.number"/></onentry>
+      </state>
+      <state id="closed">
+        <onentry><log label="closed" expr="'#' + issue.number"/></onentry>
+      </state>
+      <state id="failed">
+        <onentry><log label="gave up closing" expr="'#' + issue.number + ' after ' + attempts + ' attempts'"/></onentry>
+      </state>
+    </state>
+
+    <!-- Decide, based on the datamodel, what happens to the issue. -->
+    <state id="triaging">
+      <onentry><log label="triage" expr="'#' + issue.number + ' by @' + issue.author"/></onentry>
+      <transition cond="allowlist.includes(issue.author)" target="accepting"/>
+      <transition target="rejecting"/>
+    </state>
+
+    <state id="accepting">
+      <onentry>
+        <send type="github" targetexpr="issue.repo" event="label">
+          <param name="number" expr="issue.number"/>
+          <param name="labels" expr="['triage']"/>
+        </send>
+      </onentry>
+      <transition event="github.label.done" target="kept"/>
+      <transition event="github.label.error" target="kept"/>
+    </state>
+
+    <!-- Comment and label concurrently; close once both are finished. -->
+    <parallel id="rejecting">
+      <state id="commenting" initial="postingComment">
+        <state id="postingComment">
+          <onentry>
+            <send type="github" targetexpr="issue.repo" event="comment">
+              <param name="number" expr="issue.number"/>
+              <param name="body" expr="closeComment"/>
+            </send>
+          </onentry>
+          <transition event="github.comment.*" target="commented"/>
+        </state>
+        <final id="commented"/>
+      </state>
+
+      <state id="labelling" initial="postingLabel">
+        <state id="postingLabel">
+          <onentry>
+            <send type="github" targetexpr="issue.repo" event="label">
+              <param name="number" expr="issue.number"/>
+              <param name="labels" expr="['auto-closed']"/>
+            </send>
+          </onentry>
+          <transition event="github.label.*" target="labelled"/>
+        </state>
+        <final id="labelled"/>
+      </state>
+
+      <transition event="done.state.rejecting" target="closing"/>
+    </parallel>
+
+    <state id="closing">
+      <onentry>
+        <assign location="attempts" expr="attempts + 1"/>
+        <send type="github" targetexpr="issue.repo" event="close">
+          <param name="number" expr="issue.number"/>
+          <param name="reason" expr="'not_planned'"/>
+        </send>
+      </onentry>
+      <transition event="github.close.done" target="closed"/>
+      <transition event="github.close.error" cond="attempts &lt; maxAttempts" target="backingOff"/>
+      <transition event="github.close.error" target="failed"/>
+    </state>
+
+    <state id="backingOff">
+      <onentry>
+        <log label="retrying close" expr="'in ' + (backoffMs * attempts) + 'ms'"/>
+        <send id="retryTimer" event="retry" delayexpr="(backoffMs * attempts) + 'ms'"/>
+      </onentry>
+      <onexit><cancel sendid="retryTimer"/></onexit>
+      <transition event="retry" target="closing"/>
+    </state>
+  </state>
+</scxml>

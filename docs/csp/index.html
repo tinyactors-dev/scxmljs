@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Content-Security-Policy · scxmljs</title>
+<meta name="description" content="The package works under a strict Content-Security-Policy. What script-src must allow depends on the entry point; styles need nothing special.">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/csp/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Content-Security-Policy · scxmljs">
+<meta property="og:description" content="The package works under a strict Content-Security-Policy. What script-src must allow depends on the entry point; styles need nothing special.">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/csp/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/" aria-current="page">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="content-security-policy">Content-Security-Policy</h1>
+<p>The package works under a strict Content-Security-Policy. What <code>script-src</code> must allow depends on
+the entry point; styles need nothing special.</p>
+<table>
+<thead>
+<tr>
+<th>You use</th>
+<th><code>script-src</code> needs</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@tinyactors/scxmljs</code> (sandboxed), or <code>&lt;scxml-view&gt;</code> without <code>trusted</code></td>
+<td><code>&#39;wasm-unsafe-eval&#39;</code></td>
+<td>QuickJS is WebAssembly, compiled at run time</td>
+</tr>
+<tr>
+<td><code>@tinyactors/scxmljs/trusted</code>, or <code>&lt;scxml-view trusted&gt;</code></td>
+<td><code>&#39;unsafe-eval&#39;</code></td>
+<td>chart code runs with <code>eval</code> in a hidden iframe</td>
+</tr>
+<tr>
+<td>only <code>&lt;scxml-explorer&gt;</code> with a session you created</td>
+<td>whatever that session&#39;s entry point needs</td>
+<td>the explorer itself evaluates nothing</td>
+</tr>
+</tbody></table>
+<p><code>&#39;wasm-unsafe-eval&#39;</code> only allows compiling WebAssembly; it doesn&#39;t allow <code>eval()</code> of JavaScript.
+It&#39;s the smaller permission, which is one more reason to prefer the sandbox.</p>
+<p>A policy for a page that uses <code>&lt;scxml-view&gt;</code> with sandboxed charts, served from the same origin:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'</span></span></code></pre><p>And one that also runs trusted sessions:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self'</span></span></code></pre><p>Both are tested in CI in Chromium, Firefox and WebKit (<code>tests/browser/specs/csp.pw.ts</code>, with
+these exact policies plus the import map&#39;s hash): under the first, sandboxed <code>&lt;scxml-view&gt;</code> and
+<code>&lt;scxml-explorer&gt;</code> work with no violations and a trusted <code>&lt;scxml-view&gt;</code> is refused (its <code>eval</code>
+is the only violation); under the second, everything works with no violations. The same two
+checks run against the classic-script (IIFE) bundles from <a href="/docs/bundling/#classic-scripts-no-modules">Bundling</a>.</p>
+<h2 id="the-other-directives">The other directives<a class="anchor" href="#the-other-directives" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<ul>
+<li><strong>Styles.</strong> <code>style-src &#39;self&#39;</code> is enough; <code>&#39;unsafe-inline&#39;</code> isn&#39;t needed. The elements style
+themselves with constructable stylesheets adopted by their shadow roots, and position things
+through the CSSOM (<code>element.style</code>), neither of which <code>style-src</code> restricts. They never write
+<code>style</code> attributes or inline <code>&lt;style&gt;</code> elements. If you link <code>themes/tinyactors.css</code> from
+another origin, allow that origin.</li>
+<li><strong>Fetching charts.</strong> <code>&lt;scxml-view src&gt;</code>, and the loader it uses for <code>&lt;script src&gt;</code>,
+<code>&lt;data src&gt;</code> and <code>&lt;invoke src&gt;</code>, use <code>fetch()</code>: the URLs must be allowed by <code>connect-src</code>
+(<code>default-src &#39;self&#39;</code> covers same-origin charts). Your own I/O processors need whatever their
+transport needs.</li>
+<li><strong>Frames.</strong> The trusted data model creates a same-origin <code>about:blank</code> iframe, which <code>frame-src</code>
+doesn&#39;t block.</li>
+<li><strong>Nothing else.</strong> No fonts, images, workers or <code>.wasm</code> files are loaded: QuickJS is embedded in
+the JavaScript.</li>
+<li><strong>Import maps</strong> are inline scripts. If you load the package through an
+<a href="/docs/bundling/#from-a-cdn-with-an-import-map">import map</a>, allow it with a hash
+(<code>&#39;sha256-…&#39;</code> of the map&#39;s text) or a nonce in <code>script-src</code>, and allow the CDN&#39;s origin.</li>
+</ul>
+<h2 id="trusted-types">Trusted Types<a class="anchor" href="#trusted-types" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>With <code>require-trusted-types-for &#39;script&#39;</code>, the browser refuses strings where it expects HTML or
+scripts:</p>
+<ul>
+<li><strong>The elements</strong> build all their DOM with <code>createElement</code> and never parse HTML, so they work
+unchanged.</li>
+<li><strong>Parsing SCXML text</strong> uses <code>DOMParser.parseFromString</code>, which then needs <code>TrustedHTML</code>. Pass a
+<code>domParser</code> that wraps the text with your own policy. It goes into <code>createSession()</code>, or into
+<code>&lt;scxml-view&gt;</code>&#39;s <code>options</code> (set it before <code>src</code>):</li>
+</ul>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// the Trusted Types API (types: @types/trusted-types)</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">declare</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> trustedTypes</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">createPolicy</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">name</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">rules</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">createHTML</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">s</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> })</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">createHTML</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">s</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } };</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> policy</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> trustedTypes.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">createPolicy</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, { </span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">createHTML</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">text</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> text });</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> domParser</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  parseFromString</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">text</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">type</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">().</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">parseFromString</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(policy.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">createHTML</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(text), type </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">as</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657"> DOMParserSupportedType</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">),</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> fetch</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"chart.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">text</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(), { domParser });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">document.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">querySelector</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml-view"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.options </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { domParser };</span></span></code></pre><p>  If your policy also uses <code>trusted-types &lt;names&gt;</code>, include your policy&#39;s name.</p>
+<ul>
+<li><strong>The trusted data model</strong> evaluates chart code with <code>eval</code>, which Trusted Types blocks (it
+would need <code>TrustedScript</code>). Use the sandboxed entry point on such pages.</li>
+</ul>
+<p>Tested in CI in Chromium, Firefox and WebKit, which all enforce Trusted Types: a sandboxed
+<code>&lt;scxml-view&gt;</code> with this <code>domParser</code> and <code>&lt;scxml-explorer&gt;</code> (with a screenshot of its focus pane),
+no violations and no errors.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/bundling/"><small>Previous</small>Bundling, CDNs and classic scripts</a>
+  <a class="next" href="/docs/security/"><small>Next</small>Security</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#the-other-directives">The other directives</a></li>
+    <li class="depth-2"><a href="#trusted-types">Trusted Types</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/csp.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

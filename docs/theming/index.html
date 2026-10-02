@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theming · scxmljs</title>
+<meta name="description" content="Both elements draw everything inside their shadow DOM, and read every colour, font and size from public --scxml-* custom properties. Set them on the elements, or on any ancestor, to make the…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/theming/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Theming · scxmljs">
+<meta property="og:description" content="Both elements draw everything inside their shadow DOM, and read every colour, font and size from public --scxml-* custom properties. Set them on the elements, or on any ancestor, to make the…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/theming/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/" aria-current="page">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="theming">Theming</h1>
+<p>Both elements draw everything inside their shadow DOM, and read every colour, font and size from
+public <code>--scxml-*</code> custom properties. Set them on the elements, or on any ancestor, to make the
+elements match your app. Tokens you don&#39;t set fall back to the neutral default theme.</p>
+<p>The default theme uses system fonts (nothing is downloaded) and one indigo accent. It follows the
+page&#39;s light or dark colour scheme.</p>
+<table>
+<thead>
+<tr>
+<th>Light</th>
+<th>Dark</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><img src="https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-light-0ce739b3.webp" alt="&lt;scxml-view&gt;, light"></td>
+<td><img src="https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-dark-c43c99a3.webp" alt="&lt;scxml-view&gt;, dark"></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-light-6607c6d8.webp" alt="&lt;scxml-explorer&gt;, light"></td>
+<td><img src="https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-dark-e3410411.webp" alt="&lt;scxml-explorer&gt;, dark"></td>
+</tr>
+</tbody></table>
+<h2 id="light-and-dark">Light and dark<a class="anchor" href="#light-and-dark" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The elements use the page&#39;s <code>color-scheme</code>. A page that declares <code>color-scheme: light dark</code> (or
+<code>&lt;meta name=&quot;color-scheme&quot; content=&quot;light dark&quot;&gt;</code>) gets the dark theme when the OS is dark;
+a page that declares nothing gets the light one. To decide for the elements alone, set
+<code>--scxml-color-scheme</code> to <code>light</code>, <code>dark</code> or <code>light dark</code>:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">--scxml-color-scheme</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">light</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> dark</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; } </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">/* follow the OS */</span></span></code></pre><p>Your own token values can use <code>light-dark()</code> too, so one declaration covers both schemes.</p>
+<h2 id="tokens">Tokens<a class="anchor" href="#tokens" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The defaults are light / dark.</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Default</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--scxml-color-scheme</code></td>
+<td>the page&#39;s</td>
+<td><code>light</code>, <code>dark</code>, or <code>light dark</code></td>
+</tr>
+<tr>
+<td><code>--scxml-bg</code></td>
+<td><code>#f6f6f8</code> / <code>#141417</code></td>
+<td>the element&#39;s background</td>
+</tr>
+<tr>
+<td><code>--scxml-surface</code></td>
+<td><code>#ffffff</code> / <code>#1c1c20</code></td>
+<td>cards, boxes, buttons</td>
+</tr>
+<tr>
+<td><code>--scxml-surface-2</code></td>
+<td><code>#f0f0f3</code> / <code>#242429</code></td>
+<td>containers, notices</td>
+</tr>
+<tr>
+<td><code>--scxml-surface-3</code></td>
+<td><code>#e5e5ea</code> / <code>#2e2e34</code></td>
+<td>selected toggles</td>
+</tr>
+<tr>
+<td><code>--scxml-fg</code></td>
+<td><code>#1c1c21</code> / <code>#ececf1</code></td>
+<td>text</td>
+</tr>
+<tr>
+<td><code>--scxml-fg-muted</code></td>
+<td><code>#484852</code> / <code>#bcbcc6</code></td>
+<td>secondary text</td>
+</tr>
+<tr>
+<td><code>--scxml-fg-subtle</code></td>
+<td><code>#6a6a75</code> / <code>#90909b</code></td>
+<td>hints, counts</td>
+</tr>
+<tr>
+<td><code>--scxml-fg-faint</code></td>
+<td><code>#85858f</code> / <code>#777781</code></td>
+<td>arrows and other graphics (never text)</td>
+</tr>
+<tr>
+<td><code>--scxml-border</code></td>
+<td><code>#e6e6eb</code> / <code>#2a2a30</code></td>
+<td>dividers</td>
+</tr>
+<tr>
+<td><code>--scxml-border-2</code></td>
+<td><code>#d3d3da</code> / <code>#393940</code></td>
+<td>control and card borders</td>
+</tr>
+<tr>
+<td><code>--scxml-border-strong</code></td>
+<td><code>#8b8b96</code> / <code>#6c6c77</code></td>
+<td>state boxes</td>
+</tr>
+<tr>
+<td><code>--scxml-accent</code></td>
+<td><code>#3d5bd9</code> / <code>#8fa3ff</code></td>
+<td>the accent: focus rings, fired transitions, primary buttons</td>
+</tr>
+<tr>
+<td><code>--scxml-accent-text</code></td>
+<td><code>#2f49b8</code> / <code>#aebcff</code></td>
+<td>accent-coloured text (links, sendable events)</td>
+</tr>
+<tr>
+<td><code>--scxml-accent-subtle</code></td>
+<td><code>#e9edfc</code> / <code>#252c4c</code></td>
+<td>accent backgrounds (hover)</td>
+</tr>
+<tr>
+<td><code>--scxml-on-accent</code></td>
+<td><code>#ffffff</code> / <code>#10132b</code></td>
+<td>text on <code>--scxml-accent</code></td>
+</tr>
+<tr>
+<td><code>--scxml-running</code>, <code>--scxml-running-bg</code></td>
+<td><code>#26733a</code> on <code>#e5f3e9</code> / <code>#6fd48a</code> on <code>#1a3123</code></td>
+<td>active states</td>
+</tr>
+<tr>
+<td><code>--scxml-waiting</code>, <code>--scxml-waiting-bg</code></td>
+<td><code>#a8560a</code> on <code>#fdf0e1</code> / <code>#ffb46b</code> on <code>#382815</code></td>
+<td>waiting states, conditions, warnings</td>
+</tr>
+<tr>
+<td><code>--scxml-done</code>, <code>--scxml-done-bg</code></td>
+<td><code>#48566b</code> on <code>#e9edf3</code> / <code>#a7b5c9</code> on <code>#242b35</code></td>
+<td>final states, finished machines</td>
+</tr>
+<tr>
+<td><code>--scxml-error</code></td>
+<td><code>#c2332f</code> / <code>#ff8a84</code></td>
+<td>errors</td>
+</tr>
+<tr>
+<td><code>--scxml-font-sans</code></td>
+<td><code>system-ui, …</code></td>
+<td>text</td>
+</tr>
+<tr>
+<td><code>--scxml-font-mono</code></td>
+<td><code>ui-monospace, …</code></td>
+<td>ids, events, code</td>
+</tr>
+<tr>
+<td><code>--scxml-font-display</code></td>
+<td><code>--scxml-font-sans</code></td>
+<td>titles</td>
+</tr>
+<tr>
+<td><code>--scxml-display-weight</code></td>
+<td><code>600</code></td>
+<td>weight of titles</td>
+</tr>
+<tr>
+<td><code>--scxml-radius</code></td>
+<td><code>4px</code></td>
+<td>corner radius</td>
+</tr>
+<tr>
+<td><code>--scxml-duration</code></td>
+<td><code>140ms</code></td>
+<td>transitions (none with <code>prefers-reduced-motion</code>)</td>
+</tr>
+<tr>
+<td><code>--scxml-row-height</code></td>
+<td><code>30px</code></td>
+<td>explorer tree rows</td>
+</tr>
+<tr>
+<td><code>--scxml-min-scale</code></td>
+<td><code>0.65</code></td>
+<td>how far <code>&lt;scxml-view&gt;</code> scales a too-wide diagram down before it scrolls instead (<code>1</code>: never; the <code>fit</code> attribute ignores it)</td>
+</tr>
+<tr>
+<td><code>--scxml-height</code></td>
+<td>view: none; explorer: <code>min(860px, 100dvh - 32px)</code></td>
+<td>the element&#39;s height (the view scrolls inside it)</td>
+</tr>
+</tbody></table>
+<p>The elements don&#39;t load fonts. If a token names a web font, load it in your page.</p>
+<h3 id="keep-it-readable">Keep it readable<a class="anchor" href="#keep-it-readable" aria-label="Link to this section" data-pagefind-ignore>#</a></h3>
+<p>The default theme meets WCAG AA. A theme should keep these pairs at the given contrast ratio;
+text needs 4.5:1, graphics 3:1:</p>
+<table>
+<thead>
+<tr>
+<th>Foreground</th>
+<th>On</th>
+<th>Ratio</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--scxml-fg</code></td>
+<td><code>--scxml-bg</code>, <code>--scxml-surface</code></td>
+<td>4.5</td>
+</tr>
+<tr>
+<td><code>--scxml-fg-muted</code></td>
+<td><code>--scxml-surface</code>, <code>--scxml-surface-2</code></td>
+<td>4.5</td>
+</tr>
+<tr>
+<td><code>--scxml-fg-subtle</code></td>
+<td><code>--scxml-bg</code>, <code>--scxml-surface</code>, <code>--scxml-surface-2</code></td>
+<td>4.5</td>
+</tr>
+<tr>
+<td><code>--scxml-accent-text</code></td>
+<td><code>--scxml-bg</code>, <code>--scxml-surface</code>, <code>--scxml-accent-subtle</code></td>
+<td>4.5</td>
+</tr>
+<tr>
+<td><code>--scxml-on-accent</code></td>
+<td><code>--scxml-accent</code></td>
+<td>4.5</td>
+</tr>
+<tr>
+<td><code>--scxml-running</code></td>
+<td><code>--scxml-bg</code>, <code>--scxml-surface</code>, <code>--scxml-running-bg</code></td>
+<td>4.5</td>
+</tr>
+<tr>
+<td><code>--scxml-waiting</code></td>
+<td><code>--scxml-surface</code>, <code>--scxml-waiting-bg</code></td>
+<td>4.5</td>
+</tr>
+<tr>
+<td><code>--scxml-done</code></td>
+<td><code>--scxml-done-bg</code></td>
+<td>4.5</td>
+</tr>
+<tr>
+<td><code>--scxml-error</code></td>
+<td><code>--scxml-surface</code></td>
+<td>4.5</td>
+</tr>
+<tr>
+<td><code>--scxml-fg-faint</code></td>
+<td><code>--scxml-surface</code>, <code>--scxml-surface-2</code></td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>--scxml-border-strong</code></td>
+<td><code>--scxml-surface</code></td>
+<td>3</td>
+</tr>
+</tbody></table>
+<p>The elements never use colour alone to show state: active states also get a marker and a name
+(&quot;active&quot;) for screen readers.</p>
+<h2 id="example-your-design-tokens">Example: your design tokens<a class="anchor" href="#example-your-design-tokens" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Map your own design tokens onto the contract once, for both elements:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#953800;--shiki-dark:#FFA657">  --scxml-bg</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">var</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">--app-background</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#953800;--shiki-dark:#FFA657">  --scxml-surface</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">var</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">--app-card</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#953800;--shiki-dark:#FFA657">  --scxml-fg</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">var</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">--app-text</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#953800;--shiki-dark:#FFA657">  --scxml-fg-muted</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">var</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">--app-text-secondary</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#953800;--shiki-dark:#FFA657">  --scxml-accent</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">var</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">--brand</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#953800;--shiki-dark:#FFA657">  --scxml-accent-text</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">var</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">--brand-dark</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#953800;--shiki-dark:#FFA657">  --scxml-on-accent</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">white</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#953800;--shiki-dark:#FFA657">  --scxml-font-sans</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Inter"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">sans-serif</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#953800;--shiki-dark:#FFA657">  --scxml-radius</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">8</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">px</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">}</span></span></code></pre><p>The package ships one such mapping, for the Tinyactors design system. Import it where your
+bundler handles CSS, or link it:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/themes/tinyactors.css"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span></code></pre><p>It&#39;s also a complete example to copy: see
+<a href="https://github.com/tinyactors-dev/scxmljs/blob/main/packages/scxmljs/src/themes/tinyactors.css"><code>themes/tinyactors.css</code></a>.</p>
+<h2 id="parts">Parts<a class="anchor" href="#parts" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>For anything the tokens don&#39;t cover, style the elements&#39; insides with <code>::part()</code>. Every part and
+its modifiers are listed in the element references: <a href="/docs/view/#styling"><code>&lt;scxml-view&gt;</code></a> and
+<a href="/docs/explorer/#styling"><code>&lt;scxml-explorer&gt;</code></a>. Modifiers are added to the part name while they apply,
+so select them together:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">::part(state active) { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">box-shadow</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">0</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 0</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 0</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 3</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">px</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> gold</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; }</span></span>
+<span class="line"><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">::part(transition fired) { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">transform</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">scale</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">1.1</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">); }</span></span>
+<span class="line"><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">::part(card waiting) { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">outline</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">2</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">px</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> dashed</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> orange</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; }</span></span>
+<span class="line"><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">::part(</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">tree-row</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> match) { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">background</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">#ff05</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; }</span></span></code></pre><p>Parts are public API: they&#39;re only renamed or removed in a release that says so in the
+<a href="/docs/changelog/">changelog</a>. The classes inside the shadow DOM, and the private <code>--x-*</code> custom
+properties, are not.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/explorer/"><small>Previous</small>&lt;scxml-explorer&gt;</a>
+  <a class="next" href="/docs/custom-ui/"><small>Next</small>Custom UI and translations</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#light-and-dark">Light and dark</a></li>
+    <li class="depth-2"><a href="#tokens">Tokens</a></li>
+    <li class="depth-3"><a href="#keep-it-readable">Keep it readable</a></li>
+    <li class="depth-2"><a href="#example-your-design-tokens">Example: your design tokens</a></li>
+    <li class="depth-2"><a href="#parts">Parts</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/theming.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

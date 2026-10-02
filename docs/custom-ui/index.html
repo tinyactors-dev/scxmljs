@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Custom UI and translations · scxmljs</title>
+<meta name="description" content="The elements can be adapted at four levels, from small to large:">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/custom-ui/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Custom UI and translations · scxmljs">
+<meta property="og:description" content="The elements can be adapted at four levels, from small to large:">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/custom-ui/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/" aria-current="page">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="custom-ui-and-translations">Custom UI and translations</h1>
+<p>The elements can be adapted at four levels, from small to large:</p>
+<ol>
+<li><a href="/docs/theming/">Theme</a> them with tokens and <code>::part()</code>.</li>
+<li><a href="#translations">Translate</a> or reword every string.</li>
+<li>Put your own content into <a href="#slots"><code>&lt;scxml-explorer&gt;</code>&#39;s slots</a>.</li>
+<li>Keep the engine and build your own UI: <a href="#draw-it-yourself">draw charts yourself</a> with the
+exported layout, or <a href="#build-your-own-explorer">build your own explorer</a> on its view-model.</li>
+</ol>
+<h2 id="translations">Translations<a class="anchor" href="#translations" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Every user-visible string of both elements comes from their <code>strings</code> property. Set a partial
+object; keys you leave out keep their English default. Strings that include a value or a count
+are functions, so the translation controls word order and plural forms:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/view"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> plural</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> Intl.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">PluralRules</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"de"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">document.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">querySelector</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml-view"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.strings </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  expand: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Aufklappen"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  collapse: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Zuklappen"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  statesInside</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">n</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">n</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">} ${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">plural</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">select</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">(</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">n</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">===</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "one"</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> ?</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "Zustand"</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> :</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "Zustände"}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  announceSent</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">name</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">} gesendet`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">document.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">querySelector</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml-explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.strings </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  follow: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Folgen"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  transitions</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">n</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">n</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">} ${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">plural</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">select</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">(</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">n</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">===</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "one"</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> ?</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "Übergang"</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> :</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "Übergänge"}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  kind</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">kind</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> ({ atomic: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Zustand"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, compound: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Zusammengesetzt"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, parallel: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Parallel"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, final: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Endzustand"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, history: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Historie"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, scxml: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"Maschine"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> })[kind],</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">};</span></span></code></pre><p>The keys, with their English defaults, are the <code>ViewStrings</code> and <code>ExplorerStrings</code> types, also
+exported as <code>defaultViewStrings</code> and <code>defaultExplorerStrings</code> (a good starting point for a complete
+translation). Right-to-left layouts haven&#39;t been checked yet.</p>
+<h2 id="slots">Slots<a class="anchor" href="#slots" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p><code>&lt;scxml-explorer&gt;</code> has named slots for your own content, listed in its
+<a href="/docs/explorer/#slots">reference</a>. Slotted elements belong to your page, so your framework renders
+and styles them as usual.</p>
+<p>A common one is a form for an event&#39;s data. The explorer&#39;s generic data field takes JSON; a slot
+named <code>event:&lt;descriptor&gt;</code> puts a form into that event&#39;s row instead:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> id</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">form</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> slot</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"event:volume"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> id</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"volume-form"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">input</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"range"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"value"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> min</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"0"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> max</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"10"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">button</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>Set volume&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">button</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">form</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">p</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> slot</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"detail:muted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>Muted players remember their volume.&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">p</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span></code></pre><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> form</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> document.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">querySelector</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">HTMLFormElement</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"#volume-form"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">form.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">addEventListener</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"submit"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">e</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  e.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">preventDefault</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">send</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"volume"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, { value: </span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">Number</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> FormData</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(form).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">get</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"value"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)) });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span></code></pre><p>(Or mark the form with <code>data-scxml-send=&quot;volume&quot;</code> and <a href="/docs/driving-charts/#declarative-bind-and-data-scxml-"><code>bind()</code></a> the session to the explorer.)</p>
+<h2 id="draw-it-yourself">Draw it yourself<a class="anchor" href="#draw-it-yourself" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p><code>&lt;scxml-view&gt;</code>&#39;s layout is exported, and it knows nothing about the DOM: give it sizes, get
+positions. Use it to draw charts with SVG, canvas, or your framework&#39;s components.</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { readFile, writeFile } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "node:fs/promises"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { compile, parseSCXML } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/trusted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { layoutChart } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/view"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> model</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> compile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">parseSCXML</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> readFile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"traffic-light.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"utf8"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">()));</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// sizes would normally come from measuring rendered text; fixed ones will do here</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> layout</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> layoutChart</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(model.root, {</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  measure</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">state</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> ({ w: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">16</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> +</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 8</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> *</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> state.id.</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">length</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, h: state.children.</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">length</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> ?</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 28</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> :</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 36</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> }),</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  labelSize</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">t</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> ({ w: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">16</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> +</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 7</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> *</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> t.events.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">join</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">" "</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">).</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">length</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, h: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">18</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> }),</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> svg</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> [</span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">  `&#x3C;svg xmlns="http://www.w3.org/2000/svg" width="${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">layout</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">width</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}" height="${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">layout</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">height</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}" font-size="12">`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  ...</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">layout.boxes.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">map</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    ({ </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">node</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">rect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">r</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> }) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">      `&#x3C;rect x="${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">r</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">x</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}" y="${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">r</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">y</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}" width="${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">r</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">w</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}" height="${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">r</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">h</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}" rx="6" fill="none" stroke="gray"/>`</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> +</span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">      `&#x3C;text x="${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">r</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">x</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> +</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 8</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}" y="${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">r</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">y</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> +</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 18</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}">${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">node</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">id</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}&#x3C;/text>`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  ),</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  ...</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">layout.edges.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">map</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">((</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">e</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `&#x3C;polyline points="${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">e</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">points</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">map</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">((</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">p</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">p</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">x</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">},${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">p</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">y</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">join</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">" "</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">)</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}" fill="none" stroke="black"/>`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">),</span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">  "&#x3C;/svg>"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">].</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">join</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">\n</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> writeFile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"traffic-light.svg"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, svg);</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(layout.boxes.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">map</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">((</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">b</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> b.node.id </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">||</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "(root)"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">join</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">" "</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">));</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(layout.edges.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">map</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">((</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">e</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">e</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">id</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}→${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">e</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">to</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">id</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">join</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">" "</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">));</span></span></code></pre><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>(root) on red green yellow off</span></span>
+<span class="line"><span>on→off red→green green→yellow yellow→red</span></span></code></pre><ul>
+<li><code>measure(state, collapsed)</code> returns the size a state needs for its own content: the whole box
+for a leaf, the header band for a container (the layout adds room for the children).</li>
+<li><code>labelSize(transition)</code> returns the size of a transition&#39;s label.</li>
+<li><code>direction: &quot;down&quot;</code> lays layers out top to bottom; <code>collapsed</code> is a set of containers to draw as
+single boxes, and <code>autoCollapse(model.root, maxBoxes)</code> picks one for big charts; <code>spacing</code>
+overrides gaps.</li>
+</ul>
+<p>The result has <code>boxes</code> (parents before children, so draw them in order), <code>edges</code> with orthogonal
+<code>points</code> and a <code>label</code> rectangle, <code>initials</code> (initial-state markers), and <code>inside</code>: per box, the
+transitions it should list itself (targetless ones, and ones hidden by folding). The same chart
+always gives the same layout.</p>
+<p>To animate the drawing, follow the session: <code>macrostep</code> for the active states, <code>microstep</code> for the
+transitions that fired. Or let the session mark the chart&#39;s own elements with
+<a href="/docs/driving-charts/#the-chart-as-your-markup"><code>reflect</code></a>.</p>
+<h2 id="build-your-own-explorer">Build your own explorer<a class="anchor" href="#build-your-own-explorer" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Everything <code>&lt;scxml-explorer&gt;</code> shows comes from pure functions, exported from
+<code>@tinyactors/scxmljs/explorer</code>:</p>
+<table>
+<thead>
+<tr>
+<td></td>
+<td></td>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>treeRows(model, { expanded, isActive, filter?, activeOnly? })</code></td>
+<td>the visible rows of the state tree, for a (windowed) list</td>
+</tr>
+<tr>
+<td><code>activeExpansion(model, isActive)</code></td>
+<td>the containers to expand so the active path is visible</td>
+</tr>
+<tr>
+<td><code>focusScope(model, focus, isActive)</code></td>
+<td>one level of the chart: children, the transitions between them (merged per pair), and doors in and out</td>
+</tr>
+<tr>
+<td><code>followTarget(configuration, current)</code></td>
+<td>where to focus to see everything that&#39;s active</td>
+</tr>
+<tr>
+<td><code>acceptedEvents(session, focus)</code></td>
+<td>the events the machine accepts now, scoped <code>here</code>, <code>inherited</code> or <code>elsewhere</code> relative to the focus</td>
+</tr>
+<tr>
+<td><code>groupEvents(events)</code></td>
+<td>the same, grouped by their first dotted token</td>
+</tr>
+<tr>
+<td><code>new SystemTracker(session, processors)</code></td>
+<td>every machine and service in a system, and the traffic between them; fires <code>change</code></td>
+</tr>
+</tbody></table>
+<p>Example, with the media player from the screenshots
+(<a href="https://github.com/tinyactors-dev/scxmljs/blob/main/docs/examples/player.scxml"><code>player.scxml</code></a>):</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { readFile } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "node:fs/promises"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession, </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> StateNode } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/trusted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { acceptedEvents, activeExpansion, followTarget, treeRows } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> readFile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"player.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"utf8"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), { domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">() });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">send</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"play"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">settled</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">model</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> isActive</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">s</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657"> StateNode</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">isActiveNode</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(s);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">for</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> row</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> of</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> treeRows</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(model, { expanded: </span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">activeExpansion</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(model, isActive), isActive }))</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">`${"  "</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">repeat</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">(</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">row</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">depth</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">)</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">row</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">node</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">id</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">row</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">active</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> ?</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> " *"</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> :</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> ""}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> focus</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> followTarget</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session.configuration, model.root);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">`focus: ${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">focus</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">id</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">for</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> e</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> of</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> acceptedEvents</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session, focus)) console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">`accepts ${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">e</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">descriptor</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">} (${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">e</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">scope</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">})`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span></code></pre><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>stopped</span></span>
+<span class="line"><span>active *</span></span>
+<span class="line"><span>  transport *</span></span>
+<span class="line"><span>    playing *</span></span>
+<span class="line"><span>    paused</span></span>
+<span class="line"><span>  sound *</span></span>
+<span class="line"><span>    audible *</span></span>
+<span class="line"><span>    muted</span></span>
+<span class="line"><span>focus: active</span></span>
+<span class="line"><span>accepts mute (here)</span></span>
+<span class="line"><span>accepts next (here)</span></span>
+<span class="line"><span>accepts pause (here)</span></span>
+<span class="line"><span>accepts stop (here)</span></span>
+<span class="line"><span>accepts volume (here)</span></span></code></pre><p>Recompute on the session&#39;s <code>macrostep</code> event. <code>acceptedEvents</code> lists descriptors from the
+transitions of active states. It doesn&#39;t evaluate conditions (that could have side effects), so
+<code>volume</code> is listed even though its condition may reject a value.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/theming/"><small>Previous</small>Theming</a>
+  <a class="next" href="/docs/frameworks/"><small>Next</small>Frameworks</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#translations">Translations</a></li>
+    <li class="depth-2"><a href="#slots">Slots</a></li>
+    <li class="depth-2"><a href="#draw-it-yourself">Draw it yourself</a></li>
+    <li class="depth-2"><a href="#build-your-own-explorer">Build your own explorer</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/custom-ui.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

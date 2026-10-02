@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Node, Bun and servers · scxmljs</title>
+<meta name="description" content="The interpreter runs the same outside browsers: Node 22.3 or later, and Bun. (Deno hasn't been verified yet.) Server-side charts are useful for workflows, protocol handling, and anything that must…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/node-and-servers/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Node, Bun and servers · scxmljs">
+<meta property="og:description" content="The interpreter runs the same outside browsers: Node 22.3 or later, and Bun. (Deno hasn't been verified yet.) Server-side charts are useful for workflows, protocol handling, and anything that must…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/node-and-servers/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/" aria-current="page">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="node-bun-and-servers">Node, Bun and servers</h1>
+<p>The interpreter runs the same outside browsers: Node 22.3 or later, and Bun. (Deno hasn&#39;t been
+verified yet.) Server-side charts are useful for workflows, protocol handling, and anything that
+must behave the same on the server and in the page.</p>
+<h2 id="whats-different">What&#39;s different<a class="anchor" href="#whats-different" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p><strong>A DOMParser.</strong> SCXML text is XML, and Node and Bun have no XML parser built in. Pass one as
+<code>domParser</code>; any standards-compliant implementation works, such as
+<a href="https://github.com/capricorn86/happy-dom">happy-dom</a>&#39;s or <a href="https://github.com/WebReflection/linkedom">linkedom</a>&#39;s:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"&#x3C;scxml xmlns='http://www.w3.org/2005/07/scxml' version='1.0'/>"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(),</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span></code></pre><p>Without one, <code>createSession()</code> and <code>parseSCXML()</code> throw an <code>SCXMLParseError</code> with
+<code>code: &quot;SCXML_NO_DOMPARSER&quot;</code> and instructions. Instead of text, you can also pass an <code>Element</code>
+you parsed yourself, or a compiled <code>Model</code>. Sessions keep the parser to read SCXML that arrives
+at run time (for example an <code>&lt;invoke&gt;</code> with <code>&lt;content expr&gt;</code>).</p>
+<p><strong>The trusted data model</strong> runs chart code in a <code>node:vm</code> context per session. <code>node:vm</code> is <em>not</em>
+a security boundary: code in the context can reach the host (see <a href="/docs/security/">SECURITY.md</a>).
+On a server, use it only for charts you wrote. The sandboxed entry point works the same as in
+browsers.</p>
+<p><strong>Loading <code>src</code>.</strong> Charts that use <code>&lt;script src&gt;</code>, <code>&lt;data src&gt;</code> or <code>&lt;invoke src&gt;</code> need a <code>loader</code>:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { readFile } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "node:fs/promises"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { join } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "node:path"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> dir</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "charts"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> loader</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">src</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> readFile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">join</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(dir, src), </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"utf8"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> loader</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"main.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), { loader, domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">().</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">() });</span></span></code></pre><p><strong>The elements</strong> can be imported on the server (for example during server-side rendering). The
+import does nothing there: the elements register only where <code>customElements</code> exists.</p>
+<h2 id="a-session-per-user">A session per user<a class="anchor" href="#a-session-per-user" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Compile the chart once and create a session per user, conversation or order. This server (Bun)
+drives <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/docs/examples/login.scxml"><code>login.scxml</code></a> over HTTP:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { readFile } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "node:fs/promises"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { compile, createSession, parseSCXML, </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> SCXMLSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> domParser</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">().</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> model</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> compile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">parseSCXML</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> readFile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"login.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"utf8"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), domParser));</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> sessions</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Map</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">SCXMLSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>();</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> server</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> Bun.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">serve</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  port: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">0</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  routes: {</span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">    "/sessions/:id/events/:event"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: {</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">      POST</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">async</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">req</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">        const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">id</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">event</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> req.params;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">        let</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> sessions.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">get</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(id);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">        if</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session) {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">          session </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(model, { domParser, sessionId: id });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">          sessions.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">set</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(id, session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">());</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">          session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">addEventListener</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"done"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> sessions.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">delete</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(id));</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        }</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">send</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(event, </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> req.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">json</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">());</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">        await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">settled</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">        return</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> Response.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">json</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ states: session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">activeStateIds</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(), data: session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">snapshot</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">() });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      },</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    },</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  },</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// try it</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> post</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> async</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">path</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">body</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> unknown</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> fetch</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> URL</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(path, server.url), { method: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"POST"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, body: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">JSON</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">stringify</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(body) })).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">json</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">JSON</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">stringify</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> post</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"/sessions/ada/events/login"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, { user: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"ada"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> })));</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">JSON</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">stringify</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> post</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"/sessions/ada/events/logout"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, {})));</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">for</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> s</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> of</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> sessions.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">values</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">()) s.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">server.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">stop</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span></code></pre><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>{"states":["signed-in"],"data":{"user":"ada"}}</span></span>
+<span class="line"><span>{"states":["signed-out"],"data":{"user":null}}</span></span></code></pre><p><code>await session.settled()</code> returns once the event and everything it caused internally has been
+processed, so the response shows the new state. Delayed <code>&lt;send&gt;</code>s and replies from services
+don&#39;t count; the session is settled while it waits for them.</p>
+<p>Things to plan for:</p>
+<ul>
+<li><strong>Memory.</strong> A session costs from about 100 KB (small chart) to a few MB (large system); see
+<a href="/docs/measurements/">measurements</a>. Dispose sessions you no longer need.</li>
+<li><strong>Persistence.</strong> Sessions live in memory. <code>session.snapshot()</code> returns the data model, but not
+the active states, pending timers or invoked children, and there is no way to restore a session
+from it. To survive restarts, store the events you sent, with their times, and replay them
+into a new session driven by a <code>VirtualClock</code>. That only works if your I/O processors and
+invokers can replay their side too.</li>
+<li><strong>Timers.</strong> Delayed <code>&lt;send&gt;</code>s use the session&#39;s clock: real time by default. They&#39;re lost when
+the process exits.</li>
+<li><strong>Isolation.</strong> With the sandboxed entry point, one session&#39;s chart code can&#39;t see another&#39;s, and
+a runaway script is interrupted after <code>scriptTimeoutMs</code>. See <a href="/docs/security/">SECURITY.md</a> for
+what that does and doesn&#39;t protect against.</li>
+</ul>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/invokers/"><small>Previous</small>Custom invokers</a>
+  <a class="next" href="/docs/bundling/"><small>Next</small>Bundling, CDNs and classic scripts</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#whats-different">What&#39;s different</a></li>
+    <li class="depth-2"><a href="#a-session-per-user">A session per user</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/node-and-servers.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

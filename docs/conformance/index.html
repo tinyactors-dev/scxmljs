@@ -1,0 +1,1721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conformance · scxmljs</title>
+<meta name="description" content="The interpreter is tested against the W3C SCXML 1.0 Implementation Report Plan test suite, converted to the ECMAScript data model. The converted suite is vendored in conformance/ (W3C licence in…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/conformance/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Conformance · scxmljs">
+<meta property="og:description" content="The interpreter is tested against the W3C SCXML 1.0 Implementation Report Plan test suite, converted to the ECMAScript data model. The converted suite is vendored in conformance/ (W3C licence in…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/conformance/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/" aria-current="page">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="conformance">Conformance</h1>
+<p>The interpreter is tested against the W3C <a href="https://www.w3.org/Voice/2013/scxml-irp/">SCXML 1.0 Implementation Report Plan</a>
+test suite, converted to the ECMAScript data model. The converted suite is vendored in
+<a href="https://github.com/tinyactors-dev/scxmljs/tree/main/conformance"><code>conformance/</code></a> (W3C licence in <a href="https://github.com/tinyactors-dev/scxmljs/tree/main/conformance/LICENSE-W3C"><code>conformance/LICENSE-W3C</code></a>), so running it needs no network.
+A test passes when its session reaches the top-level <code>&lt;final id=&quot;pass&quot;&gt;</code>. Time is virtual, so delayed events
+fire instantly and the whole suite runs in well under a second per data model.</p>
+<p>Reproduce: <code>mise run conformance</code> (sandboxed), <code>mise run conformance:trusted</code> (trusted),
+<code>mise run docs:conformance</code> (this page). <code>bun test</code> runs the suite too, in both data models.</p>
+<h2 id="summary">Summary<a class="anchor" href="#summary" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<table>
+<thead>
+<tr>
+<td></td>
+<th>Sandboxed (QuickJS)</th>
+<th>Trusted (host engine)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mandatory tests</td>
+<td><strong>160/160</strong></td>
+<td><strong>160/160</strong></td>
+</tr>
+<tr>
+<td>Optional tests</td>
+<td>21/33</td>
+<td>21/33</td>
+</tr>
+<tr>
+<td>Manual tests</td>
+<td>see <a href="#manual-tests">below</a></td>
+<td>see <a href="#manual-tests">below</a></td>
+</tr>
+</tbody></table>
+<p>Every test that doesn&#39;t pass is optional and needs the Basic HTTP Event I/O Processor, which isn&#39;t included:
+<a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/201/test201.scxml">201</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/509/test509.scxml">509</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/510/test510.scxml">510</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/518/test518.scxml">518</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/519/test519.scxml">519</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/520/test520.scxml">520</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/522/test522.scxml">522</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/531/test531.scxml">531</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/532/test532.scxml">532</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/534/test534.scxml">534</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/567/test567.scxml">567</a>, <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/577/test577.scxml">577</a>. See <a href="/docs/deviations/">deviations</a>.</p>
+<h2 id="manual-tests">Manual tests<a class="anchor" href="#manual-tests" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>9 tests are marked <em>manual</em>: a person reads the output and decides. The verdicts, with the
+evidence for each, are in <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/MANUAL.md"><code>conformance/MANUAL.md</code></a>: 8 pass, and 513 is not
+applicable (it needs the Basic HTTP processor). The mechanically checkable ones are also pinned in
+<code>conformance/conformance.test.ts</code>.</p>
+<h2 id="deviations">Deviations<a class="anchor" href="#deviations" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Where the interpreter deliberately differs from the specification, or leaves something out, is listed in
+<a href="/docs/deviations/">deviations.md</a>, each item pinned by a test.</p>
+<h2 id="all-automatic-tests">All automatic tests<a class="anchor" href="#all-automatic-tests" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Sorted by specification section. Descriptions are the W3C&#39;s, shortened.</p>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Section</th>
+<td></td>
+<th>Sandboxed</th>
+<th>Trusted</th>
+<th>What it checks</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/355/test355.scxml">355</a></td>
+<td>3.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>At system initialization time, if the &#39;initial&#39; attribute is not present, the Processor MUST enter the first state in document order.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/576/test576.scxml">576</a></td>
+<td>3.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>At system initialization time, the SCXML Processor MUST enter the states specified by the &#39;initial&#39; attribute, if it is present.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/364/test364.scxml">364</a></td>
+<td>3.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Definition: The default initial state(s) of a compound state are those specified by the &#39;initial&#39; attribute or initial element, if either is present.…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/372/test372.scxml">372</a></td>
+<td>3.7</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When the state machine enters the final child of a state element, the SCXML processor MUST generate the event done.state.id after completion of the o…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/570/test570.scxml">570</a></td>
+<td>3.7</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Immediately after generating done.state.id upon entering a final child of state, if the parent state is a child of a parallel element, and all of the…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/375/test375.scxml">375</a></td>
+<td>3.8</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML processor MUST execute the onentry handlers of a state in document order when the state is entered.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/376/test376.scxml">376</a></td>
+<td>3.8</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML processor MUST treat each [onentry] handler as a separate block of executable content.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/377/test377.scxml">377</a></td>
+<td>3.9</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML processor MUST execute the onexit handlers of a state in document order when the state is exited.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/378/test378.scxml">378</a></td>
+<td>3.9</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML processor MUST treat each [onexit] handler as a separate block of executable content.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/387/test387.scxml">387</a></td>
+<td>3.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Before the parent state has been visited for the first time, if a transition is executed that takes the history state as its target, the SCXML proces…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/388/test388.scxml">388</a></td>
+<td>3.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>After the parent state has been visited for the first time, if a transition is executed that takes the history state as its target, the SCXML process…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/579/test579.scxml">579</a></td>
+<td>3.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Before the parent state has been visited for the first time, if a transition is executed that takes the history state as its target, the SCXML proces…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/580/test580.scxml">580</a></td>
+<td>3.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>It follows from the semantics of history states that they never end up in the state configuration</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/396/test396.scxml">396</a></td>
+<td>3.12</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML processor MUST use this same name value [the one reflected in the event variable] to match against the &#39;event&#39; attribute of transitions.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/399/test399.scxml">399</a></td>
+<td>3.12</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>[Definition: A transition matches an event if at least one of its event descriptors matches the event&#39;s name. ] [Definition: An event descriptor matc…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/401/test401.scxml">401</a></td>
+<td>3.12</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The processor MUST place these [error] events in the internal event queue.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/402/test402.scxml">402</a></td>
+<td>3.12</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The processor MUST process them [error events] like any other event.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/403/test403a.scxml">403a</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>To execute a microstep, the SCXML Processor MUST execute the transitions in the corresponding optimal enabled transition set, where the optimal trans…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/403/test403b.scxml">403b</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>To execute a microstep, the SCXML Processor MUST execute the transitions in the corresponding optimal enabled transition set, where the optimal trans…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/403/test403c.scxml">403c</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>To execute a microstep, the SCXML Processor MUST execute the transitions in the corresponding optimal enabled transition set, where the optimal trans…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/404/test404.scxml">404</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>To execute a set of transitions, the SCXML Processor MUST first exit all the states in the transitions&#39; exit set in exit order.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/405/test405.scxml">405</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>[the SCXML Processor executing a set of transitions] MUST then [after the onexits] execute the executable content contained in the transitions in doc…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/406/test406.scxml">406</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>[the SCXML Processor executing a set of transitions] MUST then [after the exits and the transitions] enter the states in the transitions&#39; entry set i…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/407/test407.scxml">407</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>To exit a state, the SCXML Processor MUST execute the executable content in the state&#39;s onexit handler.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/409/test409.scxml">409</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Finally [after the onexits and canceling the invocations], the Processor MUST remove the state from the active state&#39;s list.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/411/test411.scxml">411</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>To enter a state, the SCXML Processor MUST add the state to the active state&#39;s list. Then it MUST execute the executable content in the state&#39;s onent…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/412/test412.scxml">412</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the state is a default entry state and has an initial child, the SCXML Processor MUST then [after doing the active state add and the onentry handl…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/413/test413.scxml">413</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>At startup, the SCXML Processor MUST place the state machine in the configuration specified by the &#39;initial&#39; attribute of the scxml element.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/416/test416.scxml">416</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If it [the SCXML processor] has entered a final state that is a child of a compound state [during the last microstep], it MUST generate the event don…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/417/test417.scxml">417</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the compound state [which has the final element that we entered this microstep] is itself the child of a parallel element, and all the parallel el…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/419/test419.scxml">419</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>After checking the state configuration, the Processor MUST select the optimal transition set enabled by NULL in the current configuration. If the [op…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/421/test421.scxml">421</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the set (of eventless transitions) is empty, the Processor MUST remove events from the internal event queue until the queue is empty or it finds a…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/422/test422.scxml">422</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>After completing a macrostep, the SCXML Processor MUST execute in document order the invoke handlers in all states that have been entered (and not ex…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/423/test423.scxml">423</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Then [after invoking the new invoke handlers since the last macrostep] the Processor MUST remove events from the external event queue, waiting till e…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/503/test503.scxml">503</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the transition does not contain a &#39;target&#39;, its exit set is empty.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/504/test504.scxml">504</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>if [a transition&#39;s] &#39;type&#39; is &quot;external&quot;, its exit set consists of all active states that are proper descendents of the Least Common Compound Ancesto…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/505/test505.scxml">505</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Otherwise, if the transition has &#39;type&#39; &quot;internal&quot;, its source state is a compound state and all its target states are proper descendents of its sour…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/506/test506.scxml">506</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If a transition has &#39;type&#39; of &quot;internal&quot;, but its source state is not a compound state or its target states are not all proper descendents of its sou…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/533/test533.scxml">533</a></td>
+<td>3.13</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If a transition has &#39;type&#39; of &quot;internal&quot;, but its source state is not a compound state, its exit set is defined as if it had &#39;type&#39; of &quot;external&quot;.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/144/test144.scxml">144</a></td>
+<td>4.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML processor MUST place the event that is generated by the raise element at the rear of the session&#39;s internal event queue.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/147/test147.scxml">147</a></td>
+<td>4.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When the if element is executed, the SCXML processor MUST execute the first partition in document order that is defined by a tag whose &#39;cond&#39; attribu…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/148/test148.scxml">148</a></td>
+<td>4.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When the if element is executed, if no &#39;cond&#39;attribute evaluates to true, the SCXML Processor must execute the partition defined by the else tag, if…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/149/test149.scxml">149</a></td>
+<td>4.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When it executes an if element, if no &#39;cond&#39; attribute evaluates to true and there is no else element, the SCXML processor must not evaluate any exec…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/150/test150.scxml">150</a></td>
+<td>4.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the foreach element, the SCXML processor MUST declare a new variable if the one specified by &#39;item&#39; is not already defined.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/151/test151.scxml">151</a></td>
+<td>4.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the foreach element, if &#39;index&#39; is present, the SCXML processor MUST declare a new variable if the one specified by &#39;index&#39; is not already defined.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/152/test152.scxml">152</a></td>
+<td>4.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the foreach element, if &#39;array&#39; does not evaluate to a legal iterable collection, or if &#39;item&#39; does not specify a legal variable name, the SCXML p…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/153/test153.scxml">153</a></td>
+<td>4.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When evaluating foreach, the SCXML processor MUST start with the first item in the collection and proceed to the last item in the iteration order tha…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/155/test155.scxml">155</a></td>
+<td>4.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>when evaluating foreach, for each item, after making the assignment, the SCXML processor MUST evaluate its child executable content. It MUST then pro…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/156/test156.scxml">156</a></td>
+<td>4.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the evaluation of any child element of foreach causes an error, the processor MUST cease execution of the foreach element and the block that conta…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/525/test525.scxml">525</a></td>
+<td>4.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML processor MUST act as if it has made a shallow copy of the collection produced by the evaluation of &#39;array&#39;. Specifically, modifications to…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/158/test158.scxml">158</a></td>
+<td>4.9</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML processor MUST execute the elements of a block of executable contentin document order.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/159/test159.scxml">159</a></td>
+<td>4.9</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the processing of an element of executable content causes an error to be raised, the processor MUST NOT process the remaining elements of the bloc…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/276/test276.scxml">276</a></td>
+<td>5.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST allow the environment to provide values for top-level data elements at instantiation time. (Top-level data elements are thos…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/277/test277.scxml">277</a></td>
+<td>5.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the value specified for a data element (by &#39;src&#39;, children, or the environment) is not a legal data value, the SCXML Processor MUST raise place er…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/279/test279.scxml">279</a></td>
+<td>5.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When &#39;binding&#39; attribute on the scxml element is assigned the value &quot;early&quot; (the default), the SCXML Processor MUST create all data elements and assi…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/280/test280.scxml">280</a></td>
+<td>5.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When &#39;binding&#39; attribute on the scxml element is assigned the value &quot;late&quot;, the SCXML Processor MUST create the data elements at document initializat…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/550/test550.scxml">550</a></td>
+<td>5.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the &#39;expr&#39; attribute is present, the Platform MUST evaluate the corresponding expression at the time specified by the &#39;binding&#39; attribute of scxml…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/551/test551.scxml">551</a></td>
+<td>5.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>f child content is specified, the Platform MUST assign it as the value of the data element at the time specified by the &#39;binding&#39; attribute of scxml.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/552/test552.scxml">552</a></td>
+<td>5.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the &#39;src&#39; attribute is present, the Platform MUST fetch the specified object at the time specified by the &#39;binding&#39; attribute of scxml and MUST as…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/286/test286.scxml">286</a></td>
+<td>5.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the location expression of an assign does not denote a valid location in the datamodel the processor MUST place the error error.execution in the i…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/287/test287.scxml">287</a></td>
+<td>5.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the location expression of an assign denotes a valid location in the datamodel and if the value specified by &#39;expr&#39; is a legal value for the locat…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/487/test487.scxml">487</a></td>
+<td>5.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the value specified (by &#39;expr&#39; or children) is not a legal value for the location specified, the processor MUST place the error error.execution in…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/294/test294.scxml">294</a></td>
+<td>5.5</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>In cases where the SCXML Processor generates a &#39;done&#39; event upon entry into the final state, it MUST evaluate the donedata elements param or content…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/527/test527.scxml">527</a></td>
+<td>5.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When the SCXML Processor evaluates the content element, if the &#39;expr&#39; value expression is present, the Processor MUST evaluate it and use the result…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/528/test528.scxml">528</a></td>
+<td>5.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>f the evaluation of &#39;expr&#39; produces an error, the Processor MUST place error.execution in the internal event queue and use the empty string as the ou…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/529/test529.scxml">529</a></td>
+<td>5.6</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the &#39;expr&#39; attribute is not present, the Processor MUST use the children of content as the output.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/298/test298.scxml">298</a></td>
+<td>5.7</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the &#39;location&#39; attribute on a param element does not refer to a valid location in the data model, the processor MUST place the error error.executi…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/343/test343.scxml">343</a></td>
+<td>5.7</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the &#39;location&#39; attribute on a param element does not refer to a valid location in the data model, or if the evaluation of the &#39;expr&#39; produces an e…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/488/test488.scxml">488</a></td>
+<td>5.7</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>if the evaluation of the &#39;expr&#39; produces an error, the processor MUST place the error error.execution on the internal event queue.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/302/test302.scxml">302</a></td>
+<td>5.8</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST evaluate any script element that is a child of scxml at document load time. N.B. This test is valid only for datamodels that…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/303/test303.scxml">303</a></td>
+<td>5.8</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST evaluate all script elements not children of scxml as part of normal executable content evaluation. N.B. This test is valid…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/304/test304.scxml">304</a></td>
+<td>5.8</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>In a conformant SCXML document, the name of any script variable MAY be used as a location expression. N.B. This test is valid only for datamodels tha…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/309/test309.scxml">309</a></td>
+<td>5.9</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If a conditional expression cannot be evaluated as a boolean value (&#39;true&#39; or &#39;false&#39;) or if its evaluation causes an error, the SCXML processor MUST…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/310/test310.scxml">310</a></td>
+<td>5.9</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>All datamodels MUST support the &#39;In()&#39; predicate, which takes a stateID as its argument and returns true if the state machine is in that state.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/311/test311.scxml">311</a></td>
+<td>5.9</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If a location expression cannot be evaluated to yield a valid location, the SCXML processor MUST place the error error.execution in the internal even…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/312/test312.scxml">312</a></td>
+<td>5.9</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If a value expression does not return a legal data value, the SCXML processor MUST place the error error.execution in the internal event queue.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/344/test344.scxml">344</a></td>
+<td>5.9</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If a conditional expression cannot be evaluated as a boolean value (&#39;true&#39; or &#39;false&#39;) or if its evaluation causes an error, the SCXML processor MUST…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/318/test318.scxml">318</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST bind the _event variable when an event is pulled off the internal or external event queue to be processed, and MUST keep the…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/319/test319.scxml">319</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST NOT bind _event at initialization time until the first event is processed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/321/test321.scxml">321</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor MUST bind the variable _sessionid at load time to the system-generated id for the current SCXML session.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/322/test322.scxml">322</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor MUST keep the _sessionid variable bound to the system-generated id until the session terminates.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/323/test323.scxml">323</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor MUST bind the variable _name at load time to the value of the &#39;name&#39; attribute of the scxml element. a</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/324/test324.scxml">324</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor MUST keep the _name variable bound to the value of the &#39;name&#39; attribute of the scxml element until the session terminates.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/325/test325.scxml">325</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor MUST bind the variable _ioprocessors to a set of values, one for each Event I/O Processor that it supports.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/326/test326.scxml">326</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor MUST keep the _ioprocessors variable bound to its set of values until the session terminates.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/329/test329.scxml">329</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor MUST cause any attempt to change the value of a system variable to fail.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/330/test330.scxml">330</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST insure that the following fields (name, type, sendid, origin, origintype, invokeid, data) are present in all events (_event…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/331/test331.scxml">331</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST set the type property of _event to: &quot;platform&quot; (for events raised by the platform itself, such as error events), &quot;internal&quot;…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/332/test332.scxml">332</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the sending entity has specified a value for this, the Processor MUST set this field to that value. Otherwise, in the case of error events trigger…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/333/test333.scxml">333</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>For events other than error events triggered by a failed attempt to send an event, if the sending entity did not specify a value for the sendid field…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/335/test335.scxml">335</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If an event was not received from an external entity, the Processor MUST leave the origin field blank.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/336/test336.scxml">336</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>For external events, the SCXML Processor SHOULD set the origintype field to a value which, in combination with the &#39;origin&#39; field, will allow the rec…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/337/test337.scxml">337</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>For internal and platform events, the Processor MUST leave the origintype field blank.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/338/test338.scxml">338</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If an event is generated from an invoked child process, the Processor MUST set the invokeid field to the invoke id of the invocation that triggered t…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/339/test339.scxml">339</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If an event is not generated from an invoked child process, the Processor MUST leave the invokeid field blank.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/342/test342.scxml">342</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST set the name field (of the _event variable) to the name of the event.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/346/test346.scxml">346</a></td>
+<td>5.10</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor MUST place the error error.execution on the internal event queue when any attempt to change the value of a system variable is made.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/172/test172.scxml">172</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If &#39;eventexpr&#39; is present, the SCXML Processor MUST evaluate it when the parent send element is evaluated and treat the result as if it had been ente…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/173/test173.scxml">173</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If &#39;targetexpr&#39; is present, the SCXML Processor MUST evaluate it when the parent send element is evaluated and treat the result as if it had been ent…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/174/test174.scxml">174</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If &#39;typexpr&#39; is present, the SCXML Processor MUST evaluate it when the parent send element is evaluated and treat the result as if it had been entere…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/175/test175.scxml">175</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If &#39;delayexpr&#39; is present, the SCXML Processor MUST evaluate it when the parent send element is evaluated and treat the result as if it had been ente…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/176/test176.scxml">176</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST evaluate param when the parent send element is evaluated and pass the resulting data unmodified to the external service when…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/179/test179.scxml">179</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST evaluate the content element when the parent send element is evaluated and pass the resulting data unmodified to the externa…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/183/test183.scxml">183</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If &#39;idlocation&#39; is present, the SCXML Processor MUST generate an id when the parent send element is evaluated and store it in this location</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/185/test185.scxml">185</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If a delay is specified via &#39;delay&#39; or &#39;delayexpr&#39;, the SCXML Processor MUST interpret the character string as a time interval. the SCXML Processor M…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/186/test186.scxml">186</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor MUST evaluate all arguments to send when the send element is evaluated, and not when the message is actually dispatched.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/187/test187.scxml">187</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the SCXML session terminates before the delay interval has elapsed, the SCXML Processor MUST discard the message without attempting to deliver it.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/194/test194.scxml">194</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the value of the &#39;target&#39; or &#39;targetexpr&#39; attribute is not supported or invalid, the Processor MUST place the error error.execution on the interna…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/198/test198.scxml">198</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If neither the &#39;type&#39; nor the &#39;typeexpr&#39; is defined, the SCXML Processor MUST assume the default value of <a href="http://www.w3.org/TR/scxml/#SCXMLEventProce%E2%80%A6">http://www.w3.org/TR/scxml/#SCXMLEventProce…</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/199/test199.scxml">199</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>f the SCXML Processor does not support the type that is specified, it MUST place the event error.execution on the internal event queue.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/200/test200.scxml">200</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>SCXML Processors MUST support the type <a href="http://www.w3.org/TR/scxml/#SCXMLEventProcessor">http://www.w3.org/TR/scxml/#SCXMLEventProcessor</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/201/test201.scxml">201</a></td>
+<td>6.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>Processors that support HTTP POST must use the value <a href="http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor">http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor</a> for the &quot;type&quot; attribute</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/205/test205.scxml">205</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The sending SCXML Interpreter MUST not alter the content of the send and include it in the message that it sends to the destination specified in the…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/521/test521.scxml">521</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>f the Processor cannot dispatch the event, it MUST place the error error.communication on the internal event queue of the session that attempted to s…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/553/test553.scxml">553</a></td>
+<td>6.2</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the evaluation of send&#39;s arguments produces an error, If the evaluation of send&#39;s arguments produces an error, the Processor MUST discard the mess…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/207/test207.scxml">207</a></td>
+<td>6.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST NOT allow cancel to affect events that were not raised in the same session.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/208/test208.scxml">208</a></td>
+<td>6.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The Processor SHOULD make its best attempt to cancel all delayed events with the specified id.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/210/test210.scxml">210</a></td>
+<td>6.3</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the &#39;sendidexpr&#39; attribute is present, the SCXML Processor MUST evaluate it when the parent cancel element is evaluated and treat the result as if…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/215/test215.scxml">215</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the typeexpr attribute is present, the SCXML Processor MUST evaluate it when the parent invoke element is evaluated and treat the result as if it…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/216/test216.scxml">216</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the srcexpr attribute is present, the SCXML Processor MUST evaluate it when the parent invoke element is evaluated and treat the result as if it h…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/220/test220.scxml">220</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Platforms MUST support <a href="http://www.w3.org/TR/scxml/">http://www.w3.org/TR/scxml/</a>, as a value for the &#39;type&#39; attribute</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/223/test223.scxml">223</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the &#39;idlocation&#39; attribute is present, the SCXML Processor MUST generate an id automatically when the invoke element is evaluated and store it in…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/224/test224.scxml">224</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When the platform generates an identifier for &#39;idlocation&#39;, the identifier MUST have the form stateid.platformid, where stateid is the id of the stat…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/225/test225.scxml">225</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>n the automatically generated invoke identifier, platformid MUST be unique within the current session</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/226/test226.scxml">226</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When the invoke element is executed, the SCXML Processor MUST start a new logical instance of the external service specified in &#39;type&#39; or &#39;typexpr&#39;,…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/228/test228.scxml">228</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>the Processor MUST keep track of the unique invokeid and insure that it is included in all events that the invoked service returns to the invoking se…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/229/test229.scxml">229</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When the &#39;autoforward&#39; attribute is set to true, the SCXML Processor MUST send an exact copy of every external event it receives to the invoked proce…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/232/test232.scxml">232</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>he invoked external service MAY return multiple events while it is processing</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/233/test233.scxml">233</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If there is a finalize handler in the instance of invoke that created the service that generated the event, the SCXML Processor MUST execute the code…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/234/test234.scxml">234</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>t MUST NOT execute the finalize handler in any other instance of invoke besides the one in the instance of invoke that created the service that gener…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/235/test235.scxml">235</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Once the invoked external service has finished processing it MUST return a special event &#39;done.invoke.id&#39; to the external event queue of the invoking…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/236/test236.scxml">236</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The external service MUST NOT generate any other events after the invoke.done.invokeid event.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/237/test237.scxml">237</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the invoking session takes a transition out of the state containing the invoke before it receives the &#39;done.invoke.id&#39; event, the SCXML Processor…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/239/test239.scxml">239</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Invoked services of type <a href="http://www.w3.org/TR/scxml/">http://www.w3.org/TR/scxml/</a>, <a href="http://www.w3.org/TR/ccxml/">http://www.w3.org/TR/ccxml/</a>, <a href="http://www.w3.org/TR/voicexml30/">http://www.w3.org/TR/voicexml30/</a>, or <a href="http://www.w3.org/TR/voicexml%E2%80%A6">http://www.w3.org/TR/voicexml…</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/240/test240.scxml">240</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Invoked services of type <a href="http://www.w3.org/TR/scxml/">http://www.w3.org/TR/scxml/</a>, <a href="http://www.w3.org/TR/ccxml/">http://www.w3.org/TR/ccxml/</a>, <a href="http://www.w3.org/TR/voicexml30/">http://www.w3.org/TR/voicexml30/</a>, or <a href="http://www.w3.org/TR/voicexml%E2%80%A6">http://www.w3.org/TR/voicexml…</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/241/test241.scxml">241</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Invoked services MUST treat values specified by param and namelist identically.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/242/test242.scxml">242</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Invoked services MUST also treat values specified by &#39;src&#39; and content identically.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/243/test243.scxml">243</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the invoked process is of type <a href="http://www.w3.org/TR/scxml/">http://www.w3.org/TR/scxml/</a> and &#39;name&#39; of a param element in the invoke matches the &#39;id&#39; of a data element in the t…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/244/test244.scxml">244</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the invoked process is of type <a href="http://www.w3.org/TR/scxml/">http://www.w3.org/TR/scxml/</a> and the key of namelist item in the invoke matches the &#39;id&#39; of a data element in the to…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/245/test245.scxml">245</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the invoked process is of type <a href="http://www.w3.org/TR/scxml/">http://www.w3.org/TR/scxml/</a>, and the name of a param element or the key of of a namelis item do not match the name…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/247/test247.scxml">247</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the invoked state machine is of type <a href="http://www.w3.org/TR/scxml/">http://www.w3.org/TR/scxml/</a> and it reaches a top-level final state, the Processor MUST place the event done.i…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/252/test252.scxml">252</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>Once it cancels an invoked session, the Processor MUST NOT insert any events it receives from the invoked session into the external event queue of th…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/253/test253.scxml">253</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When the invoked session is of type <a href="http://www.w3.org/TR/scxml/">http://www.w3.org/TR/scxml/</a>, The SCXML Processor MUST support the use of SCXML Event/IO processor (E.1 SCXML Even…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/530/test530.scxml">530</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The SCXML Processor MUST evaluate a child content element when the parent invoke element is evaluated and pass the resulting data to the invoked serv…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/554/test554.scxml">554</a></td>
+<td>6.4</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>if the evaluation of the invoke element&#39;s arguments arguments produces an error, the SCXML Processor MUST terminate the processing of the element wit…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/436/test436.scxml">436</a></td>
+<td>B.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When the &quot;datamodel&quot; attribute of the scxml element has the value &quot;null&quot;, the In() predicate must return &#39;true&#39; if and only if that state is in the c…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/278/test278.scxml">278</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, the SCXML processor MUST allow any data element to be accessed from any state.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/444/test444.scxml">444</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript datamodel, for each data element in the document, the SCXML Processor must create an ECMAScript variable object whose name is the v…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/445/test445.scxml">445</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript datamodel for each data element in the document, if the variable object associated with the element is not assigned at the time ind…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/446/test446.scxml">446</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, if either the &#39;src&#39; attribute or in-line content is provided in the data elemenet, then if the content (whether fetched…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/448/test448.scxml">448</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript datamodel, the SCXML Processor must place all variables in a single global ECMAScript scope.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/449/test449.scxml">449</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript datamodel, the SCXML Processor must convert ECMAScript expressions used in conditional expressions into their effective boolean val…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/451/test451.scxml">451</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript datamodel, the SCXML Processor must add an ECMAScript function &#39;In()&#39; to the SCXML namespace that takes a stateID as its argument a…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/452/test452.scxml">452</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript datamodel, the SCXML Processor must accept any ECMAScript left-hand-side expression as a location expression.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/453/test453.scxml">453</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript datamodel, the SCXML Processor must accept any ECMAScript expression as a value expression.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/456/test456.scxml">456</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>the SCXML Processor must accept any ECMAScript program as defined in Section 14 of [ECMASCRIPT-262] as the content of a script element.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/457/test457.scxml">457</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, the legal iterable collections are arrays, namely objects that satisfy instanceof(Array) in ECMAScript. The legal value…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/459/test459.scxml">459</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, the iteration order for the foreach element is the order of the underlying ECMAScript array, and goes from an index of…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/460/test460.scxml">460</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, since shallow copy is required for the foreach element, foreach assignment is equivalent to item = array_name[index] in…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/557/test557.scxml">557</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, if either the &#39;src&#39; attribute or in-line content is provided in the data element, then if the content (whether fetched…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/558/test558.scxml">558</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript datamodel, if either the &#39;src&#39; attribute or in-line content is provided in the data element, and the content (whether fetched or pr…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/560/test560.scxml">560</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, if the content provided to populate _event.data can be interpeted as key-value pairs, then for each unique key, the SCX…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/561/test561.scxml">561</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, if the content provided to populate _event.data can be interpreted as a valid XML document (and cannot be interpreted a…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/562/test562.scxml">562</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, if the content provided to populate _event.data is neither key-value pairs nor JSON nor a valid XML document, the Proce…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/569/test569.scxml">569</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>For the _ioprocessors system variable in the ECMAScript datamodel the Processor MUST create an array with an object for each Event I/O processor that…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/578/test578.scxml">578</a></td>
+<td>B.2</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>In the ECMAScript data model, if the content provided to populate _event.data cannot be interpreted as key value pairs and can be interpeted as JSON…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/189/test189.scxml">189</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>When using the scxml event i/o processor] If the target is the special term &#39;#_internal&#39;, the Processor MUST add the event to the internal event queu…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/190/test190.scxml">190</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>[When using the scxml event i/o processor] If the target is the special term &#39;#_scxml_sessionid&#39;, where sessionid is the id of an SCXML session that…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/191/test191.scxml">191</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>[When using the scxml event i/o processor] If the target is the special term &#39;#_parent&#39;, the Processor MUST add the event to the external event queue…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/192/test192.scxml">192</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>[When using the scxml event i/o processor] If the target is the special term &#39;#_invokeid&#39;, where invokeid is the invokeid of an SCXML session that th…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/193/test193.scxml">193</a></td>
+<td>C.1</td>
+<td>O</td>
+<td>pass</td>
+<td>pass</td>
+<td>[When using the scxml event i/o processor] If neither the &#39;target&#39; nor the &#39;targetexpr&#39; attribute is specified, the SCXML Processor MUST add the even…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/347/test347.scxml">347</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>SCXML Processors MUST support sending messages to and receiving messages from other SCXML sessions using the SCXML Event I/O Processor.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/348/test348.scxml">348</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>name&#39;. The sending SCXML Processor MUST take the value of this attribute from the &#39;event&#39; attribute of the send element. The receiving SCXML Processo…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/349/test349.scxml">349</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>source&#39;. The sending SCXML Processor MUST populate this attribute with a URI that the receiving processor can use to reply to the sending processor.…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/350/test350.scxml">350</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>target&#39;. The sending SCXML Processor MUST take the value of this attribute from the &#39;target&#39; attribute of the send element. The receiving SCXML Proce…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/351/test351.scxml">351</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>sendid&#39;. the sending SCXML Processor MUST populate this attribute with the identifier specified in the &#39;id&#39; attribute or automatically generated by t…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/352/test352.scxml">352</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>&#39;sourcetype&#39;. The sending SCXML Processor MUST assign this attribute the value &quot;scxml&quot;. (Note that other types of senders will assign different value…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/354/test354.scxml">354</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The &#39;data&#39; field of the event raised in the receiving session MUST contain a copy of the data specified in the &#39;namelist&#39; attribute or in param or co…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/495/test495.scxml">495</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If no errors occur, the receiving Processor MUST convert the message into an SCXML event, using the mapping defined above and insert it into the appr…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/496/test496.scxml">496</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>If the sending SCXML session specifies a session that does not exist or is inaccessible, the SCXML Processor MUST place the error error.communication…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/500/test500.scxml">500</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>SCXML Processors that support the BasicHTTP Event I/O Processor MUST maintain a &#39;scxml&#39; entry in the _ioprocessors system variable. The Processor MUS…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/501/test501.scxml">501</a></td>
+<td>C.1</td>
+<td>M</td>
+<td>pass</td>
+<td>pass</td>
+<td>The &#39;location&#39; field inside the entry for the SCXML Event I/O Processor in the _ioprocessors system variable MUST hold an address that external entit…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/509/test509.scxml">509</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>An SCXML Processor that supports the Basic HTTP Event I/O Processor MUST accept messages at the access URI as HTTP POST requests</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/510/test510.scxml">510</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>The SCXML Processor MUST validate the message it receives [via the Basic HTTP Event I/O Processor] and then MUST build the appropriate SCXML event an…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/518/test518.scxml">518</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>If the namelist attribute is defined [in send], the SCXML Processor MUST map its variable names and values to HTTP POST parameters</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/519/test519.scxml">519</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>If one or more param children are present [in send], the SCXML Processor MUST map their names (i.e. name attributes) and values to HTTP POST paramete…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/520/test520.scxml">520</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>If a content child is present, the SCXML Processor MUST use its value as the body of the message.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/522/test522.scxml">522</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>SCXML Processors that support the BasicHTTP Event I/O Processor MUST maintain a &#39;basichttp&#39; entry in the _ioprocessors system variable. The Processor…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/531/test531.scxml">531</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>If a single instance of the parameter &#39;_scxmleventname&#39; is present, the SCXML Processor MUST use its value as the name of the SCXML event that it rai…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/532/test532.scxml">532</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>If _scxmleventname is not present, the Processor MUST the name of the HTTP method that was used to deliver the event as name of the SCXML event that…</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/534/test534.scxml">534</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>If the &#39;event&#39; parameter of send is defined, the SCXML Processor MUST use its value as the value of the HTTP POST parameter _scxmleventname</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/567/test567.scxml">567</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>The processor MUST use any message content other than &#39;_scxmleventname&#39; to populate _event.data.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/ecma/577/test577.scxml">577</a></td>
+<td>C.2</td>
+<td>O</td>
+<td><strong>fail</strong></td>
+<td><strong>fail</strong></td>
+<td>If neither the &#39;target&#39; nor the &#39;targetexpr&#39; attribute is specified, the SCXML Processor MUST add the event error.communication to the internal event…</td>
+</tr>
+</tbody></table>
+<p>M = mandatory, O = optional.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/security/"><small>Previous</small>Security</a>
+  <a class="next" href="/docs/deviations/"><small>Next</small>Deviations from the SCXML specification</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#summary">Summary</a></li>
+    <li class="depth-2"><a href="#manual-tests">Manual tests</a></li>
+    <li class="depth-2"><a href="#deviations">Deviations</a></li>
+    <li class="depth-2"><a href="#all-automatic-tests">All automatic tests</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/conformance.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

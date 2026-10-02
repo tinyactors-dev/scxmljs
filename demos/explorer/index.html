@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explorer demo · scxmljs</title>
+<meta name="description" content="&lt;scxml-explorer&gt; on three running systems: an order pipeline with invoked machines, a 333-state support desk, and a GitHub gatekeeper.">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/demos/explorer/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Explorer demo · scxmljs">
+<meta property="og:description" content="&lt;scxml-explorer&gt; on three running systems: an order pipeline with invoked machines, a 333-state support desk, and a GitHub gatekeeper.">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/demos/explorer/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+<script type="module" src="/assets/explorer-rp15hs86.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/">Docs</a>
+      <a href="/demos/" aria-current="page">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="wrap explorer-demo">
+  <h1 class="page-title">Explorer</h1>
+  <p class="lede">A running system at three levels: the <em>system</em> of machines and services, one <em>machine</em> as a tree plus a focus on one compound state, and a <em>state</em>'s details. The focus follows the action until you navigate; Space pauses, <kbd>.</kbd> steps.</p>
+  <div class="demo-bar">
+    <label>Sample <select id="sample"><option value="fulfillment">Order fulfilment</option><option value="support-desk">Support desk (stress test)</option><option value="gatekeeper">GitHub issue gatekeeper</option></select></label>
+    <button id="restart" type="button">Restart</button>
+    <span class="about" id="about"></span>
+  </div>
+  <scxml-explorer>
+    <div slot="state:completed" class="slotted">✓ <strong>Order complete</strong> — custom slotted UI</div>
+    <div slot="state:closed" class="slotted">slotted: closed issues are archived nightly</div>
+  </scxml-explorer>
+  <p>Built with <a href="/docs/explorer/"><code>&lt;scxml-explorer&gt;</code></a> and a <a href="/docs/playback/"><code>PlaybackClock</code></a>. The simulated services are custom <a href="/docs/io-processors/">I/O processors</a>; the source is in <a href="https://github.com/tinyactors-dev/scxmljs/tree/main/examples/playground/src/explorer">examples/playground</a>.</p>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

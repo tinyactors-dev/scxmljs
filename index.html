@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>scxmljs — SCXML statecharts you can run, see and step through</title>
+<meta name="description" content="A correctness-first SCXML 1.0 interpreter (160/160 W3C tests) with custom elements that render and step through running statecharts in any framework.">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="scxmljs — SCXML statecharts you can run, see and step through">
+<meta property="og:description" content="A correctness-first SCXML 1.0 interpreter (160/160 W3C tests) with custom elements that render and step through running statecharts in any framework.">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+<script type="module" src="/assets/landing-hp8n70be.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="wrap" data-pagefind-body>
+  <section class="hero">
+    <div>
+      <p class="eyebrow">SCXML 1.0 · ECMAScript data model</p>
+      <h1>Statecharts you can <em>run</em>, see and step through</h1>
+      <p class="lede">scxmljs is a correctness-first SCXML interpreter that passes every mandatory W3C test, with two custom elements that render running charts in any framework: <code>&lt;scxml-view&gt;</code> draws a whole chart, <code>&lt;scxml-explorer&gt;</code> explores whole systems level by level.</p>
+      <div class="install">
+        <code id="install-cmd">npm install @tinyactors/scxmljs</code>
+        <button class="icon-button copy" type="button" data-copy="#install-cmd">Copy</button>
+      </div>
+      <div class="actions">
+        <a class="button primary" href="/docs/getting-started/">Get started</a>
+        <a class="button" href="/demos/">See the demos</a>
+        <a class="button" href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+      </div>
+    </div>
+    <figure class="card hero-demo">
+      <scxml-view id="hero-view" trusted direction="right" fit src="/charts/traffic-light.scxml" aria-label="A live traffic light statechart"></scxml-view>
+      <figcaption><span>Live: <code>&lt;scxml-view src="traffic-light.scxml"&gt;</code></span><a href="/demos/gallery/">More charts</a></figcaption>
+    </figure>
+  </section>
+  <figure class="showcase">
+    <a class="card frame" href="https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-43551975.webm" aria-label="Watch the explorer tour (WebM video)">
+      <img src="https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-43551975.webp" width="1600" height="1000" alt="The explorer stepping through an order-fulfilment system: the tree of states, the focused compound state, the events it accepts, and the system of machines and services." loading="lazy">
+    </a>
+    <figcaption><code>&lt;scxml-explorer&gt;</code> on a three-machine order system. <a href="https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-43551975.webm">Full-resolution video</a> · <a href="/demos/explorer/">try it</a></figcaption>
+  </figure>
+  <h2 class="section-title">Why scxmljs</h2>
+  <div class="features">
+    <div class="card feature"><span class="stat">160 / 160</span><h3>Conformant</h3><p>Every mandatory W3C SCXML test passes, in both data models. The algorithm follows the spec's Appendix D procedure by procedure.</p></div>
+    <div class="card feature"><span class="stat">Sandboxed</span><h3>Safe for user charts</h3><p>Each session gets its own QuickJS context: no access to the page, other sessions, or the network, and runaway scripts are stopped.</p></div>
+    <div class="card feature"><span class="stat">16 KB</span><h3>Or trusted and tiny</h3><p>For your own charts, the trusted entry runs on the page's engine with the same semantics and no WebAssembly download.</p></div>
+    <div class="card feature"><span class="stat">▶ ⏸ ⏭</span><h3>Playback built in</h3><p>A <code>PlaybackClock</code> pauses, steps and speeds up whole systems: machines, delayed events and simulated services together.</p></div>
+    <div class="card feature"><span class="stat">Any framework</span><h3>Custom elements</h3><p>Plain web components with properties, events, slots and <code>::part()</code>. Tested with React, Vue, Svelte and Angular.</p></div>
+    <div class="card feature"><span class="stat">Accessible</span><h3>Keyboard and screen readers</h3><p>Tree navigation, live announcements, WCAG AA contrast in both themes, and zero axe violations in three browser engines.</p></div>
+  </div>
+  <h2 class="section-title">Two elements, two jobs</h2>
+  <div class="two-up">
+    <div class="card"><h3>&lt;scxml-view&gt;</h3><p>Drop-in and zero-JavaScript: point it at a chart and it loads, validates, runs and draws the whole thing. Transition labels are buttons that send their event.</p><a href="/docs/view/">Reference</a> · <a href="/demos/gallery/">Gallery</a></div>
+    <div class="card"><h3>&lt;scxml-explorer&gt;</h3><p>For systems too big to draw at once: a tree of states, a focus on one level, the events accepted right now, and a system view of machines and services.</p><a href="/docs/explorer/">Reference</a> · <a href="/demos/explorer/">Demo</a></div>
+  </div>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

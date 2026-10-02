@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changelog · scxmljs</title>
+<meta name="description" content="All notable changes to @tinyactors/scxmljs are listed here. The format follows Keep a Changelog.">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/changelog/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Changelog · scxmljs">
+<meta property="og:description" content="All notable changes to @tinyactors/scxmljs are listed here. The format follows Keep a Changelog.">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/changelog/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/" aria-current="page">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="changelog">Changelog</h1>
+<p>All notable changes to <code>@tinyactors/scxmljs</code> are listed here. The format follows
+<a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>.</p>
+<h2 id="versioning">Versioning<a class="anchor" href="#versioning" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The package follows <a href="https://semver.org/">Semantic Versioning</a>, with the usual rule for 0.x:
+until 1.0, a <strong>minor</strong> version (0.1 → 0.2) may contain breaking changes, and a <strong>patch</strong> version
+(0.1.0 → 0.1.1) contains only fixes and additions. Every breaking change is listed under
+<strong>Changed</strong> or <strong>Removed</strong> with what to do instead.</p>
+<p>The public API is everything the entry points export (<code>@tinyactors/scxmljs</code>, <code>/trusted</code>, <code>/view</code>,
+<code>/explorer</code>), the custom elements&#39; attributes, properties, events, slots and <code>::part()</code> names,
+the <code>--scxml-*</code> custom properties, and <code>themes/tinyactors.css</code>. Anything marked <code>@internal</code>,
+the files under <code>dist/</code> other than the entry points, class names inside the shadow DOM and the
+private <code>--x-*</code> properties are not public API and can change in any release.</p>
+<h2 id="unreleased"><a href="https://github.com/tinyactors-dev/scxmljs/compare/v0.1.0...HEAD">Unreleased</a><a class="anchor" href="#unreleased" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<h3 id="added">Added<a class="anchor" href="#added" aria-label="Link to this section" data-pagefind-ignore>#</a></h3>
+<ul>
+<li><code>&lt;scxml-view&gt;</code>: the <code>event-data</code> attribute gives label clicks event data (a JSON object from
+event names to data), and <code>scxml-send</code> listeners can set <code>detail.data</code>.</li>
+<li><code>&lt;scxml-view&gt;</code>: when a clicked event changes nothing, or raises an error (for example a
+condition that throws, which counts as false), a <code>send-status</code> bar says so, and the live
+region announces it. Before, the click looked like it did nothing.</li>
+<li><code>&lt;scxml-explorer&gt;</code>: list rows answer &quot;what is this state, what happens in it, how do I get
+out&quot;: entry actions and invokes, transitions as &quot;event → target&quot; with a condition mark, send
+buttons while the state is active, a &quot;last visited&quot; mark, and a click that opens the row in
+place. New parts: <code>list-row</code> modifiers <code>active</code> <code>visited</code> <code>open</code>, <code>visited</code>, <code>row-actions</code>,
+<code>row-exits</code>, <code>row-event</code> (<code>fired</code>), <code>row-detail</code>, <code>open-detail</code>; <code>card</code> and <code>lane-row</code> get
+<code>visited</code>, <code>edge-label</code> gets <code>fired</code>. New <code>strings</code>: <code>onEntry</code>, <code>eventless</code>, <code>guard</code>,
+<code>justTaken</code>, <code>lastVisited</code>, <code>openDetail</code>, <code>lastStep</code>.</li>
+</ul>
+<h3 id="changed">Changed<a class="anchor" href="#changed" aria-label="Link to this section" data-pagefind-ignore>#</a></h3>
+<ul>
+<li><code>&lt;scxml-explorer&gt;</code> is quieter: one header bar (the playback controls moved into it), no
+status badges or redundant counts, sentence-case labels, hairlines instead of boxes, and colour
+only for meaning (running colour: active; waiting colour: what the last step did). The System
+level hides the tree and shows the service inspector.</li>
+<li><code>&lt;scxml-explorer&gt;</code> parts: <code>speeds</code> is now a <code>&lt;select&gt;</code> (it was a group of buttons); <code>last-step</code>
+moved from the playback bar to under the title; <code>send</code> is now the event&#39;s name itself (there&#39;s
+no separate Send button); <code>event-data</code> is a <code>&lt;details&gt;</code> disclosure. The playback bar&#39;s queue
+readout is the <code>clock</code> part&#39;s tooltip. The English <code>focusSummary</code> no longer lists all
+descendants and <code>traffic</code> gives a message total.</li>
+</ul>
+<h2 id="010---2026-09-28"><a href="https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.1.0">0.1.0</a> - 2026-09-28<a class="anchor" href="#010---2026-09-28" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The first release.</p>
+<h3 id="added-1">Added<a class="anchor" href="#added-1" aria-label="Link to this section" data-pagefind-ignore>#</a></h3>
+<ul>
+<li>An SCXML 1.0 interpreter with the ECMAScript data model. All 160 automatic mandatory W3C
+conformance tests pass in both data models; see <a href="/docs/conformance/">docs/conformance.md</a>
+and <a href="/docs/deviations/">docs/deviations.md</a>.</li>
+<li>Two entry points with the same API: <code>@tinyactors/scxmljs</code> runs chart code in a QuickJS
+sandbox (WebAssembly), with a per-evaluation timeout (<code>scriptTimeoutMs</code>) and a per-session
+memory limit (<code>memoryLimitBytes</code>); <code>@tinyactors/scxmljs/trusted</code> runs it in the host&#39;s engine.</li>
+<li>Load-time validation (<code>SCXMLValidationError</code> with every problem) and authoring warnings
+(<code>model.warnings</code>).</li>
+<li>Clocks: <code>realClock</code>, <code>VirtualClock</code> for tests, <code>PlaybackClock</code> for pause, step and speed.</li>
+<li>Custom Event I/O Processors and invokers; SCXML child sessions with a <code>loader</code> for <code>src</code>.</li>
+<li>Typed session events, <code>settled()</code>, <code>waitFor()</code>, <code>steps()</code> and <code>snapshot()</code>.</li>
+<li>Page integration: <code>connect()</code>, <code>bind()</code> with <code>data-scxml-*</code> attributes, and the opt-in
+<code>reflect</code> and <code>elementEvents</code> options.</li>
+<li><code>&lt;scxml-view&gt;</code> (<code>@tinyactors/scxmljs/view</code>): a whole chart, drawn and running, with no
+JavaScript of your own.</li>
+<li><code>&lt;scxml-explorer&gt;</code> (<code>@tinyactors/scxmljs/explorer</code>): explore running systems level by level,
+and its view-model.</li>
+<li>A shared theming contract (<code>--scxml-*</code> tokens, <code>::part()</code>), a neutral light/dark default
+theme, and <code>themes/tinyactors.css</code>.</li>
+<li>Works under a strict Content-Security-Policy (no <code>&#39;unsafe-inline&#39;</code> styles) and with Trusted
+Types (sandboxed entry point); see <a href="/docs/csp/">docs/csp.md</a>.</li>
+<li><code>&lt;scxml-view&gt;</code> scales a too-wide diagram down on its own, no further than
+<code>--scxml-min-scale</code> (default 0.65); <code>fit</code> scales all the way. A terminated session keeps its
+final states marked (<code>reached</code>), and an element with nothing to show yet shows a hint instead
+of an error (a host may set <code>session</code> later).</li>
+<li>Tested in CI in Chromium, Firefox and WebKit (functional, screenshots, axe-core with no
+violations), in Node, Bun and Deno from the packed tarball, and with React 19, Vue 3,
+Svelte 5 and Angular 22 apps; see <a href="/docs/bundling/#support">docs/bundling.md</a>.</li>
+</ul>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/measurements/"><small>Previous</small>Measurements</a>
+
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#versioning">Versioning</a></li>
+    <li class="depth-2"><a href="#unreleased">Unreleased</a></li>
+    <li class="depth-3"><a href="#added">Added</a></li>
+    <li class="depth-3"><a href="#changed">Changed</a></li>
+    <li class="depth-2"><a href="#010---2026-09-28">0.1.0 - 2026-09-28</a></li>
+    <li class="depth-3"><a href="#added-1">Added</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/CHANGELOG.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

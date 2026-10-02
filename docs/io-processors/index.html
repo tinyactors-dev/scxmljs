@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Custom I/O processors · scxmljs</title>
+<meta name="description" content="An Event I/O Processor carries &lt;send&gt; messages out of a chart and delivers events back in (SCXML spec §6.2.4 and Appendix C). The built-in SCXML processor handles sessions talking to each other:…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/io-processors/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Custom I/O processors · scxmljs">
+<meta property="og:description" content="An Event I/O Processor carries &lt;send&gt; messages out of a chart and delivers events back in (SCXML spec §6.2.4 and Appendix C). The built-in SCXML processor handles sessions talking to each other:…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/io-processors/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/" aria-current="page">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="custom-io-processors">Custom I/O processors</h1>
+<p>An <em>Event I/O Processor</em> carries <code>&lt;send&gt;</code> messages out of a chart and delivers events back in
+(SCXML spec §6.2.4 and Appendix C). The built-in SCXML processor handles sessions talking to each
+other: <code>#_internal</code>, <code>#_parent</code>, <code>#_&lt;invokeid&gt;</code> and <code>#_scxml_&lt;sessionid&gt;</code> targets. Anything else
+(a server, a worker, a message bus) is a custom processor that you pass to <code>createSession()</code>.</p>
+<p>The spec&#39;s Basic HTTP processor isn&#39;t included; the <a href="#example-http-with-fetch">example below</a>
+shows how to write one.</p>
+<h2 id="the-interface">The interface<a class="anchor" href="#the-interface" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { IOProcessor } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> processor</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657"> IOProcessor</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  type: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"urn:example:api"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// canonical type URI: the key in _ioprocessors, and _event.origintype</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  aliases: [</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"api"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">], </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// short names allowed in &#x3C;send type="…"></span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  location</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `urn:example:api/${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">sessionId</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// _ioprocessors[type].location</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  attach</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) {}, </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// a session using this processor started: keep `session` to deliver events</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  detach</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) {}, </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// it terminated or was disposed: stop delivering</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  send</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">message</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) {}, </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// transport one message; throwing raises error.communication</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">};</span></span></code></pre><p><code>send()</code> receives an <code>OutboundSend</code>: <code>event</code>, <code>target</code>, <code>type</code> (the canonical URI), <code>data</code> (the
+<code>&lt;param&gt;</code>/<code>namelist</code> values as an object, or the <code>&lt;content&gt;</code> value) and <code>sendid</code>. It runs when the
+send is due, so <code>delay</code> has already passed.</p>
+<p><code>session.deliver(name, data?, origin?)</code> puts an event on the session&#39;s external queue. The event
+arrives with <code>origintype</code> set to your <code>type</code> and <code>origin</code> set to what you pass, so the chart can
+reply with <code>&lt;send type=&quot;…&quot; targetexpr=&quot;_event.origin&quot;&gt;</code>.</p>
+<p>One processor object can serve many sessions: <code>attach</code> and <code>detach</code> tell it which ones exist.
+Invoked child sessions get the same processors as their parent.</p>
+<h2 id="example-a-backend">Example: a backend<a class="anchor" href="#example-a-backend" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p><code>order.scxml</code> sends a request when it starts and waits for the answer:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> xmlns</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"http://www.w3.org/2005/07/scxml"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> version</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"1.0"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> datamodel</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"ecmascript"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"order"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> initial</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"saving"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">state</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> id</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"saving"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">onentry</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">send</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"api"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> target</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"/orders"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> event</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"order.create"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">param</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"item"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> expr</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"'tea'"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">send</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">onentry</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">transition</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> event</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"order.created"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> target</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"saved"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">transition</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> event</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"error.communication"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> target</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"failed"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">state</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">final</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> id</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"saved"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">donedata</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">param</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"id"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> expr</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"_event.data.id"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">donedata</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">final</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">final</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> id</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"failed"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span></code></pre><p>A processor that pretends to be the backend:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { readFile } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "node:fs/promises"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession, </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> IOProcessor } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> api</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657"> IOProcessor</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  type: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"urn:example:api"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  aliases: [</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"api"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">],</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  location</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `urn:example:api/${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">sessionId</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  send</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">message</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"request"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, message.target, message.event, </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">JSON</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">stringify</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(message.data));</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">    if</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (message.event </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!==</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "order.create"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">throw</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Error</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">`unknown request ${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">message</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">event</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">    setTimeout</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(() </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">deliver</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"order.created"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, { id: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">42</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> }, message.target), </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">10</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  },</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> readFile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"order.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"utf8"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(),</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  ioprocessors: [api],</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"done"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">JSON</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">stringify</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.done));</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span></code></pre><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>request /orders order.create {"item":"tea"}</span></span>
+<span class="line"><span>done {"id":42}</span></span></code></pre><p>If <code>send()</code> throws, the chart gets <code>error.communication</code> and moves to <code>failed</code>. A <code>&lt;send&gt;</code> with a
+<code>type</code> that no processor handles raises <code>error.execution</code>.</p>
+<h2 id="example-http-with-fetch">Example: HTTP with <code>fetch</code><a class="anchor" href="#example-http-with-fetch" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>A processor that POSTs the event as JSON and delivers the response as <code>&lt;event&gt;.done</code>, or
+<code>error.communication</code> when the request fails:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { IOProcessor, IOSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">export</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> function</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> httpProcessor</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">base</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657"> IOProcessor</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> live</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Set</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">IOSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  return</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    type: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"urn:example:http"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    aliases: [</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"http"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">],</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">    location</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> base,</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">    attach</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> void</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> live.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">add</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session),</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">    detach</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> void</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> live.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">delete</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session),</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">    send</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">message</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) {</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">      fetch</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> URL</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(message.target, base), {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        method: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"POST"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        headers: { </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"content-type"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"application/json"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> },</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        body: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">JSON</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">stringify</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ event: message.event, data: message.data }),</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      })</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        .</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">then</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">async</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">res</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">          if</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">res.ok) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">throw</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Error</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">`HTTP ${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">res</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">status</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">          const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> body</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> res.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">json</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">          if</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (live.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">has</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session)) session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">deliver</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">`${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">message</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">event</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}.done`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, body, message.target);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        })</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        .</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">catch</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">((</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">error</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">          if</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (live.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">has</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session)) session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">deliver</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"error.communication"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, { message: </span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">String</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(error) }, message.target);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    },</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  };</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">}</span></span></code></pre><p>Failures that happen after <code>send()</code> returns can&#39;t raise the chart&#39;s internal <code>error.communication</code>
+any more, so this processor delivers an external event with that name instead. The <code>live</code> set
+stops it from delivering to sessions that have ended.</p>
+<h2 id="in-the-explorer">In the explorer<a class="anchor" href="#in-the-explorer" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Pass the same processors to <code>&lt;scxml-explorer&gt;</code> (<code>attach({ session, processors })</code>) to see each
+one as a service at the System level, with the messages flowing to and from it. The service&#39;s
+slot is named after its first alias (<code>service:api</code>).</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/large-charts/"><small>Previous</small>Large charts</a>
+  <a class="next" href="/docs/invokers/"><small>Next</small>Custom invokers</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#the-interface">The interface</a></li>
+    <li class="depth-2"><a href="#example-a-backend">Example: a backend</a></li>
+    <li class="depth-2"><a href="#example-http-with-fetch">Example: HTTP with fetch</a></li>
+    <li class="depth-2"><a href="#in-the-explorer">In the explorer</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/io-processors.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

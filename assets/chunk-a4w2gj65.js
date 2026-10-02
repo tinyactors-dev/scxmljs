@@ -1,0 +1,1 @@
+import{e}from"./chunk-zrha9h2z.js";function o(r){return new Proxy({},{get(n,t){if(typeof t==="symbol")return;throw new e(`\`${r}.${t}\` is not available in this environment; it needs a Node.js-compatible runtime`)}})}var i=o("fs");var c=o("path");export{i as fs,c as path};

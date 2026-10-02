@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bundling, CDNs and classic scripts · scxmljs</title>
+<meta name="description" content="The package is ESM only. It has four entry points (@tinyactors/scxmljs, /trusted, /view, /explorer) and a stylesheet (/themes/tinyactors.css). This page shows how to get them into a page: with a…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/bundling/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Bundling, CDNs and classic scripts · scxmljs">
+<meta property="og:description" content="The package is ESM only. It has four entry points (@tinyactors/scxmljs, /trusted, /view, /explorer) and a stylesheet (/themes/tinyactors.css). This page shows how to get them into a page: with a…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/bundling/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/" aria-current="page">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="bundling-cdns-and-classic-scripts">Bundling, CDNs and classic scripts</h1>
+<p>The package is ESM only. It has four entry points (<code>@tinyactors/scxmljs</code>, <code>/trusted</code>, <code>/view</code>,
+<code>/explorer</code>) and a stylesheet (<code>/themes/tinyactors.css</code>). This page shows how to get them into a
+page: with a bundler, from a CDN with an import map, or as classic <code>&lt;script&gt;</code> files.</p>
+<h2 id="with-a-bundler">With a bundler<a class="anchor" href="#with-a-bundler" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Vite, esbuild, webpack, Rollup, Parcel and Bun need no configuration. Import what you use:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// or "@tinyactors/scxmljs/trusted"</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/view"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// registers &#x3C;scxml-view></span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// registers &#x3C;scxml-explorer></span></span></code></pre><p>Things to know:</p>
+<ul>
+<li><strong>Lazy engines.</strong> <code>&lt;scxml-view&gt;</code> loads its data model with <code>import()</code> when it first needs one:
+QuickJS for sandboxed charts, the host engine for <code>trusted</code> ones. With code splitting (on by
+default in Vite, webpack and Rollup; <code>splitting: true</code> in esbuild and Bun), each engine becomes a
+separate chunk that&#39;s only downloaded when used.</li>
+<li><strong>The sandbox is one file.</strong> QuickJS is compiled into the JavaScript (the WebAssembly is embedded
+as base64), so there&#39;s no <code>.wasm</code> file to copy, serve or configure.</li>
+<li><strong>Side effects.</strong> The element modules register custom elements when imported. <code>package.json</code>
+lists them in <code>sideEffects</code>, so tree shaking keeps them; everything else can be shaken.</li>
+<li><strong>Server-side rendering.</strong> The element modules can be imported where there&#39;s no DOM; they just
+don&#39;t register anything there.</li>
+</ul>
+<p>Sizes, minified and gzipped, for a browser bundle of each entry point alone:</p>
+<table>
+<thead>
+<tr>
+<th>Import</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@tinyactors/scxmljs</code></td>
+<td>20 KB, plus 290 KB of QuickJS loaded on first use</td>
+</tr>
+<tr>
+<td><code>@tinyactors/scxmljs/trusted</code></td>
+<td>17 KB</td>
+</tr>
+<tr>
+<td><code>@tinyactors/scxmljs/view</code></td>
+<td>33 KB, plus the engine it loads</td>
+</tr>
+<tr>
+<td><code>@tinyactors/scxmljs/explorer</code></td>
+<td>26 KB</td>
+</tr>
+</tbody></table>
+<h2 id="from-a-cdn-with-an-import-map">From a CDN, with an import map<a class="anchor" href="#from-a-cdn-with-an-import-map" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Browsers can load the published files directly. An import map tells them where each bare
+specifier lives: the package&#39;s entry points and its two QuickJS dependencies (which are only
+fetched when a sandboxed session is created).</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"importmap"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    "imports": {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      "@tinyactors/scxmljs": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.1.0/dist/index.js",</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      "@tinyactors/scxmljs/trusted": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.1.0/dist/trusted.js",</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      "@tinyactors/scxmljs/view": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.1.0/dist/view.js",</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      "@tinyactors/scxmljs/explorer": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.1.0/dist/explorer.js",</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      "quickjs-emscripten-core": "https://cdn.jsdelivr.net/npm/quickjs-emscripten-core@0.32.0/dist/index.mjs",</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      "@jitl/quickjs-singlefile-browser-release-sync": "https://cdn.jsdelivr.net/npm/@jitl/quickjs-singlefile-browser-release-sync@0.32.0/dist/index.mjs",</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      "@jitl/quickjs-ffi-types": "https://cdn.jsdelivr.net/npm/@jitl/quickjs-ffi-types@0.32.0/dist/index.mjs"</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    }</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  }</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"module"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/view"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> src</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"traffic-light.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span></code></pre><ul>
+<li>Pin exact versions, and use the dependency versions from the package&#39;s <code>package.json</code>.</li>
+<li>The package&#39;s own files import each other with relative paths, so only the entry points need
+entries.</li>
+<li>An import map is an inline script: under a Content-Security-Policy it needs a hash or nonce in
+<code>script-src</code> (see <a href="/docs/csp/">CSP</a>). To avoid that, host the files yourself.</li>
+<li>CDNs that rewrite imports for you, such as <code>https://esm.sh/@tinyactors/scxmljs@0.1.0/view</code>,
+work without the dependency entries.</li>
+</ul>
+<p>Both CDNs were tried with the published 0.1.0 in Chrome: this import map against jsDelivr (a
+sandboxed <code>&lt;scxml-view&gt;</code>, QuickJS fetched on demand), and esm.sh without an import map (a
+<code>trusted</code> <code>&lt;scxml-view&gt;</code>). The sandboxed engine is about 290 KB on first load, so give it a moment.</p>
+<h2 id="classic-scripts-no-modules">Classic scripts (no modules)<a class="anchor" href="#classic-scripts-no-modules" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>For pages that can&#39;t use modules, build IIFE bundles. Classic scripts have no <code>import.meta</code>, which
+the sandbox and <code>&lt;scxml-view&gt;</code> use to find their base URL, so define it as the page&#39;s URL:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> results</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> Promise</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">all</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  [</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml-view.ts"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml-global.ts"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">].</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">map</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">((</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">entry</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    Bun.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">build</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      entrypoints: [entry],</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      outdir: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"public/vendor"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      format: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"iife"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      target: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"browser"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      minify: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">true</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">,</span></span>
+<span class="line"><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">      // classic scripts have no import.meta: give the code the page's URL instead</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      define: { </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"import.meta.url"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"document.baseURI"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> },</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    }),</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  ),</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">for</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> result</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> of</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> results) {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  if</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">result.success) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">throw</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> AggregateError</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(result.logs, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"build failed"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  for</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> output</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> of</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> result.outputs) console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(output.path.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">slice</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(output.path.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">indexOf</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"public/"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)));</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">}</span></span></code></pre><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>public/vendor/scxml-view.js</span></span>
+<span class="line"><span>public/vendor/scxml-global.js</span></span></code></pre><p>The two entry files: <code>scxml-view.ts</code> registers the element,</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/view"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span></code></pre><p>and <code>scxml-global.ts</code> puts the interpreter on <code>window.scxml</code> and registers the explorer:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> *</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> as</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> scxml </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/trusted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">Object.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">assign</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(globalThis, { scxml });</span></span></code></pre><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> src</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"vendor/scxml-view.js"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> src</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"vendor/scxml-global.js"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> src</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"traffic-light.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> src</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"app.js"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">> </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">&#x3C;!-- scxml.createSession(…), explorer.attach(…) --></span></span></code></pre><p>With esbuild, the same build is <code>--format=iife --define:import.meta.url=document.baseURI</code>.</p>
+<p>An IIFE can&#39;t load chunks lazily, so <code>scxml-view.js</code> contains both engines (about 1.3 MB
+minified, 340 KB gzipped). For a smaller page, use modules. <code>&lt;scxml-explorer&gt;</code> and the trusted
+entry point don&#39;t use <code>import.meta</code> and can be bundled as-is.</p>
+<p>Tested in CI in Chromium, Firefox and WebKit, under both policies from <a href="/docs/csp/">CSP</a>: both
+bundles (built from the published files with exactly this recipe), a sandboxed <code>&lt;scxml-view&gt;</code>,
+and a trusted session in <code>&lt;scxml-explorer&gt;</code> (<code>tests/browser/specs/csp.pw.ts</code>).</p>
+<h2 id="support">Support<a class="anchor" href="#support" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Environment</th>
+<th>Status</th>
+<th>Needs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Chrome, Edge (Chromium)</td>
+<td>tested in CI: Chromium 153 (and Chrome 154 by hand)</td>
+<td>Chromium 123 or later (from the features used; older versions aren&#39;t tested)</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>tested in CI: Firefox 155</td>
+<td>Firefox 120 or later (from the features used)</td>
+</tr>
+<tr>
+<td>Safari</td>
+<td>tested in CI with WebKit 26.6 (Playwright&#39;s build, see below)</td>
+<td>Safari 17.5 or later (from the features used)</td>
+</tr>
+<tr>
+<td>Node</td>
+<td>tested in CI: 26.10 (and 22.3 by hand)</td>
+<td>22.3 or later (<code>process.getBuiltinModule</code>), and a DOMParser such as happy-dom</td>
+</tr>
+<tr>
+<td>Bun</td>
+<td>tested in CI: 1.4</td>
+<td>a DOMParser such as happy-dom</td>
+</tr>
+<tr>
+<td>Deno</td>
+<td>tested in CI: 2.9</td>
+<td><code>--allow-read --allow-env --allow-sys</code>, and a DOMParser such as happy-dom (<code>npm:happy-dom</code>)</td>
+</tr>
+</tbody></table>
+<p>What &quot;tested in CI&quot; covers:</p>
+<ul>
+<li><strong>Browsers</strong> (<code>tests/browser</code>, Playwright): both elements with the three playground systems;
+zero-JS <code>&lt;scxml-view src&gt;</code> and inline source; the sandboxed engine (WebAssembly) and the trusted
+one (the iframe realm); the explorer&#39;s levels, tree keyboard navigation, stepping and sending;
+390px and wide layouts, container queries, light and dark, reduced motion, right-to-left
+pages; the Content-Security-Policies and Trusted Types from <a href="/docs/csp/">CSP</a>; an axe-core audit
+(no violations); and screenshot comparisons. The packed files are loaded through an import
+map, as a plain HTML page would.</li>
+<li><strong>Runtimes</strong> (<code>scripts/smoke-tarball.ts</code>): the packed tarball, installed with <code>npm install</code>
+into an empty project, runs a chart through both entry points in Node, Bun and Deno, and a
+bundler builds all four entry points from it.</li>
+<li><strong>Frameworks</strong>: the <a href="/docs/frameworks/">framework examples</a> are built and loaded in Chromium.</li>
+</ul>
+<p><strong>Safari:</strong> Playwright&#39;s WebKit is the engine Safari uses, built from the same sources, but not
+Safari itself (and on Linux in CI). Differences are rare; the package hasn&#39;t been tried in a
+shipping Safari by hand yet.</p>
+<p>The browser minimums come from <code>light-dark()</code> in the default theme (the newest feature used),
+constructable stylesheets, container queries and <code>color-mix()</code>. The sandbox needs WebAssembly;
+the trusted entry point needs <code>eval</code> in an iframe. See <a href="/docs/csp/">CSP</a> for both.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/node-and-servers/"><small>Previous</small>Node, Bun and servers</a>
+  <a class="next" href="/docs/csp/"><small>Next</small>Content-Security-Policy</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#with-a-bundler">With a bundler</a></li>
+    <li class="depth-2"><a href="#from-a-cdn-with-an-import-map">From a CDN, with an import map</a></li>
+    <li class="depth-2"><a href="#classic-scripts-no-modules">Classic scripts (no modules)</a></li>
+    <li class="depth-2"><a href="#support">Support</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/bundling.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

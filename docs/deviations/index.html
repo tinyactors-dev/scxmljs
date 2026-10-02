@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deviations from the SCXML specification · scxmljs</title>
+<meta name="description" content="@tinyactors/scxmljs implements SCXML 1.0 with the ECMAScript data model. It passes all 160 mandatory automatic W3C conformance tests and the 8 applicable manual ones (see conformance/MANUAL.md),…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/deviations/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Deviations from the SCXML specification · scxmljs">
+<meta property="og:description" content="@tinyactors/scxmljs implements SCXML 1.0 with the ECMAScript data model. It passes all 160 mandatory automatic W3C conformance tests and the 8 applicable manual ones (see conformance/MANUAL.md),…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/deviations/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/" aria-current="page">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="deviations-from-the-scxml-specification">Deviations from the SCXML specification</h1>
+<p><code>@tinyactors/scxmljs</code> implements <a href="https://www.w3.org/TR/scxml/">SCXML 1.0</a> with the
+ECMAScript data model. It passes all 160 mandatory automatic W3C conformance tests
+and the 8 applicable manual ones (see <a href="https://github.com/tinyactors-dev/scxmljs/blob/main/conformance/MANUAL.md">conformance/MANUAL.md</a>),
+in both data models.</p>
+<p>This page lists every place where the library leaves out part of the spec, extends it,
+or makes a choice the spec leaves open. Each point is pinned by a test, in
+<code>packages/scxmljs/test/deviations.test.ts</code> unless noted.</p>
+<h2 id="not-included">Not included<a class="anchor" href="#not-included" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<ul>
+<li><strong>The Basic HTTP Event I/O Processor</strong> (spec Appendix C.2). Twelve optional W3C
+tests need it (201, 509, 510, 518, 519, 520, 522, 531, 532, 534, 567, 577), plus the
+manual test 513. A host can add one as a custom <code>IOProcessor</code>.</li>
+<li><strong><code>_event.raw</code></strong> is always <code>undefined</code>. The spec defines it for the Basic HTTP
+processor; the SCXML Event I/O Processor has no wire format to put there.</li>
+<li><strong><code>#_scxml_&lt;sessionid&gt;</code> targets</strong> reach only sessions in the same JavaScript
+realm (the same page, or the same process). There is no cross-process transport.</li>
+</ul>
+<h2 id="data-models">Data models<a class="anchor" href="#data-models" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<ul>
+<li><strong><code>datamodel=&quot;null&quot;</code></strong> is supported. Its only expressions are <code>In(&#39;state&#39;)</code>
+conditions, which the ECMAScript engine evaluates. <code>&lt;data&gt;</code>, <code>&lt;assign&gt;</code>, <code>&lt;script&gt;</code>
+and <code>&lt;foreach&gt;</code> are rejected at load time.</li>
+<li><strong>XML values</strong> (a <code>&lt;data&gt;</code> or <code>&lt;content&gt;</code> whose content is XML) are DOM objects, as
+the spec requires, but different ones in each engine:<ul>
+<li><strong>sandboxed:</strong> a small DOM implemented inside QuickJS (<code>getElementsByTagName</code>,
+<code>getAttribute</code>, <code>setAttribute</code>, <code>childNodes</code>, <code>children</code>, <code>textContent</code>,
+<code>documentElement</code>, …). It is serialised to XML text when it leaves the engine.</li>
+<li><strong>trusted:</strong> real DOM nodes (copies of the source), handed out as nodes.</li>
+</ul>
+</li>
+<li><strong>Values crossing into and out of the data model are copies.</strong> Going in (event
+data, <code>data</code> option, invoke parameters): functions and symbols become <code>undefined</code>,
+<code>Date</code>s become their timestamp, and a reference back into its own ancestors (a
+cycle) becomes <code>undefined</code>. Going out (<code>&lt;log&gt;</code>, send payloads, <code>&lt;donedata&gt;</code>,
+<code>evaluate()</code>, <code>snapshot()</code>), both engines apply the same rules:<ul>
+<li>top-level primitives pass through unchanged (including <code>undefined</code>, <code>NaN</code>, <code>-0</code> and
+bigints), and a top-level function becomes <code>undefined</code>;</li>
+<li>inside objects and arrays, JSON&#39;s rules apply: keys holding <code>undefined</code> or functions
+are dropped, such array entries become <code>null</code>, <code>NaN</code> and <code>Infinity</code> become <code>null</code>,
+and bigints become strings;</li>
+<li><code>toJSON()</code> is honoured (so <code>Date</code>s become ISO strings); <code>Map</code>s and <code>Set</code>s become
+plain objects of their own keys;</li>
+<li>cyclic references are dropped.</li>
+</ul>
+</li>
+<li><strong>Repeated <code>&lt;param&gt;</code> names</strong> collect their values in an array
+(<code>{ Var1: [2, 3] }</code>). The spec requires every pair to be kept, but leaves the
+shape to the data model (W3C test 178).</li>
+<li><strong>Expressions may end with a semicolon</strong> (<code>expr=&quot;x + 1;&quot;</code>), as authors often
+write. The spec&#39;s grammar doesn&#39;t allow it.</li>
+<li><strong>An empty <code>expr</code> on <code>&lt;log&gt;</code></strong> logs no value instead of raising
+<code>error.execution</code> (W3C test 307 writes <code>&lt;log expr=&quot;&quot;/&gt;</code>).</li>
+</ul>
+<h2 id="scheduling-and-limits">Scheduling and limits<a class="anchor" href="#scheduling-and-limits" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<ul>
+<li><strong>External events are asynchronous.</strong> <code>session.send()</code>, delayed <code>&lt;send&gt;</code>s and
+replies from I/O processors are queued and processed one at a time by the session&#39;s
+clock (<code>clock.defer</code>), never inside the caller&#39;s stack. The internal queue is
+drained synchronously within each macrostep, as the spec requires.</li>
+<li><strong>Invoked sessions start synchronously</strong> at the end of the macrostep that
+entered the invoking state. When the source comes from an asynchronous <code>loader</code>,
+they start as soon as it has arrived (unless the invoking state has been exited
+meanwhile, in which case the child never starts).</li>
+<li><strong><code>maxMicrosteps</code></strong> (default 100,000) stops a macrostep that never settles
+(an eventless loop), raises <code>error.platform</code> and ends the session. The spec would
+let it run forever.</li>
+<li><strong>The sandbox limits every evaluation</strong> to <code>scriptTimeoutMs</code> (default 2 s) and
+64 MB of memory. Exceeding either raises <code>error.execution</code>. The trusted engine
+can&#39;t interrupt a runaway script.</li>
+</ul>
+<h2 id="load-time-validation">Load-time validation<a class="anchor" href="#load-time-validation" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<ul>
+<li>Documents are <strong>validated strictly when compiled</strong>, and every problem is reported at
+once in an <code>SCXMLValidationError</code> (unknown targets, duplicate ids, illegal initial
+states, targets that can&#39;t be active together, misplaced or unknown elements, and so
+on). The spec allows a processor to reject a non-conformant document; this one does
+so eagerly, instead of failing later at run time.</li>
+<li>A <code>&lt;script src&gt;</code> that can&#39;t be loaded rejects the document (spec §5.8; W3C test
+301). A <code>&lt;data src&gt;</code> that can&#39;t be loaded raises <code>error.execution</code> and leaves the
+variable <code>undefined</code>.</li>
+<li>An <code>&lt;invoke&gt;</code> whose source can&#39;t be loaded or compiled raises <code>error.execution</code>
+in the invoking session.</li>
+<li><strong>Warnings</strong> (<code>model.warnings</code>) point out likely mistakes that are still valid
+SCXML. See <a href="/docs/getting-started/#authoring-warnings">authoring warnings</a>.</li>
+</ul>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/conformance/"><small>Previous</small>Conformance</a>
+  <a class="next" href="/docs/measurements/"><small>Next</small>Measurements</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#not-included">Not included</a></li>
+    <li class="depth-2"><a href="#data-models">Data models</a></li>
+    <li class="depth-2"><a href="#scheduling-and-limits">Scheduling and limits</a></li>
+    <li class="depth-2"><a href="#load-time-validation">Load-time validation</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/deviations.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

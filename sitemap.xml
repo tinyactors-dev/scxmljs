@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://scxmljs.tinyactors.dev/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/demos/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/demos/explorer/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/demos/llm-chat/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/demos/pi-durable/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/demos/gallery/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/playground/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/getting-started/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/sandboxed-vs-trusted/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/driving-charts/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/playback/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/testing/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/view/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/explorer/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/theming/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/custom-ui/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/frameworks/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/large-charts/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/io-processors/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/invokers/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/node-and-servers/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/bundling/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/csp/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/security/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/conformance/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/deviations/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/measurements/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/docs/changelog/</loc></url>
+  <url><loc>https://scxmljs.tinyactors.dev/api/</loc></url>
+</urlset>

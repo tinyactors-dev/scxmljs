@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>&lt;scxml-explorer&gt; · scxmljs</title>
+<meta name="description" content="&lt;scxml-explorer&gt; explores a running system one level at a time. It never draws a whole chart, so it stays usable for charts with thousands of states and for many machines invoking each other.">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/explorer/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="&lt;scxml-explorer&gt; · scxmljs">
+<meta property="og:description" content="&lt;scxml-explorer&gt; explores a running system one level at a time. It never draws a whole chart, so it stays usable for charts with thousands of states and for many machines invoking each other.">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/explorer/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/" aria-current="page">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id=""><code>&lt;scxml-explorer&gt;</code></h1>
+<p><code>&lt;scxml-explorer&gt;</code> explores a running system one level at a time. It never draws a whole chart,
+so it stays usable for charts with thousands of states and for many machines invoking each other.</p>
+<p><img src="https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-light-6607c6d8.webp" alt="&lt;scxml-explorer&gt; showing an order-fulfilment system"></p>
+<p>It has two levels:</p>
+<ul>
+<li><strong>System</strong>: every machine (the root session and the sessions it invoked), every external
+service (I/O processors), and the messages between them. Links light up while traffic flows.</li>
+<li><strong>Machine</strong>: one machine at a time.<ul>
+<li>A <strong>tree</strong> of its states on the left, with the active path expanded and highlighted.</li>
+<li>The <strong>focus</strong> in the middle: one compound or parallel state, its children, the transitions
+between them, and &quot;doors&quot; to states outside it. When it gets crowded, it switches from a
+diagram to a list. In the list, each state says what it does and how it leaves: its entry
+actions and invokes, and its transitions as &quot;event → target&quot; (with an <code>if</code> mark for a
+condition). While a state is active, those are buttons that send the event. A click opens
+the row in place with every transition, action and way in, and a link to the full detail.</li>
+<li>The <strong>inspector</strong> on the right: the events the machine accepts right now (each name is a
+button that sends it; event data sits behind a disclosure), and the details of the selected
+state. At the System level it shows the selected service, and the tree is hidden.</li>
+</ul>
+</li>
+</ul>
+<p>The header holds the levels, the breadcrumb, the playback controls and the Follow toggle. Under
+the title, one line says what the last step did. Colour means one thing each: the running colour
+marks what is active, the waiting colour what just happened (the arrow the last step took, the
+transition just taken and the state it left, marked &quot;last visited&quot;).</p>
+<p>Below 760 px of width, the panes become tabs.</p>
+<h2 id="use">Use<a class="anchor" href="#use" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>You create the session; the explorer shows it. It works with sessions from either entry point and
+never loads a data model itself.</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession, PlaybackClock } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/trusted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> source</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> fetch</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"traffic-light.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">text</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> clock</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> PlaybackClock</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ speed: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">1</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> });</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(source, { clock });</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">document.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">querySelector</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml-explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">attach</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ session, clock });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span></code></pre><p>Attach before or after <code>start()</code>. The explorer finds invoked child sessions by itself. Pass the
+session&#39;s I/O processors as <code>processors</code> to show them as services at the System level. Pass a
+<code>PlaybackClock</code> (or create the session with one) to get play, pause, step and speed controls.</p>
+<p><code>detach()</code> stops showing the session and removes the explorer&#39;s listeners. It never disposes the
+session: that&#39;s yours to do.</p>
+<h2 id="attributes">Attributes<a class="anchor" href="#attributes" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Default</th>
+<td></td>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>follow</code></td>
+<td><code>true</code></td>
+<td><code>&quot;false&quot;</code> starts without following: the focus stays where the user put it</td>
+</tr>
+<tr>
+<td><code>announce</code></td>
+<td><code>all</code></td>
+<td>what the live region reads out: <code>all</code> (steps and sent events), <code>sends</code>, or <code>off</code></td>
+</tr>
+</tbody></table>
+<h2 id="properties-and-methods">Properties and methods<a class="anchor" href="#properties-and-methods" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<table>
+<thead>
+<tr>
+<td></td>
+<td></td>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>attach({ session, processors?, clock? })</code></td>
+<td>show a root session. <code>clock</code> defaults to <code>session.clock</code>.</td>
+</tr>
+<tr>
+<td><code>detach()</code></td>
+<td>stop showing it</td>
+</tr>
+<tr>
+<td><code>session</code>, <code>processors</code>, <code>clock</code></td>
+<td>the same three, one at a time. Setting one re-attaches.</td>
+</tr>
+<tr>
+<td><code>follow</code></td>
+<td>keep the focus on the part of the machine that is moving. Reflected as the <code>follow</code> attribute; the header has a toggle for it.</td>
+</tr>
+<tr>
+<td><code>announce</code></td>
+<td>as the attribute</td>
+</tr>
+<tr>
+<td><code>announceInterval</code></td>
+<td>while a clock plays, announce steps at most this often (ms, default 3000)</td>
+</tr>
+<tr>
+<td><code>strings</code></td>
+<td>translations; see <a href="/docs/custom-ui/#translations">custom UI and translations</a></td>
+</tr>
+</tbody></table>
+<h2 id="events">Events<a class="anchor" href="#events" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>All events bubble and cross the shadow boundary.</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th><code>detail</code></th>
+<th>When</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>scxml-focus</code></td>
+<td><code>ExplorerFocusDetail</code>: <code>{ session, state }</code></td>
+<td>the focused state changed, by the user or by following</td>
+</tr>
+<tr>
+<td><code>scxml-select</code></td>
+<td><code>ExplorerSelectDetail</code>: <code>{ session, state }</code></td>
+<td>a state was selected for the detail pane</td>
+</tr>
+<tr>
+<td><code>scxml-send</code></td>
+<td><code>ExplorerSendDetail</code>: <code>{ session, name, data }</code></td>
+<td>the user is about to send an event. Cancelable.</td>
+</tr>
+</tbody></table>
+<p><code>session</code> is the machine the state belongs to: the root, or an invoked child.</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { ExplorerSelectDetail, ExplorerSendDetail } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> explorer</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> document.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">querySelector</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml-explorer"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">explorer.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">addEventListener</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml-select"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">e</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">state</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (e </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">as</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657"> CustomEvent</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">ExplorerSelectDetail</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>).detail;</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  history.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">replaceState</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">null</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">""</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">`#${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">state</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">id</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">explorer.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">addEventListener</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"scxml-send"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">e</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">data</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (e </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">as</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657"> CustomEvent</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">ExplorerSendDetail</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>).detail;</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"sending"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, name, data);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span></code></pre><h2 id="slots">Slots<a class="anchor" href="#slots" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Put your own content into the explorer with named slots. Slotted elements stay in your DOM, so
+they work with any framework and any styling.</p>
+<table>
+<thead>
+<tr>
+<th>Slot</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>state:&lt;id&gt;</code></td>
+<td>in the card of state <code>&lt;id&gt;</code> in the focus</td>
+</tr>
+<tr>
+<td><code>detail:&lt;id&gt;</code></td>
+<td>in the detail pane of state <code>&lt;id&gt;</code></td>
+</tr>
+<tr>
+<td><code>event:&lt;descriptor&gt;</code></td>
+<td>in the row of that accepted event, e.g. a form for its data (<code>event:order.placed</code>)</td>
+</tr>
+<tr>
+<td><code>service:&lt;name&gt;</code></td>
+<td>in that service&#39;s card at the System level (<code>&lt;name&gt;</code> is the I/O processor&#39;s first alias, or its type)</td>
+</tr>
+<tr>
+<td><code>toolbar</code></td>
+<td>in the header, before the Follow toggle</td>
+</tr>
+<tr>
+<td><code>empty-tree</code>, <code>empty-events</code>, <code>empty-detail</code></td>
+<td>replace the &quot;nothing here&quot; messages</td>
+</tr>
+</tbody></table>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">button</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> slot</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"toolbar"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"button"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>Restart&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">button</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">p</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> slot</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"detail:checkout"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>Payment is handled by the payments team.&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">p</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">span</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> slot</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"empty-events"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>Waiting for the next order…&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">span</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-explorer</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span></code></pre><p>Slots are only shown while their place exists: <code>detail:checkout</code> appears when <code>checkout</code> is
+selected. <a href="/docs/custom-ui/">Custom UI</a> has a complete example.</p>
+<h2 id="keyboard-and-screen-readers">Keyboard and screen readers<a class="anchor" href="#keyboard-and-screen-readers" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<ul>
+<li>The tree follows the ARIA tree pattern: ↑ ↓ move, → expands or moves to the first child,
+← collapses or moves to the parent, Home and End jump, Enter or Space focuses the state, and
+typing jumps to the next state whose name starts with those letters.</li>
+<li>Cards, rows, lanes and doors are focusable. In the diagram, Enter drills into a container or
+selects a state, and Space selects. In the list, Enter, Space or a click drills into a container
+and opens a leaf in place (its name button says whether it&#39;s expanded); the opened row links to
+the detail. Keyboard focus stays on the row when the view re-renders.</li>
+<li>With a <code>PlaybackClock</code>: Space plays and pauses, <code>.</code> steps. They don&#39;t apply in fields, buttons,
+rows and cards, which use those keys themselves.</li>
+<li>A polite live region announces steps and sent events. While a clock plays, step announcements
+are throttled to one per <code>announceInterval</code>.</li>
+<li>Several explorers on one page: give each an <code>aria-label</code>. It names the explorer&#39;s breadcrumb
+landmark (&quot;Orders: Breadcrumb&quot;), so screen-reader users can tell them apart.</li>
+<li>Checked with axe-core in Chromium, Firefox and WebKit (every level, both layouts, both themes):
+no violations. Controls are at least 24px tall (WCAG 2.2 target size), and cards and list rows
+are labelled groups whose state name is the primary button (controls never nest).</li>
+<li>Right-to-left pages: the layout mirrors, and so do the tree&#39;s disclosure triangles. Arrows
+written inside labels (→) don&#39;t.</li>
+</ul>
+<h2 id="styling">Styling<a class="anchor" href="#styling" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The explorer uses the shared <code>--scxml-*</code> tokens (see <a href="/docs/theming/">theming</a>). It fills
+<code>--scxml-height</code> (default: the smaller of 860 px and the viewport height minus 32 px), and tree
+rows are <code>--scxml-row-height</code> tall (default 30 px).</p>
+<p>Parts, with their modifiers (added while they apply):</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Parts</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Header</td>
+<td><code>top</code>, <code>levels</code>, <code>crumbs</code>, <code>crumb</code> (<code>current</code>), <code>follow</code></td>
+</tr>
+<tr>
+<td>Playback (in the header)</td>
+<td><code>playback</code>, <code>play</code>, <code>step</code>, <code>speeds</code> (a <code>&lt;select&gt;</code>), <code>clock</code></td>
+</tr>
+<tr>
+<td>Tree</td>
+<td><code>tree-pane</code>, <code>tree-search</code>, <code>tree</code>, <code>tree-row</code> (<code>path</code> <code>active</code> <code>match</code>)</td>
+</tr>
+<tr>
+<td>Focus</td>
+<td><code>focus-pane</code>, <code>title</code>, <code>last-step</code>, <code>diagram</code>, <code>card</code> (<code>path</code> <code>active</code> <code>waiting</code> <code>final</code> <code>selected</code> <code>visited</code>), <code>edges</code>, <code>edge-label</code> (<code>live</code> <code>fired</code> <code>collapsed</code>), <code>list</code>, <code>list-row</code> (<code>path</code> <code>active</code> <code>visited</code> <code>open</code>), <code>visited</code>, <code>row-actions</code>, <code>row-exits</code>, <code>row-event</code> (<code>fired</code>), <code>row-detail</code>, <code>open-detail</code>, <code>lanes</code>, <code>lane</code> (<code>path</code>), <code>lane-row</code> (<code>active</code> <code>visited</code>), <code>doors</code>, <code>door</code> (<code>exit</code> or <code>entry</code>, <code>live</code>)</td>
+</tr>
+<tr>
+<td>Accepted events</td>
+<td><code>inspector</code>, <code>event-search</code>, <code>scopes</code>, <code>event-data</code> (a <code>&lt;details&gt;</code>), <code>events</code>, <code>event-group</code>, <code>event-row</code> (<code>here</code>, <code>inherited</code> or <code>elsewhere</code>), <code>send</code> (the event&#39;s name)</td>
+</tr>
+<tr>
+<td>Details</td>
+<td><code>detail</code>, <code>warning</code></td>
+</tr>
+<tr>
+<td>System level</td>
+<td><code>system</code>, <code>machine</code> (<code>running</code> <code>done</code> <code>hot</code>), <code>service</code> (<code>selected</code> <code>hot</code>)</td>
+</tr>
+<tr>
+<td>Narrow layout</td>
+<td><code>tabs</code>, <code>tab</code> (<code>selected</code>), <code>strip</code></td>
+</tr>
+<tr>
+<td>Anywhere</td>
+<td><code>empty</code></td>
+</tr>
+</tbody></table>
+<h2 id="the-view-model">The view-model<a class="anchor" href="#the-view-model" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Everything the explorer shows is computed by pure functions exported from
+<code>@tinyactors/scxmljs/explorer</code>: <code>treeRows</code>, <code>focusScope</code>, <code>acceptedEvents</code>, <code>groupEvents</code>,
+<code>followTarget</code>, <code>SystemTracker</code> and more. Use them to build your own explorer with your own
+components; see <a href="/docs/custom-ui/#build-your-own-explorer">custom UI</a>.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/view/"><small>Previous</small>&lt;scxml-view&gt;</a>
+  <a class="next" href="/docs/theming/"><small>Next</small>Theming</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#use">Use</a></li>
+    <li class="depth-2"><a href="#attributes">Attributes</a></li>
+    <li class="depth-2"><a href="#properties-and-methods">Properties and methods</a></li>
+    <li class="depth-2"><a href="#events">Events</a></li>
+    <li class="depth-2"><a href="#slots">Slots</a></li>
+    <li class="depth-2"><a href="#keyboard-and-screen-readers">Keyboard and screen readers</a></li>
+    <li class="depth-2"><a href="#styling">Styling</a></li>
+    <li class="depth-2"><a href="#the-view-model">The view-model</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/explorer.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

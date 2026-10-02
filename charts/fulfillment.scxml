@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Order fulfilment for a web shop: the root machine of a small system.
+
+    order ─ invokes ─▶ payment   (fulfillment-payment.scxml)
+          ─ invokes ─▶ shipment  (fulfillment-shipping.scxml)
+          ─ sends ───▶ risk, crm, warehouse, email, payments (I/O processors)
+
+  Global transitions on <order> (cancel, hold, fraud, address changes, notes)
+  are accepted in every state; a deep <history> lets admin.release resume a
+  held order exactly where it stopped.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="order-fulfillment" initial="order">
+  <datamodel>
+    <data id="orderId" expr="null"/>
+    <data id="customer" expr="null"/>
+    <data id="items" expr="[]"/>
+    <data id="amount" expr="0"/>
+    <data id="currency" expr="'EUR'"/>
+    <data id="address" expr="null"/>
+    <data id="tier" expr="'standard'"/>
+    <data id="riskScore" expr="null"/>
+    <data id="payment" expr="null"/>
+    <data id="parcel" expr="null"/>
+    <data id="tracking" expr="null"/>
+    <data id="holdReason" expr="null"/>
+    <data id="notes" expr="[]"/>
+    <data id="maxOrderValue" expr="10000"/>
+  </datamodel>
+
+  <state id="order" initial="awaitingOrder">
+    <!-- ── accepted everywhere ─────────────────────────────────────────── -->
+    <transition event="customer.cancel" cond="!In('inTransit') &amp;&amp; !In('delivered') &amp;&amp; !In('returned') &amp;&amp; !In('cancelling') &amp;&amp; !In('rejected')" target="cancelling"/>
+    <transition event="customer.cancel" type="internal">
+      <send type="email" event="cancelRefused"><param name="orderId" expr="orderId"/></send>
+    </transition>
+    <transition event="admin.hold" cond="In('active')" target="onHold">
+      <assign location="holdReason" expr="(_event.data &amp;&amp; _event.data.reason) || 'manual hold'"/>
+    </transition>
+    <transition event="fraud.flagged" cond="!In('rejected')" target="rejected"/>
+    <transition event="customer.address.changed" type="internal">
+      <assign location="address" expr="_event.data.address"/>
+      <if cond="In('inTransit')">
+        <send target="#_shipment" event="redirect"><param name="address" expr="address"/></send>
+      </if>
+    </transition>
+    <transition event="customer.message admin.note" type="internal">
+      <script>notes.push({ from: _event.name, text: _event.data &amp;&amp; _event.data.text })</script>
+    </transition>
+    <transition event="order.priority.upgrade" type="internal">
+      <assign location="tier" expr="'priority'"/>
+    </transition>
+
+    <state id="awaitingOrder">
+      <transition event="order.placed" target="active">
+        <assign location="orderId" expr="_event.data.id"/>
+        <assign location="customer" expr="_event.data.customer"/>
+        <assign location="items" expr="_event.data.items"/>
+        <assign location="amount" expr="_event.data.amount"/>
+        <assign location="currency" expr="_event.data.currency"/>
+        <assign location="address" expr="_event.data.address"/>
+      </transition>
+    </state>
+
+    <!-- the order's working life; held orders resume here via deep history -->
+    <state id="active" initial="intake">
+      <history id="resumePoint" type="deep"><transition target="intake"/></history>
+
+      <!-- ── intake: validate, screen, enrich ─────────────────────────── -->
+      <state id="intake" initial="received">
+        <state id="received">
+          <onentry><log label="order received" expr="orderId"/></onentry>
+          <transition target="validating"/>
+        </state>
+
+        <state id="validating" initial="checkingItems">
+          <state id="checkingItems">
+            <transition cond="items.length === 0" target="invalid"/>
+            <transition target="checkingAddress"/>
+          </state>
+          <state id="checkingAddress">
+            <transition cond="!address || !address.postcode" target="invalid"/>
+            <transition target="checkingLimits"/>
+          </state>
+          <state id="checkingLimits">
+            <transition cond="amount &gt; maxOrderValue" target="invalid"/>
+            <transition target="validated"/>
+          </state>
+          <final id="validated"/>
+          <transition event="done.state.validating" target="screening"/>
+        </state>
+
+        <state id="screening" initial="scoring">
+          <state id="scoring">
+            <onentry>
+              <send type="risk" event="score">
+                <param name="orderId" expr="orderId"/>
+                <param name="amount" expr="amount"/>
+                <param name="customer" expr="customer"/>
+              </send>
+            </onentry>
+            <transition event="risk.score.done" cond="_event.data.score &gt;= 0.9" target="rejected">
+              <assign location="riskScore" expr="_event.data.score"/>
+            </transition>
+            <transition event="risk.score.done" cond="_event.data.score &gt;= 0.6" target="manualReview">
+              <assign location="riskScore" expr="_event.data.score"/>
+            </transition>
+            <transition event="risk.score.done" target="screened">
+              <assign location="riskScore" expr="_event.data.score"/>
+            </transition>
+            <transition event="risk.score.error" target="manualReview"/>
+          </state>
+          <state id="manualReview">
+            <transition event="admin.approve" target="screened"/>
+            <transition event="admin.reject" target="rejected"/>
+          </state>
+          <final id="screened"/>
+          <transition event="done.state.screening" target="enriching"/>
+        </state>
+
+        <state id="enriching">
+          <onentry><send type="crm" event="lookup"><param name="customer" expr="customer"/></send></onentry>
+          <transition event="crm.lookup.done" target="intakeDone">
+            <assign location="tier" expr="_event.data.tier || tier"/>
+          </transition>
+          <transition event="crm.lookup.error" target="intakeDone"/>
+        </state>
+
+        <state id="invalid">
+          <transition target="rejected"/>
+        </state>
+
+        <final id="intakeDone"/>
+        <transition event="done.state.intake" target="paying"/>
+      </state>
+
+      <!-- ── payment: a child machine ─────────────────────────────────── -->
+      <state id="paying" initial="charging">
+        <invoke id="payment" src="fulfillment-payment.scxml">
+          <param name="orderId" expr="orderId"/>
+          <param name="amount" expr="amount"/>
+          <param name="currency" expr="currency"/>
+          <param name="tier" expr="tier"/>
+        </invoke>
+        <state id="charging">
+          <transition event="payment.challenge" target="challenged"/>
+          <transition event="payment.authorized" target="authorized"/>
+        </state>
+        <state id="challenged">
+          <transition event="payment.authorized" target="authorized"/>
+        </state>
+        <state id="authorized"/>
+        <transition event="payment.retrying payment.authorizing" type="internal">
+          <log label="payment" expr="_event.name + ' #' + _event.data.attempt"/>
+        </transition>
+        <transition event="done.invoke.payment" cond="_event.data &amp;&amp; _event.data.status === 'captured'" target="fulfilment">
+          <assign location="payment" expr="_event.data"/>
+        </transition>
+        <transition event="done.invoke.payment" target="paymentFailed"/>
+      </state>
+
+      <!-- ── fulfilment: pick & pack, ship, notify — in parallel ─────── -->
+      <parallel id="fulfilment">
+        <state id="picking" initial="reserving">
+          <state id="reserving">
+            <onentry><send type="warehouse" event="reserve"><param name="items" expr="items"/></send></onentry>
+            <transition event="warehouse.reserve.done" cond="_event.data.backorder" target="backordered"/>
+            <transition event="warehouse.reserve.done" target="pickingItems"/>
+            <transition event="warehouse.reserve.error" target="backordered"/>
+          </state>
+          <state id="backordered">
+            <onentry><send type="warehouse" event="restock"><param name="items" expr="items"/></send></onentry>
+            <transition event="warehouse.restock.done" target="reserving"/>
+          </state>
+          <state id="pickingItems" initial="locating">
+            <state id="locating">
+              <onentry><send type="warehouse" event="pick"><param name="orderId" expr="orderId"/></send></onentry>
+              <transition event="warehouse.pick.done" target="scanning"/>
+            </state>
+            <state id="scanning">
+              <onentry><send type="warehouse" event="scan"><param name="orderId" expr="orderId"/></send></onentry>
+              <transition event="warehouse.scan.done" target="picked"/>
+              <transition event="warehouse.scan.error" target="locating"/>
+            </state>
+            <final id="picked"/>
+            <transition event="done.state.pickingItems" target="packing"/>
+          </state>
+          <state id="packing">
+            <onentry><send type="warehouse" event="pack"><param name="orderId" expr="orderId"/></send></onentry>
+            <transition event="warehouse.pack.done" target="packed">
+              <assign location="parcel" expr="_event.data.parcel"/>
+            </transition>
+          </state>
+          <final id="packed"/>
+        </state>
+
+        <state id="shipping" initial="awaitingParcel">
+          <state id="awaitingParcel">
+            <transition cond="In('packed')" target="inTransit"/>
+          </state>
+          <state id="inTransit" initial="labelPending">
+            <invoke id="shipment" src="fulfillment-shipping.scxml">
+              <param name="orderId" expr="orderId"/>
+              <param name="address" expr="address"/>
+              <param name="parcel" expr="parcel"/>
+            </invoke>
+            <state id="labelPending">
+              <transition event="tracking.label_created" target="awaitingCollection">
+                <assign location="tracking" expr="{ number: _event.data.trackingNumber, status: 'label_created' }"/>
+              </transition>
+            </state>
+            <state id="awaitingCollection">
+              <transition event="tracking.picked_up" target="onTheWay"/>
+            </state>
+            <state id="onTheWay">
+              <transition event="tracking.exception" target="deliveryIssue"/>
+            </state>
+            <state id="deliveryIssue">
+              <transition event="tracking.update" cond="_event.data.status === 'in_transit'" target="onTheWay"/>
+            </state>
+            <transition event="tracking.update tracking.out_for_delivery" type="internal">
+              <assign location="tracking" expr="{ number: tracking &amp;&amp; tracking.number, status: _event.data &amp;&amp; _event.data.status || 'out_for_delivery' }"/>
+            </transition>
+            <transition event="done.invoke.shipment" cond="_event.data &amp;&amp; _event.data.status === 'delivered'" target="delivered"/>
+            <transition event="done.invoke.shipment" target="returned"/>
+          </state>
+          <final id="delivered"/>
+          <final id="returned"/>
+        </state>
+
+        <state id="notifications" initial="sendingConfirmation">
+          <state id="sendingConfirmation">
+            <onentry><send type="email" event="confirmation"><param name="orderId" expr="orderId"/><param name="to" expr="customer.email"/></send></onentry>
+            <transition event="email.confirmation.done" target="confirmed"/>
+            <transition event="email.confirmation.error" target="confirmed"/>
+          </state>
+          <state id="confirmed">
+            <transition cond="In('onTheWay') || In('deliveryIssue') || In('delivered')" target="notifyingShipped"/>
+            <transition cond="In('returned')" target="notified"/>
+          </state>
+          <state id="notifyingShipped">
+            <onentry><send type="email" event="shipped"><param name="orderId" expr="orderId"/><param name="tracking" expr="tracking"/></send></onentry>
+            <transition event="email.shipped.done email.shipped.error" target="shippedNotified"/>
+          </state>
+          <state id="shippedNotified">
+            <transition cond="In('delivered')" target="notifyingDelivered"/>
+            <transition cond="In('returned')" target="notified"/>
+          </state>
+          <state id="notifyingDelivered">
+            <onentry><send type="email" event="delivered"><param name="orderId" expr="orderId"/></send></onentry>
+            <transition event="email.delivered.done email.delivered.error" target="notified"/>
+          </state>
+          <final id="notified"/>
+        </state>
+
+        <transition event="done.state.fulfilment" cond="In('delivered')" target="completed"/>
+        <transition event="done.state.fulfilment" target="returnedToSender"/>
+      </parallel>
+    </state>
+
+    <!-- ── exceptions ────────────────────────────────────────────────── -->
+    <state id="onHold">
+      <onentry>
+        <log label="on hold" expr="holdReason"/>
+        <send type="email" event="onHold"><param name="orderId" expr="orderId"/><param name="reason" expr="holdReason"/></send>
+      </onentry>
+      <transition event="admin.release" target="resumePoint">
+        <assign location="holdReason" expr="null"/>
+      </transition>
+    </state>
+
+    <state id="cancelling" initial="checkingPayment">
+      <state id="checkingPayment">
+        <transition cond="payment == null" target="cancelled"/>
+        <transition target="refunding"/>
+      </state>
+      <state id="refunding">
+        <onentry><send type="payments" event="refund"><param name="orderId" expr="orderId"/><param name="amount" expr="amount"/></send></onentry>
+        <transition event="payments.refund.done" target="cancelled"/>
+        <transition event="payments.refund.error" target="refundFailed"/>
+      </state>
+      <state id="refundFailed">
+        <transition event="admin.refund.manual" target="cancelled"/>
+      </state>
+      <final id="cancelled"/>
+      <transition event="done.state.cancelling" target="closed">
+        <send type="email" event="cancelled"><param name="orderId" expr="orderId"/></send>
+      </transition>
+    </state>
+
+    <state id="paymentFailed">
+      <onentry><send type="email" event="paymentFailed"><param name="orderId" expr="orderId"/></send></onentry>
+      <transition event="customer.payment.retry" target="paying"/>
+      <transition event="email.paymentFailed.done" target="closed"/>
+    </state>
+
+    <state id="rejected">
+      <onentry><send type="email" event="rejected"><param name="orderId" expr="orderId"/></send></onentry>
+      <transition event="email.rejected.done email.rejected.error" target="closed"/>
+    </state>
+
+    <state id="returnedToSender">
+      <onentry><send type="payments" event="refund"><param name="orderId" expr="orderId"/><param name="amount" expr="amount"/></send></onentry>
+      <transition event="payments.refund.done payments.refund.error" target="closed"/>
+    </state>
+  </state>
+
+  <final id="completed">
+    <onentry><log label="order completed" expr="orderId"/></onentry>
+  </final>
+  <final id="closed">
+    <onentry><log label="order closed" expr="orderId"/></onentry>
+  </final>
+</scxml>

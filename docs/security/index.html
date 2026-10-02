@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security · scxmljs</title>
+<meta name="description" content="Email dario.hamidi@gmail.com with &quot;scxmljs security&quot; in the subject. Please don't open a public issue. Include what you found, how to reproduce it, and the version. You'll get an answer within a…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/security/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Security · scxmljs">
+<meta property="og:description" content="Email dario.hamidi@gmail.com with &quot;scxmljs security&quot; in the subject. Please don't open a public issue. Include what you found, how to reproduce it, and the version. You'll get an answer within a…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/security/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/" aria-current="page">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="security">Security</h1>
+<h2 id="reporting-a-vulnerability">Reporting a vulnerability<a class="anchor" href="#reporting-a-vulnerability" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Email <strong><a href="mailto:dario.hamidi@gmail.com">dario.hamidi@gmail.com</a></strong> with &quot;scxmljs security&quot; in the subject. Please don&#39;t open a
+public issue. Include what you found, how to reproduce it, and the version. You&#39;ll get an answer
+within a week. There is no bug bounty.</p>
+<h2 id="supported-versions">Supported versions<a class="anchor" href="#supported-versions" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Until 1.0, only the latest <code>0.x</code> release gets fixes. A fix is released as a new version; older
+versions aren&#39;t patched.</p>
+<h2 id="what-the-sandbox-protects">What the sandbox protects<a class="anchor" href="#what-the-sandbox-protects" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The default entry point, <code>@tinyactors/scxmljs</code>, runs each session&#39;s ECMAScript (<code>&lt;script&gt;</code>,
+<code>expr</code>, <code>cond</code>, <code>&lt;assign&gt;</code>…) in its own <a href="https://bellard.org/quickjs/">QuickJS</a> context, inside
+WebAssembly. It is meant for charts you don&#39;t trust: written, pasted or uploaded by users.</p>
+<p>A chart&#39;s code <strong>can&#39;t</strong>:</p>
+<ul>
+<li>read or change the page, its DOM, cookies, storage, or JavaScript globals;</li>
+<li>make network requests, or reach any host API: the context has only the standard ECMAScript
+built-ins, the SCXML system variables and <code>In()</code>;</li>
+<li>see other sessions&#39; data, including its own invoked children and its parent;</li>
+<li>run forever: each evaluation is interrupted after <code>scriptTimeoutMs</code> (default 2000 ms) and fails
+with <code>error.execution</code>;</li>
+<li>use unlimited memory: each context is capped at <code>memoryLimitBytes</code> (default 64 MiB); allocations
+beyond it fail with <code>error.execution</code>.</li>
+</ul>
+<p>Values cross the boundary as copies. Event data and <code>&lt;data&gt;</code> values are plain data; functions
+never leave the sandbox.</p>
+<p>What the sandbox <strong>doesn&#39;t</strong> protect against, because the chart&#39;s <em>structure</em> is trusted input to
+the interpreter even when its code isn&#39;t:</p>
+<ul>
+<li><strong>Events and sends.</strong> A chart can <code>&lt;send&gt;</code> events to anything the session can reach: its parent,
+its children, and every I/O processor you configured. Your I/O processors and invokers are
+the chart&#39;s capabilities; give untrusted charts only the ones they should have, and validate
+what they receive.</li>
+<li><strong>Loading.</strong> <code>&lt;script src&gt;</code>, <code>&lt;data src&gt;</code> and <code>&lt;invoke src&gt;</code> go through the session&#39;s <code>loader</code>.
+<code>&lt;scxml-view&gt;</code>&#39;s default loader fetches any URL relative to the chart. Pass your own loader to
+restrict it.</li>
+<li><strong>Busy loops across steps.</strong> <code>scriptTimeoutMs</code> limits one evaluation, and <code>maxMicrosteps</code>
+(default 100 000) one macrostep. A chart can still keep a session busy with a stream of
+delayed events. Dispose sessions you no longer want.</li>
+<li><strong>Denial of service by size.</strong> Parsing and compiling a huge document takes time and memory
+before any limit applies. Limit the size of charts you accept.</li>
+<li><strong>Rendering.</strong> The elements show state ids, event names and log values as text, never as HTML.
+They are still text chosen by the chart author.</li>
+</ul>
+<p>QuickJS vulnerabilities are ours to handle: the package pins the QuickJS build it ships, and a
+security fix in QuickJS or in quickjs-emscripten will be released as a new version of this
+package. Report them to us as well as upstream.</p>
+<h3 id="setting-the-limits">Setting the limits<a class="anchor" href="#setting-the-limits" aria-label="Link to this section" data-pagefind-ignore>#</a></h3>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(untrustedSource, {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  scriptTimeoutMs: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">500</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// per evaluation</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  memoryLimitBytes: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">16</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> *</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 1024</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> *</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 1024</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// per session</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  maxMicrosteps: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">10_000</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// per macrostep</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  ioprocessors: [], </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// no capabilities beyond the built-in SCXML processor</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  loader</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">: () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">    throw</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Error</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"loading is disabled"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  },</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">declare</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> untrustedSource</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span></code></pre><p>For <code>&lt;scxml-view&gt;</code>, set the same options through its <code>options</code> property.</p>
+<h2 id="the-trusted-entry-point-is-not-a-sandbox">The trusted entry point is not a sandbox<a class="anchor" href="#the-trusted-entry-point-is-not-a-sandbox" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p><code>@tinyactors/scxmljs/trusted</code> runs chart code in the host&#39;s own JavaScript engine. It separates
+sessions&#39; global variables, but it is <strong>not a security boundary</strong>:</p>
+<ul>
+<li><strong>In browsers</strong>, each session evaluates code in a hidden, <em>same-origin</em> iframe. The chart&#39;s code
+can reach <code>parent</code>, and with it your page, its DOM, cookies and storage.</li>
+<li><strong>In Node and Bun</strong>, each session uses a <code>node:vm</code> context. <code>node:vm</code> is not a security
+mechanism; code can escape it and reach the process.</li>
+<li><strong>No interruption.</strong> A <code>while (true) {}</code> in a chart hangs the page or the server;
+<code>scriptTimeoutMs</code> and <code>memoryLimitBytes</code> don&#39;t apply.</li>
+<li><strong>CSP.</strong> It needs <code>&#39;unsafe-eval&#39;</code> in <code>script-src</code> (the sandbox only needs
+<code>&#39;wasm-unsafe-eval&#39;</code>), and it doesn&#39;t work with Trusted Types. See
+<a href="/docs/csp/">docs/csp.md</a>.</li>
+</ul>
+<p>Use it only for charts you wrote or reviewed, like any other script you ship. <code>&lt;scxml-view&gt;</code> uses
+the sandbox unless you add the <code>trusted</code> attribute.</p>
+<p>More: <a href="/docs/sandboxed-vs-trusted/">sandboxed or trusted</a>, <a href="/docs/csp/">Content-Security-Policy</a>.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/csp/"><small>Previous</small>Content-Security-Policy</a>
+  <a class="next" href="/docs/conformance/"><small>Next</small>Conformance</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#reporting-a-vulnerability">Reporting a vulnerability</a></li>
+    <li class="depth-2"><a href="#supported-versions">Supported versions</a></li>
+    <li class="depth-2"><a href="#what-the-sandbox-protects">What the sandbox protects</a></li>
+    <li class="depth-3"><a href="#setting-the-limits">Setting the limits</a></li>
+    <li class="depth-2"><a href="#the-trusted-entry-point-is-not-a-sandbox">The trusted entry point is not a sandbox</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/SECURITY.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

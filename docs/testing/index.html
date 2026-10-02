@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testing charts · scxmljs</title>
+<meta name="description" content="Charts are easy to test: give the session a VirtualClock, send events, move time, and check the configuration and the data. Nothing waits for real time, and the same test always gives the same…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/testing/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Testing charts · scxmljs">
+<meta property="og:description" content="Charts are easy to test: give the session a VirtualClock, send events, move time, and check the configuration and the data. Nothing waits for real time, and the same test always gives the same…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/testing/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/" aria-current="page">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="testing-charts">Testing charts</h1>
+<p>Charts are easy to test: give the session a <code>VirtualClock</code>, send events, move time, and check the
+configuration and the data. Nothing waits for real time, and the same test always gives the same
+result. The examples use <code>bun test</code>; any test runner works.</p>
+<h2 id="a-chart">A chart<a class="anchor" href="#a-chart" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { expect, test } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "bun:test"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { readFile } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "node:fs/promises"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession, VirtualClock } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> source</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> readFile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"traffic-light.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"utf8"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">async</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> function</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">() {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> clock</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> VirtualClock</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(source, { clock, domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">() });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  return</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { clock, session };</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">test</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"cycles red → green → yellow → red and counts the cycles"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">async</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">clock</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">activeStateIds</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">()).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toEqual</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">([</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"on"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"red"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">]);</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">advance</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">3000</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">isActive</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"green"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toBe</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">true</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">advance</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">4000</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">isActive</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"red"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toBe</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">true</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">snapshot</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">()).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toEqual</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ cycles: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">1</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">test</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"power.off ends the chart at any time, with the count as donedata"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">async</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">clock</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">session</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">advance</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">3500</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// in green</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">send</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"power.off"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">run</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session.status).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toBe</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"done"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.done).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toEqual</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ cycles: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">0</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span></code></pre><p>What the clock does:</p>
+<ul>
+<li><code>clock.run()</code> runs everything that&#39;s queued now (such as events you sent), then every timer, in
+time order, until nothing is left. Charts whose timers re-arm themselves never run out, so give
+those a limit: <code>clock.run(until)</code> stops at the absolute time <code>until</code>.</li>
+<li><code>clock.advance(ms)</code> moves time forward by <code>ms</code>, running everything that falls due on the way.</li>
+<li><code>clock.runNext()</code> runs exactly one task, for checking what happens in between.</li>
+<li><code>clock.now()</code>, <code>clock.pending</code> and <code>clock.nextTimerAt</code> show where things stand.</li>
+</ul>
+<p>With a <code>VirtualClock</code>, <code>send()</code> only queues the event: it&#39;s processed at the next <code>run()</code>,
+<code>advance()</code> or <code>runNext()</code>.</p>
+<p><code>session.snapshot()</code> returns the values of every <code>&lt;data&gt;</code> element as plain data, from either data
+model. Create a fresh session per test; always <code>dispose()</code> it (a sandboxed session holds a QuickJS
+context).</p>
+<h2 id="waiting-for-a-state">Waiting for a state<a class="anchor" href="#waiting-for-a-state" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p><code>session.waitFor()</code> resolves when a state is active, or all of several are, or a predicate holds.
+It&#39;s convenient when the test doesn&#39;t control time, for example with real I/O:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">waitFor</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"saved"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, { timeoutMs: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">5000</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> }); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// rejects with a TimeoutError, or when the chart ends first</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">waitFor</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">([</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"playing"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"muted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">]); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// all of them</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">waitFor</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">((</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">s</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> s.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">isActive</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"done"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">||</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> s.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">isActive</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"failed"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">));</span></span></code></pre><p><code>timeoutMs</code> is measured on the session&#39;s clock. <code>session.steps()</code> is an async iterator over
+macrosteps, for asserting on the whole sequence:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> seen</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">[][] </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> [];</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">for</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> step</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> of</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">steps</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">()) seen.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">push</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(step.configuration.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">map</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">((</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">s</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> s.id));</span></span></code></pre><h2 id="both-data-models">Both data models<a class="anchor" href="#both-data-models" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The two entry points behave the same, and your tests can check that your chart does too: run the
+same test against both.</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { describe } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "bun:test"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> *</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> as</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> sandboxed </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> *</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> as</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> trusted </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/trusted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">for</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> [</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> }] </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">of</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> [[</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"sandboxed"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, sandboxed], [</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"trusted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, trusted]] </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">as</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) {</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  describe</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(name, () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">    // …the tests above, using this createSession</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">}</span></span></code></pre><h2 id="ui-that-drives-a-chart">UI that drives a chart<a class="anchor" href="#ui-that-drives-a-chart" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Page code that uses <code>bind()</code> or <code>connect()</code> can be tested in happy-dom, with no browser:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { expect, test } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "bun:test"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { readFile } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "node:fs/promises"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { bind, createSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">test</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"the login form signs in"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">async</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> window</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> document</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> window.document;</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  document.body.innerHTML </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `</span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">    &#x3C;form data-scxml-send="login">&#x3C;input name="user" value="ada">&#x3C;button>Log in&#x3C;/button>&#x3C;/form></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">    &#x3C;button id="logout" data-scxml-send="logout">Log out&#x3C;/button>`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> readFile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"login.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"utf8"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), { domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> window.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">() });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  bind</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session, document </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">as</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> unknown</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> as</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657"> Document</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, { reflectEnabled: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">true</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> });</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> logout</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> document.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">querySelector</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"#logout"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(logout.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">hasAttribute</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"data-scxml-enabled"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toBe</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">false</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  document.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">querySelector</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"button"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">!</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">click</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// submits the form</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">settled</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">isActive</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"signed-in"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toBe</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">true</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">snapshot</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">()).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toEqual</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ user: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"ada"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> });</span></span>
+<span class="line"><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">  expect</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(logout.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">hasAttribute</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"data-scxml-enabled"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toBe</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">true</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span></code></pre><p>(The cast is needed because happy-dom&#39;s types differ slightly from the DOM&#39;s.)</p>
+<h2 id="the-elements">The elements<a class="anchor" href="#the-elements" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p><code>&lt;scxml-view&gt;</code> and <code>&lt;scxml-explorer&gt;</code> work in happy-dom too. A custom element can only be
+registered once per process, so install happy-dom&#39;s globals (<code>window</code>, <code>document</code>,
+<code>HTMLElement</code>, <code>customElements</code>, <code>CSSStyleSheet</code>…) once, before importing the element module, and
+keep all tests for one element in one file. For layout and visual checks, use a real browser.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/playback/"><small>Previous</small>Playback and stepping</a>
+  <a class="next" href="/docs/view/"><small>Next</small>&lt;scxml-view&gt;</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#a-chart">A chart</a></li>
+    <li class="depth-2"><a href="#waiting-for-a-state">Waiting for a state</a></li>
+    <li class="depth-2"><a href="#both-data-models">Both data models</a></li>
+    <li class="depth-2"><a href="#ui-that-drives-a-chart">UI that drives a chart</a></li>
+    <li class="depth-2"><a href="#the-elements">The elements</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/testing.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

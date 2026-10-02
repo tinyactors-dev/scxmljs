@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sandboxed or trusted · scxmljs</title>
+<meta name="description" content="SCXML charts contain ECMAScript: &lt;script&gt;, expr, cond, &lt;assign&gt; and so on. The package has two entry points that differ only in where that code runs. Their APIs are identical, and both pass the…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/sandboxed-vs-trusted/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Sandboxed or trusted · scxmljs">
+<meta property="og:description" content="SCXML charts contain ECMAScript: &lt;script&gt;, expr, cond, &lt;assign&gt; and so on. The package has two entry points that differ only in where that code runs. Their APIs are identical, and both pass the…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/sandboxed-vs-trusted/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/" aria-current="page">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="sandboxed-or-trusted">Sandboxed or trusted</h1>
+<p>SCXML charts contain ECMAScript: <code>&lt;script&gt;</code>, <code>expr</code>, <code>cond</code>, <code>&lt;assign&gt;</code> and so on. The package has
+two entry points that differ only in <em>where</em> that code runs. Their APIs are identical, and both
+pass the same W3C conformance suite (<a href="/docs/conformance/">report</a>).</p>
+<table>
+<thead>
+<tr>
+<td></td>
+<th><code>@tinyactors/scxmljs</code> (sandboxed)</th>
+<th><code>@tinyactors/scxmljs/trusted</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Engine</td>
+<td><a href="https://bellard.org/quickjs/">QuickJS</a> compiled to WebAssembly, one context per session</td>
+<td>the host&#39;s own engine: a hidden same-origin <code>&lt;iframe&gt;</code> per session in browsers, a <code>node:vm</code> context in Node and Bun</td>
+</tr>
+<tr>
+<td>Browser download</td>
+<td>20 KB gzip, plus 290 KB of QuickJS loaded on demand</td>
+<td>17 KB gzip</td>
+</tr>
+<tr>
+<td>Chart can reach the page</td>
+<td>no</td>
+<td><strong>yes</strong>: the iframe&#39;s <code>parent</code> is your page</td>
+</tr>
+<tr>
+<td>Runaway scripts</td>
+<td>interrupted after <code>scriptTimeoutMs</code> (default 2 s)</td>
+<td>not interruptible: the page hangs</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>capped per session by <code>memoryLimitBytes</code> (default 64 MiB)</td>
+<td>shared with the page</td>
+</tr>
+<tr>
+<td>Content-Security-Policy</td>
+<td>needs <code>&#39;wasm-unsafe-eval&#39;</code></td>
+<td>needs <code>&#39;unsafe-eval&#39;</code></td>
+</tr>
+<tr>
+<td>Startup</td>
+<td><code>createSession</code> loads QuickJS once (about 15 ms)</td>
+<td>synchronous</td>
+</tr>
+<tr>
+<td>XML data values</td>
+<td>a small DOM inside the sandbox</td>
+<td>real DOM nodes</td>
+</tr>
+</tbody></table>
+<p>Measurements are in <a href="/docs/measurements/">measurements</a>; security details are in
+<a href="/docs/security/">SECURITY.md</a>.</p>
+<h2 id="which-one-to-use">Which one to use<a class="anchor" href="#which-one-to-use" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<ul>
+<li>A chart that <strong>someone else</strong> wrote, pasted or uploaded: <strong>sandboxed</strong>. Its code can&#39;t read your
+page, cookies or other sessions, and a <code>while (true) {}</code> can&#39;t freeze the tab.</li>
+<li>A chart that <strong>you</strong> wrote and ship with your app: <strong>trusted</strong> is fine, and saves the
+WebAssembly download. It isn&#39;t a security boundary: treat the chart like any other script in
+your bundle.</li>
+</ul>
+<p>Both keep sessions apart from each other: each session has its own global scope, so <code>&lt;script&gt;</code>
+declarations persist across evaluations and two sessions (including invoked children) never share
+variables. System variables such as <code>_sessionid</code> and <code>_event</code> are read-only in both.</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> chart</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">script</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `</span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">  &#x3C;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">    &#x3C;state id="s">&#x3C;onentry>&#x3C;script>${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">script</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}&#x3C;/script>&#x3C;/onentry>&#x3C;/state></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">  &#x3C;/scxml>`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// Each session has its own global scope …</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> a</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">chart</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"var secret = 42;"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), { domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">() });</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> b</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">chart</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"var seen = typeof secret;"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), { domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">() });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">a.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">b.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(b.datamodel.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">evaluate</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"seen"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">));</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// … and in the sandbox, a runaway script is interrupted instead of hanging the page.</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> c</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">chart</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"while (true) {}"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), { domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(), scriptTimeoutMs: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">100</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> });</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">c.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">addEventListener</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"error"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, (</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">e</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(e.kind));</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">c.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">for</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> s</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> of</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> [a, b, c]) s.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span></code></pre><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>undefined</span></span>
+<span class="line"><span>error.execution</span></span></code></pre><h2 id="using-both">Using both<a class="anchor" href="#using-both" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The two entry points can be used in the same app. Sessions from either one are <code>SCXMLSession</code>s,
+so code that works with sessions (and both elements) doesn&#39;t care which engine runs them:</p>
+<ul>
+<li><code>&lt;scxml-explorer&gt;</code> shows sessions from either entry point and never loads an engine itself.</li>
+<li><code>&lt;scxml-view&gt;</code> creates its own session when it loads a chart. It uses the sandbox unless it has
+the <code>trusted</code> attribute, and loads that engine on demand. Given your own session through its
+<code>session</code> property, it loads nothing.</li>
+</ul>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { SCXMLSession } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">as</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> sandboxed } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">as</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> trusted } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/trusted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">async</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> function</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> open</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">source</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> string</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">fromUser</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> boolean</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657"> Promise</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#953800;--shiki-dark:#FFA657">SCXMLSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">> {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  return</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> fromUser </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">?</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> sandboxed</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(source) </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">:</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> trusted</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(source);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">}</span></span></code></pre><p>Import only what you use: importing even one value from <code>@tinyactors/scxmljs</code> puts its (small)
+loader in your bundle, and QuickJS is fetched the first time a sandboxed session is created.</p>
+<h2 id="limits">Limits<a class="anchor" href="#limits" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>These <code>SessionOptions</code> apply to the sandbox:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<td></td>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>scriptTimeoutMs</code></td>
+<td>2000</td>
+<td>maximum run time of one evaluation (a <code>&lt;script&gt;</code>, one <code>expr</code>…); it then fails with <code>error.execution</code></td>
+</tr>
+<tr>
+<td><code>memoryLimitBytes</code></td>
+<td>64 MiB</td>
+<td>memory of the session&#39;s QuickJS context; allocations beyond it fail with <code>error.execution</code></td>
+</tr>
+</tbody></table>
+<p>This one applies to both:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<td></td>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>maxMicrosteps</code></td>
+<td>100 000</td>
+<td>microsteps in one macrostep before the session stops with <code>error.platform</code> (an eventless loop)</td>
+</tr>
+</tbody></table>
+<h2 id="how-each-engine-works">How each engine works<a class="anchor" href="#how-each-engine-works" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p><strong>Sandboxed.</strong> Each session gets its own QuickJS context inside one shared WebAssembly module.
+Values cross the boundary as copies (plain data; functions stay inside). Evaluations run under an
+interrupt handler that enforces the timeout, and the context has its own memory limit.</p>
+<p><strong>Trusted.</strong> In browsers, each session creates a hidden, same-origin <code>&lt;iframe&gt;</code> and evaluates the
+chart&#39;s code with that iframe&#39;s own <code>eval</code>, so the chart gets a fresh global object. In Node and
+Bun, each session gets a <code>node:vm</code> context. Values are copied at the boundary too, so a chart can&#39;t
+change your objects through event data. But the iframe is same-origin: the chart&#39;s code can reach
+<code>parent</code>, and nothing can interrupt a loop.</p>
+<p>Both engines share one implementation of the SCXML data-model rules, so behaviour matches. The
+remaining differences are listed in <a href="/docs/deviations/">deviations</a>.</p>
+<h2 id="advanced-another-engine">Advanced: another engine<a class="anchor" href="#advanced-another-engine" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p><code>SessionOptions.datamodel</code> takes a <code>DataModelFactory</code>, which creates a <code>DataModel</code> per session.
+Both entry points set it for you. Implementing your own is possible (the interface is exported),
+but you then own the SCXML data-model semantics that the conformance suite checks.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/getting-started/"><small>Previous</small>Getting started</a>
+  <a class="next" href="/docs/driving-charts/"><small>Next</small>Driving charts from the page</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#which-one-to-use">Which one to use</a></li>
+    <li class="depth-2"><a href="#using-both">Using both</a></li>
+    <li class="depth-2"><a href="#limits">Limits</a></li>
+    <li class="depth-2"><a href="#how-each-engine-works">How each engine works</a></li>
+    <li class="depth-2"><a href="#advanced-another-engine">Advanced: another engine</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/sandboxed-vs-trusted.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

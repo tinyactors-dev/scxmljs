@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playback and stepping · scxmljs</title>
+<meta name="description" content="Every session takes its time from a clock: when delayed &lt;send&gt;s fire, and when queued events are processed. Pick the clock when you create the session:">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/playback/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Playback and stepping · scxmljs">
+<meta property="og:description" content="Every session takes its time from a clock: when delayed &lt;send&gt;s fire, and when queued events are processed. Pick the clock when you create the session:">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/playback/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/" aria-current="page">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="playback-and-stepping">Playback and stepping</h1>
+<p>Every session takes its time from a <em>clock</em>: when delayed <code>&lt;send&gt;</code>s fire, and when queued events
+are processed. Pick the clock when you create the session:</p>
+<table>
+<thead>
+<tr>
+<th>Clock</th>
+<th>Time</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>realClock</code> (default)</td>
+<td>real time</td>
+<td>production</td>
+</tr>
+<tr>
+<td><code>VirtualClock</code></td>
+<td>moves only when you call <code>run()</code>, <code>advance()</code> or <code>runNext()</code></td>
+<td>tests, simulations; see <a href="/docs/testing/">testing</a></td>
+</tr>
+<tr>
+<td><code>PlaybackClock</code></td>
+<td>a <code>VirtualClock</code> that real time drives, at an adjustable speed; can be paused and stepped</td>
+<td>demos, debugging, teaching</td>
+</tr>
+</tbody></table>
+<h2 id="playbackclock"><code>PlaybackClock</code><a class="anchor" href="#playbackclock" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { PlaybackClock } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> clock</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> PlaybackClock</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ speed: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">0.5</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, playing: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">false</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> }); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// defaults: speed 1, playing</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">play</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// real time drives the clock, at `speed` virtual ms per real ms</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">pause</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// nothing happens until play() or step()</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">toggle</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">clock.speed </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 4</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// four times as fast; 0 stops time without pausing</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">step</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// pause, then run exactly one task (jumping to the next timer if nothing is due)</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> unsubscribe</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">subscribe</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(() </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> {</span></span>
+<span class="line"><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">  // after every tick, play/pause, speed change and step, and whenever work is queued</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// pause and drop every subscriber</span></span></code></pre><p><code>step(until)</code> runs tasks one at a time until <code>until()</code> returns true or nothing is left. A task is
+one piece of the session&#39;s work, such as processing one queued event or firing one timer. To step
+from one stable configuration to the next, count macrosteps:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { readFile } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "node:fs/promises"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { createSession, PlaybackClock } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/trusted"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { Window } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "happy-dom"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> Window</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> clock</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> PlaybackClock</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ playing: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">false</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> });</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> session</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> readFile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"traffic-light.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"utf8"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">), {</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  clock,</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  domParser: </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(),</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">});</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">let</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> steps </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 0</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">addEventListener</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"macrostep"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> steps</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">++</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">start</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">`${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">clock</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">now</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">()</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">} ms: ${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">activeStateIds</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">().</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">join</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">" "</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">)</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">for</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">let</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> i </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 0</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; i </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">&#x3C;</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> 3</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">; i</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">++</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">) {</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> before</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> steps;</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">step</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(() </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> steps </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> before); </span><span style="--shiki-light:#57606a;--shiki-dark:#8B949E">// run until the next macrostep</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">`${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">clock</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">now</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">()</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">} ms: ${</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">activeStateIds</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">().</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">join</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">" "</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">)</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">}`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">}</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">session.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">clock.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">dispose</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">();</span></span></code></pre><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>0 ms: on red</span></span>
+<span class="line"><span>3000 ms: on green</span></span>
+<span class="line"><span>6000 ms: on yellow</span></span>
+<span class="line"><span>7000 ms: on red</span></span></code></pre><p>Stepping jumps over idle time: the timers fire at 3, 6 and 7 seconds of virtual time, but the
+three steps take no real time at all.</p>
+<p>While playing, the clock advances at most 250 ms of real time per frame. A tab that was in the
+background doesn&#39;t fast-forward through minutes of timers when it comes back.</p>
+<h2 id="in-the-elements">In the elements<a class="anchor" href="#in-the-elements" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Both elements show playback controls when the session&#39;s clock is a <code>PlaybackClock</code>: play/pause,
+step, speeds from ¼× to 4×, and the virtual time. Their Step button does exactly what the example
+above does: it runs until the next macrostep. Space plays and pauses, and <code>.</code> steps.</p>
+<ul>
+<li><code>&lt;scxml-view&gt;</code>: set its <code>clock</code> property; the element creates the session with it.</li>
+<li><code>&lt;scxml-explorer&gt;</code>: create the session with the clock and pass both to <code>attach()</code>.</li>
+</ul>
+<p>Everything that should pause with the chart must use the same clock: invokers, I/O processors
+that simulate a backend, fake environments. Take time from <code>clock.setTimeout()</code> instead of the
+global <code>setTimeout()</code>, as the <a href="/docs/invokers/#example-a-countdown">countdown invoker</a> does.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/driving-charts/"><small>Previous</small>Driving charts from the page</a>
+  <a class="next" href="/docs/testing/"><small>Next</small>Testing charts</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#playbackclock">PlaybackClock</a></li>
+    <li class="depth-2"><a href="#in-the-elements">In the elements</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/playback.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

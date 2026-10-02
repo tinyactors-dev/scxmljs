@@ -1,0 +1,49 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="downloads" initial="idle">
+  <!-- A download manager: each download is an invoked child machine that reports progress to its
+       parent (#_parent) and finishes with done.invoke. Cancelling leaves the state, which cancels
+       the child. Try: start, then cancel; or start and wait. -->
+  <datamodel>
+    <data id="progress" expr="0"/>
+    <data id="finished" expr="0"/>
+  </datamodel>
+  <state id="idle">
+    <transition event="start" target="downloading"/>
+  </state>
+  <state id="downloading">
+    <onentry><assign location="progress" expr="0"/></onentry>
+    <invoke id="download">
+      <param name="chunks" expr="5"/>
+      <content>
+        <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="download" initial="fetching">
+          <datamodel>
+            <data id="chunks" expr="3"/>
+            <data id="done" expr="0"/>
+          </datamodel>
+          <state id="fetching">
+            <onentry><send id="next" event="chunk" delay="600ms"/></onentry>
+            <onexit><cancel sendid="next"/></onexit>
+            <transition event="chunk" cond="done + 1 &lt; chunks" target="fetching">
+              <assign location="done" expr="done + 1"/>
+              <send target="#_parent" event="progress"><param name="percent" expr="Math.round(100 * done / chunks)"/></send>
+            </transition>
+            <transition event="chunk" target="complete"/>
+          </state>
+          <final id="complete">
+            <donedata><param name="bytes" expr="chunks * 65536"/></donedata>
+          </final>
+        </scxml>
+      </content>
+    </invoke>
+    <transition event="progress" type="internal">
+      <assign location="progress" expr="_event.data.percent"/>
+      <log label="progress" expr="progress + '%'"/>
+    </transition>
+    <transition event="done.invoke.download" target="idle">
+      <assign location="finished" expr="finished + 1"/>
+      <log label="downloaded" expr="_event.data.bytes + ' bytes'"/>
+    </transition>
+    <transition event="cancel" target="idle">
+      <log label="cancelled at" expr="progress + '%'"/>
+    </transition>
+  </state>
+</scxml>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pi Durable, as statecharts · scxmljs</title>
+<meta name="description" content="Earendil’s Pi Durable, section by section, as running statecharts: kill the process mid-run and watch every task continue from its checkpoint. Forks, subagents, hooks, compaction and multiplayer clients, simulated in your browser.">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/demos/pi-durable/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Pi Durable, as statecharts · scxmljs">
+<meta property="og:description" content="Earendil’s Pi Durable, section by section, as running statecharts: kill the process mid-run and watch every task continue from its checkpoint. Forks, subagents, hooks, compaction and multiplayer clients, simulated in your browser.">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/demos/pi-durable/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+<script type="module" src="/assets/pi-durable-tsw6nxam.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/">Docs</a>
+      <a href="/demos/" aria-current="page">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="chat-demo pd-demo">
+  <h1 class="page-title">Pi Durable, as statecharts</h1>
+  <p class="lede">A working model of <a href="https://earendil.com/posts/pi-durable/">Pi Durable</a>, Earendil’s durable agent harness, where every task is a statechart that commits each step to storage. Kill the process whenever you like: a new one continues every task from its checkpoint. Each chapter follows a section of the post; <span class="pd-cite-btn pd-cite-sample" aria-hidden="true">¶</span> opens the passage.</p>
+  <nav class="pd-chapters" aria-label="Chapters">
+    <ol>
+      <li><button type="button" data-chapter="harness" aria-pressed="false"><span class="pd-chapter-n">1</span> What is a harness?</button></li>
+      <li><button type="button" data-chapter="anywhere" aria-pressed="false"><span class="pd-chapter-n">2</span> Long runs anywhere</button></li>
+      <li><button type="button" data-chapter="crashes" aria-pressed="false"><span class="pd-chapter-n">3</span> Survives crashes</button></li>
+      <li><button type="button" data-chapter="conversations" aria-pressed="false"><span class="pd-chapter-n">4</span> Many conversations at once</button></li>
+      <li><button type="button" data-chapter="sections" aria-pressed="false"><span class="pd-chapter-n">5</span> System prompt sections</button></li>
+      <li><button type="button" data-chapter="tools" aria-pressed="false"><span class="pd-chapter-n">6</span> Tools</button></li>
+      <li><button type="button" data-chapter="hooks" aria-pressed="false"><span class="pd-chapter-n">7</span> Hooks</button></li>
+      <li><button type="button" data-chapter="tasks" aria-pressed="false"><span class="pd-chapter-n">8</span> Tasks</button></li>
+      <li><button type="button" data-chapter="compaction" aria-pressed="false"><span class="pd-chapter-n">9</span> Compaction</button></li>
+      <li><button type="button" data-chapter="documents" aria-pressed="false"><span class="pd-chapter-n">10</span> Durable application state</button></li>
+      <li><button type="button" data-chapter="malleable" aria-pressed="false"><span class="pd-chapter-n">11</span> Malleable</button></li>
+      <li><button type="button" data-chapter="multiplayer" aria-pressed="false"><span class="pd-chapter-n">12</span> Multiplayer</button></li>
+      <li><button type="button" data-chapter="" aria-pressed="false"><span class="pd-chapter-n">∞</span> Free play</button></li>
+    </ol>
+  </nav>
+  <div class="chat-toolbar pd-toolbar">
+    <div class="chat-playback" role="group" aria-label="Playback">
+      <button id="pd-play" type="button" class="chat-play" aria-label="Play"></button>
+      <fieldset class="chat-speed">
+        <legend class="visually-hidden">Speed</legend>
+        <label><input type="radio" name="pd-speed" value="0.25"><span>¼×</span></label><label><input type="radio" name="pd-speed" value="0.5"><span>½×</span></label><label><input type="radio" name="pd-speed" value="1"><span>1×</span></label><label><input type="radio" name="pd-speed" value="2"><span>2×</span></label><label><input type="radio" name="pd-speed" value="4"><span>4×</span></label>
+      </fieldset>
+      <label class="chat-speed-compact"><span class="visually-hidden">Speed</span><select id="pd-speed-select"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+      <button id="pd-step" type="button" class="chat-step" aria-label="Step"><span class="chat-step-label">Step</span></button>
+      <span class="chat-time" id="pd-time" aria-label="Simulated time">0.0 s</span>
+    </div>
+    <div class="pd-process-controls" role="group" aria-label="Process">
+      <span class="pd-process-status" id="pd-process-status" aria-live="polite"></span>
+      <button id="pd-kill" type="button" class="pd-kill">Kill process</button>
+      <button id="pd-start" type="button" class="chat-primary">Start process</button>
+    </div>
+  </div>
+  <div class="pd-story">
+    <header class="pd-chapter-head">
+      <h2 id="pd-chapter-title">Free play</h2>
+      <span id="pd-chapter-cite"></span>
+      <button id="pd-replay" type="button" class="chat-quiet pd-mini">Restart chapter</button>
+      <p id="pd-chapter-blurb" class="pd-small"></p>
+    </header>
+    <div class="pd-caption-row">
+      <p class="chat-caption pd-caption" id="pd-caption" aria-live="polite"></p>
+      <button id="pd-chart-hint" type="button" class="pd-mini" hidden></button>
+      <button id="pd-next" type="button" class="chat-primary" hidden>Next</button>
+    </div>
+  </div>
+  <div class="pd-main" id="pd-main" data-panel="process">
+    <section class="pd-stage" aria-labelledby="pd-clients-title">
+      <h2 id="pd-clients-title" class="visually-hidden">Clients</h2>
+      <div class="pd-clients" id="pd-clients"></div>
+      <button id="pd-add-client" type="button" class="pd-add-client" title="Another person on another machine, attached to the same harness">+ Add a client</button>
+    </section>
+  </div>
+  <section class="pd-inspector" id="pd-inspector" aria-labelledby="pd-inspector-title" hidden>
+    <div class="pd-inspector-bar">
+      <button id="pd-back" type="button" class="chat-primary">← Back to the simulation</button>
+      <h2 id="pd-inspector-title">Statechart</h2>
+      <label class="pd-small" for="pd-session">Session</label>
+      <select id="pd-session"></select>
+      <span class="pd-small">The simulation keeps running; Esc goes back.</span>
+    </div>
+    <scxml-explorer></scxml-explorer>
+  </section>
+  <p class="pd-small pd-footer">The charts, the harness model and the tour are in <a href="https://github.com/tinyactors-dev/scxmljs/tree/main/examples/pi-durable">examples/pi-durable</a>; Pi Durable itself is in <a href="https://github.com/earendil-works/pi/tree/main/packages/durable">earendil-works/pi</a>. Built with <a href="/docs/explorer/"><code>&lt;scxml-explorer&gt;</code></a>, a <a href="/docs/playback/"><code>PlaybackClock</code></a>, <a href="/docs/io-processors/">custom I/O processors</a> and <a href="/docs/invokers/">invokers</a>.</p>
+  <aside class="pd-sidebar" id="pd-sidebar" data-open="true" aria-label="Inside the harness">
+    <div class="pd-sidebar-resize" id="pd-sidebar-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize the sidebar" aria-valuemin="300" aria-valuemax="760" aria-valuenow="440"></div>
+    <div class="pd-sidebar-head">
+      <div role="tablist" aria-label="Inside the harness" aria-orientation="horizontal">
+        <button type="button" role="tab" id="pd-tab-process" data-panel="process" aria-selected="true" aria-controls="pd-process-panel" title="Process: memory, lost when it dies"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg><span class="pd-tab-label">Process</span></button>
+        <button type="button" role="tab" id="pd-tab-storage" data-panel="storage" aria-selected="false" aria-controls="pd-storage-panel" title="Storage: survives the process"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg><span class="pd-tab-label">Storage</span></button>
+      </div>
+      <button type="button" id="pd-side-toggle" class="pd-side-toggle" aria-expanded="true" aria-controls="pd-side-body" aria-label="Collapse the sidebar">»</button>
+    </div>
+    <div class="pd-side-body" id="pd-side-body">
+      <section id="pd-process-panel" role="tabpanel" aria-labelledby="pd-tab-process">
+        <p class="pd-side-note"><button type="button" class="pd-cite-btn" popovertarget="cite-harness" aria-label="From the post: What is a harness?" title="From the post: What is a harness?"><span aria-hidden="true">¶</span></button> The process: everything in memory. Lost when it dies.</p>
+        <div id="pd-process"></div>
+      </section>
+      <section id="pd-storage-panel" role="tabpanel" aria-labelledby="pd-tab-storage" hidden>
+        <p class="pd-side-note"><button type="button" class="pd-cite-btn" popovertarget="cite-anywhere" aria-label="From the post: Long runs anywhere" title="From the post: Long runs anywhere"><span aria-hidden="true">¶</span></button> The storage: survives the process.</p>
+        <div id="pd-storage"></div>
+      </section>
+    </div>
+  </aside>
+  <div popover id="cite-harness" class="pd-cite" role="dialog" aria-label="From the post: What is a harness?">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>What is a harness?</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20harness%20is%20storage%20plus%20the,environments%20the%20tools%20run%20in." target="_blank" rel="noopener" title="Read it in the post">A harness is storage plus the machinery needed to run one or more conversations with large language models in parallel. It provides the tools those models call, and the execution environments the tools run in.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Everything%20the%20harness%20runs%2C%20from%20calling,a%20tool%2C%20is%20a%20task." target="_blank" rel="noopener" title="Read it in the post">Everything the harness runs, from calling the model to executing a tool, is a task.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-harness" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-anywhere" class="pd-cite" role="dialog" aria-label="From the post: Long runs anywhere">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Long runs anywhere</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=In%20Pi%20Durable%2C%20a%20harness%20opens%20over%20a%20storage%20backend." target="_blank" rel="noopener" title="Read it in the post">In Pi Durable, a harness opens over a storage backend.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=One%20process%20owns%20a%20storage%20at,clients%20attach%20to%20that%20process." target="_blank" rel="noopener" title="Read it in the post">One process owns a storage at a time, and other clients attach to that process.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Your%20env%20function%20builds%20the%20environment,run%20in%20a%20different%20place." target="_blank" rel="noopener" title="Read it in the post">Your env function builds the environment for every tool call, from the conversation's working directory, so each conversation can run in a different place.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-anywhere" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-crashes" class="pd-cite" role="dialog" aria-label="From the post: Survives crashes">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Survives crashes</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=In%20Pi%20Durable%2C%20every%20step%20of,one%20from%20its%20last%20checkpoint." target="_blank" rel="noopener" title="Read it in the post">In Pi Durable, every step of a run is a task that stores a checkpoint before it moves on. If the process dies, a new process opens the same storage, finds the unfinished tasks, and continues each one from its last checkpoint.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20model%20request%20that%20was%20cut,is%20told%20it%20was%20interrupted." target="_blank" rel="noopener" title="Read it in the post">A model request that was cut off is sent again; the partial answer stays in the transcript, marked as aborted. A tool call that was cut off reruns if it is safe to; otherwise the model is told it was interrupted.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Queued%20messages%20are%20still%20queued.%20A,back%20instead%20of%20asking%20twice." target="_blank" rel="noopener" title="Read it in the post">Queued messages are still queued. A requestId makes a submission exactly-once, so a client that retries after a crash gets the original submission back instead of asking twice.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-crashes" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-conversations" class="pd-cite" role="dialog" aria-label="From the post: Many conversations at once">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Many conversations at once</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20conversation%20starts%20fresh%20or%20forks,that%20point%20without%20copying%20it." target="_blank" rel="noopener" title="Read it in the post">A conversation starts fresh or forks another one at any point in its transcript, and sees the parent's history up to that point without copying it.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20reviewer%20next%20to%20the%20main,tools%2C%20and%20its%20own%20checkout." target="_blank" rel="noopener" title="Read it in the post">A reviewer next to the main agent can use a cheaper model, read-only tools, and its own checkout.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-conversations" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-sections" class="pd-cite" role="dialog" aria-label="From the post: Extensions › System prompt sections">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Extensions › System prompt sections</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=The%20system%20prompt%20is%20rebuilt%20from,exactly%20what%20the%20model%20saw." target="_blank" rel="noopener" title="Read it in the post">The system prompt is rebuilt from the sections of the conversation's extensions before every request, so a changed section is picked up by the next request. Pi Durable records what changed in the transcript, at the position where it changed, so a restart or a fork sees exactly what the model saw.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-sections" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-tools" class="pd-cite" role="dialog" aria-label="From the post: Extensions › Tools">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Extensions › Tools</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Every%20tool%20call%20runs%20as%20its,it%20says%20that%20is%20safe." target="_blank" rel="noopener" title="Read it in the post">Every tool call runs as its own durable task, and its intent is stored before it runs. After a crash, a tool reruns only if it says that is safe.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20tool%20creates%20a%20conversation%20it,and%20waits%20for%20its%20answer." target="_blank" rel="noopener" title="Read it in the post">A tool creates a conversation it owns, gives it a smaller model and its own instructions, and waits for its answer.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20tool%20with%20the%20same%20name,the%20wrapping%20extension%20is%20selected." target="_blank" rel="noopener" title="Read it in the post">A tool with the same name in a later extension replaces the earlier one, for example a bash that runs inside a Python virtualenv. A wrap decorates whichever tool won, wherever the wrapping extension is selected.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-tools" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-hooks" class="pd-cite" role="dialog" aria-label="From the post: Extensions › Hooks">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Extensions › Hooks</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20hook%20can%20run%20again%20after,where%20the%20first%20write%20wins." target="_blank" rel="noopener" title="Read it in the post">A hook can run again after a crash, so a hook that makes a decision stores it in a memo: a small value stored with the task, where the first write wins.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Their%20hooks%20run%20as%20a%20chain%2C,defines%20how%20its%20chain%20runs." target="_blank" rel="noopener" title="Read it in the post">Their hooks run as a chain, in the order the conversation selects the extensions, and each hook defines how its chain runs.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-hooks" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-tasks" class="pd-cite" role="dialog" aria-label="From the post: Extensions › Tasks">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Extensions › Tasks</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20checkout%20that%20splits%20the%20bill,are%20aborted%20and%20refund%20themselves" target="_blank" rel="noopener" title="Read it in the post">A checkout that splits the bill across several cards charges every card at once. If one card is declined, the other payments are aborted and refund themselves<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Tasks%20and%20conversations%20form%20one%20ownership,work%20it%20owns%20has%20finished." target="_blank" rel="noopener" title="Read it in the post">Tasks and conversations form one ownership tree. Aborting a task aborts what it owns, bottom-up, so every task cleans up its own effects first, and a task only finishes once the work it owns has finished.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20background%20task%20belongs%20to%20the,and%20everything%20it%20owns%20alone." target="_blank" rel="noopener" title="Read it in the post">A background task belongs to the conversation, but not to its current work. The conversation goes idle while it runs, and an ordinary abort leaves it and everything it owns alone.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-tasks" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-compaction" class="pd-cite" role="dialog" aria-label="From the post: Compaction">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Compaction</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=When%20the%20context%20gets%20close%20to,request%20would%20not%20fit%20otherwise." target="_blank" rel="noopener" title="Read it in the post">When the context gets close to the model's limit, a background compaction summarizes the older messages, and the summary is placed at the next turn boundary. The conversation only waits for a summary when the next request would not fit otherwise.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Because%20nothing%20is%20deleted%2C%20a%20second,search%20everything%20before%20the%20handoff." target="_blank" rel="noopener" title="Read it in the post">Because nothing is deleted, a second tool can still search everything before the handoff.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-compaction" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-documents" class="pd-cite" role="dialog" aria-label="From the post: Durable application state">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Durable application state</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Documents%20are%20typed%20JSON%20stored%20next,value%2C%20or%20a%20fresh%20one." target="_blank" rel="noopener" title="Read it in the post">Documents are typed JSON stored next to the transcript and changed in the same atomic commits, so the state never disagrees with the transcript that produced it. Each document says what a fork starts with: the parent's value at the fork point, its current value, or a fresh one.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-documents" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-malleable" class="pd-cite" role="dialog" aria-label="From the post: Malleable">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Malleable</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Installing%20an%20extension%20under%20a%20name,call%20uses%20the%20new%20code." target="_blank" rel="noopener" title="Read it in the post">Installing an extension under a name that is already installed replaces it in one step. A tool call that is already running finishes on the code it started with; the next call uses the new code.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Conversations%20store%20extension%20and%20tool%20names%2C,whatever%20the%20new%20process%20installs." target="_blank" rel="noopener" title="Read it in the post">Conversations store extension and tool names, never code, so after a restart they pick up whatever the new process installs.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-malleable" popovertargetaction="hide">Close</button>
+  </div>
+  <div popover id="cite-multiplayer" class="pd-cite" role="dialog" aria-label="From the post: Multiplayer">
+    <p class="pd-cite-head">From <a href="https://earendil.com/posts/pi-durable/">“Pi Durable”</a> · <strong>Multiplayer</strong></p>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=A%20client%20gets%20the%20current%20view,it%20only%20gets%20what%20changes." target="_blank" rel="noopener" title="Read it in the post">A client gets the current view first: the transcript, the answer being streamed, running tools and their output, queued messages, the agent, and usage. After that it only gets what changes.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <a class="pd-quote" href="https://earendil.com/posts/pi-durable/#:~:text=Any%20client%20can%20steer%20a%20running,conversation%20or%20queue%20a%20follow%2Dup." target="_blank" rel="noopener" title="Read it in the post">Any client can steer a running conversation or queue a follow-up.<span class="pd-quote-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></span><span class="visually-hidden"> (opens the post)</span></a>
+    <button type="button" class="chat-quiet pd-cite-close" popovertarget="cite-multiplayer" popovertargetaction="hide">Close</button>
+  </div>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

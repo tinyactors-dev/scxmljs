@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chart gallery · scxmljs</title>
+<meta name="description" content="Classic statecharts drawn and run by &lt;scxml-view&gt;: parallel regions, history, delayed events and guards.">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/demos/gallery/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Chart gallery · scxmljs">
+<meta property="og:description" content="Classic statecharts drawn and run by &lt;scxml-view&gt;: parallel regions, history, delayed events and guards.">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/demos/gallery/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+<script type="module" src="/assets/gallery-sdfr1cvk.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/">Docs</a>
+      <a href="/demos/" aria-current="page">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="wrap">
+  <h1 class="page-title">Chart gallery</h1>
+  <p class="lede">Each chart is a <code>&lt;scxml-view src="…"&gt;</code> with a <code>PlaybackClock</code>. Click a transition label to send its event; play, pause and step with the controls.</p>
+  <div class="gallery">
+    <figure class="card">
+      <scxml-view trusted fit src="/charts/traffic-light.scxml" data-gallery aria-label="Traffic light statechart"></scxml-view>
+      <figcaption><h2>Traffic light</h2><p>Delayed &lt;send&gt;s drive the cycle; &lt;cancel&gt; on exit, and a counter in the datamodel. <a href="/charts/traffic-light.scxml">Source</a> · <a href="/playground/?example=traffic-light">Open in playground</a></p></figcaption>
+    </figure>
+    <figure class="card">
+      <scxml-view trusted fit src="/charts/microwave.scxml" data-gallery aria-label="Microwave statechart"></scxml-view>
+      <figcaption><h2>Microwave</h2><p>Two parallel regions, engine and door, coordinated with In(). It only cooks with the door closed. <a href="/charts/microwave.scxml">Source</a> · <a href="/playground/?example=microwave">Open in playground</a></p></figcaption>
+    </figure>
+    <figure class="card">
+      <scxml-view trusted fit src="/charts/player.scxml" data-gallery aria-label="Media player statechart"></scxml-view>
+      <figcaption><h2>Media player</h2><p>A &lt;parallel&gt; transport and sound, and a &lt;history&gt; that remembers whether it was muted. <a href="/charts/player.scxml">Source</a> · <a href="/playground/?example=player">Open in playground</a></p></figcaption>
+    </figure>
+    <figure class="card">
+      <scxml-view trusted fit src="/charts/login.scxml" event-data="{&quot;login&quot;:{&quot;user&quot;:&quot;ada&quot;}}" data-gallery aria-label="Sign in statechart"></scxml-view>
+      <figcaption><h2>Sign in</h2><p>Guards on event data and &lt;assign&gt;: the smallest useful chart. Clicking login sends {user: 'ada'} (set with the event-data attribute). <a href="/charts/login.scxml">Source</a> · <a href="/playground/?example=login">Open in playground</a></p></figcaption>
+    </figure>
+  </div>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

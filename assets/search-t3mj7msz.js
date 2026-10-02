@@ -1,0 +1,1 @@
+var t=new PagefindUI({element:"#search",showSubResults:!0,showImages:!1,resetStyles:!1,autofocus:!0});document.querySelector("#search input")?.setAttribute("aria-label","Search the documentation");var e=new URLSearchParams(location.search).get("q");if(e)t.triggerSearch(e);

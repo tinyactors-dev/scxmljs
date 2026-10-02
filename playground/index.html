@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playground · scxmljs</title>
+<meta name="description" content="Edit an SCXML statechart and watch it re-run as you type, in the sandboxed engine: live diagram and explorer, diagnostics, playback controls and share links.">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/playground/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Playground · scxmljs">
+<meta property="og:description" content="Edit an SCXML statechart and watch it re-run as you type, in the sandboxed engine: live diagram and explorer, diagnostics, playback controls and share links.">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/playground/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+<script type="module" src="/assets/playground-j4cnpbpn.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/" aria-current="page">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="playground" id="playground" data-tab="view">
+  <div class="pg-intro" data-pagefind-body>
+    <h1 class="page-title">Playground</h1>
+    <p class="lede">Pick an example, edit its SCXML, and it re-runs as you type. Charts run in the <a href="/docs/sandboxed-vs-trusted/">sandboxed engine</a>: they can't touch this page or the network, and runaway scripts are stopped. Click a transition to send its event, or use the form below the diagram. New to SCXML? Start with <a href="/docs/getting-started/">getting started</a>.</p>
+  </div>
+  <div class="pg-bar">
+    <label class="pg-picker">Example <select id="pg-example"><option value="traffic-light">Traffic light</option><option value="microwave">Microwave</option><option value="player">Media player</option><option value="login">Sign in</option><option value="downloads">Downloads (invoke)</option><option value="gatekeeper">GitHub gatekeeper</option><option value="fulfillment">Order fulfilment</option><option value="blank">Blank chart</option></select></label>
+    <span class="pg-about" id="pg-about">Delayed &lt;send&gt;s drive the cycle and &lt;cancel&gt; cleans up on exit.</span>
+    <span class="pg-actions">
+      <button class="button" id="pg-reset" type="button">Reset</button>
+      <button class="button" id="pg-download" type="button">Download</button>
+      <button class="button primary" id="pg-share" type="button">Share link</button>
+    </span>
+  </div>
+  <p class="pg-status" id="pg-status" role="status" aria-live="polite">Loading…</p>
+  <div class="pg-notice notice" id="pg-notice" hidden></div>
+  <div class="pg-tabs" role="tablist" aria-label="Playground panels">
+    <button type="button" role="tab" data-pg-tab="edit" aria-selected="false" aria-controls="pg-panel-edit">Edit</button>
+    <button type="button" role="tab" data-pg-tab="view" aria-selected="true" aria-controls="pg-panel-run">Diagram</button>
+    <button type="button" role="tab" data-pg-tab="explore" aria-selected="false" aria-controls="pg-panel-run">Explorer</button>
+  </div>
+  <div class="pg-grid">
+    <section class="pg-edit" id="pg-panel-edit" aria-label="Editor">
+      <div class="pg-editor card" id="pg-editor"><p class="pg-loading">Loading the editor…</p></div>
+      <details class="pg-problems-box" open>
+        <summary>Problems: <span id="pg-problem-count">none</span></summary>
+        <ul class="pg-problems" id="pg-problems"></ul>
+      </details>
+    </section>
+    <section class="pg-run" id="pg-panel-run" aria-label="Running chart">
+      <div class="pg-stage card">
+        <scxml-view class="pg-view" id="pg-view" direction="auto" fit aria-label="The chart, running"></scxml-view>
+        <scxml-explorer class="pg-explorer" id="pg-explorer" aria-label="The chart in the explorer"></scxml-explorer>
+      </div>
+      <form class="pg-send" id="pg-send" aria-label="Send an event">
+        <label>Event <input id="pg-send-name" name="event" required placeholder="e.g. go" autocomplete="off" spellcheck="false"></label>
+        <label>Data <input id="pg-send-data" name="data" placeholder='JSON, e.g. {"user": "ada"}' autocomplete="off" spellcheck="false"></label>
+        <button class="button" type="submit">Send</button>
+        <div class="pg-suggestions" id="pg-suggestions" aria-label="Suggested events"></div>
+      </form>
+      <div class="pg-log-box">
+        <div class="pg-log-head"><h2>Log</h2><button class="button" id="pg-log-clear" type="button">Clear</button></div>
+        <ol class="pg-log" id="pg-log" aria-label="Log: <log> output, errors and steps"></ol>
+      </div>
+    </section>
+  </div>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

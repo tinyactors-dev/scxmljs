@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Large charts · scxmljs</title>
+<meta name="description" content="Charts grow: a support desk with a few hundred states, a generated chart with thousands, a root machine that invokes a dozen others. Both the interpreter and the elements are built for that.…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/large-charts/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Large charts · scxmljs">
+<meta property="og:description" content="Charts grow: a support desk with a few hundred states, a generated chart with thousands, a root machine that invokes a dozen others. Both the interpreter and the elements are built for that.…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/large-charts/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/" aria-current="page">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="large-charts">Large charts</h1>
+<p>Charts grow: a support desk with a few hundred states, a generated chart with thousands, a root
+machine that invokes a dozen others. Both the interpreter and the elements are built for that.
+Numbers are from <a href="/docs/measurements/">measurements</a> (Apple M4 Max, Chrome 154).</p>
+<h2 id="the-interpreter">The interpreter<a class="anchor" href="#the-interpreter" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Compiling is linear in the size of the chart: about 3 ms for 1 000 states and 23 ms for 5 000
+(Bun), plus the time your DOMParser needs. A running session costs about 110–170 KB for a small
+chart; a system of 15 machines with 330 states costs about 3 MB. Sessions don&#39;t leak: create,
+run and dispose them as often as you like.</p>
+<ul>
+<li><strong>Share the model.</strong> <code>compile()</code> once, then pass the <code>Model</code> to <code>createSession()</code> for each
+session. A model is read-only and can be shared by any number of sessions.</li>
+<li><strong>Dispose.</strong> A sandboxed session holds a QuickJS context until <code>dispose()</code>.</li>
+<li><strong>Runaway loops.</strong> <code>maxMicrosteps</code> (default 100 000) stops a session whose eventless
+transitions never settle, with <code>error.platform</code>, instead of freezing the page.</li>
+</ul>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { compile, createSession, parseSCXML } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> model</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> compile</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">parseSCXML</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">await</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> fetch</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"support-desk.scxml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">)).</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">text</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">()));</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> sessions</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> await</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> Promise</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">all</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(Array.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">from</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">({ length: </span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">100</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> }, () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> createSession</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(model)));</span></span></code></pre><h2 id="which-element">Which element<a class="anchor" href="#which-element" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<table>
+<thead>
+<tr>
+<td></td>
+<th><code>&lt;scxml-view&gt;</code></th>
+<th><code>&lt;scxml-explorer&gt;</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Shows</td>
+<td>the whole chart at once</td>
+<td>one level at a time, plus a tree</td>
+</tr>
+<tr>
+<td>Comfortable up to</td>
+<td>about 150 boxes; bigger charts are folded</td>
+<td>thousands of states (measured with 5 000)</td>
+</tr>
+<tr>
+<td>Several machines</td>
+<td>the root machine only</td>
+<td>every machine and service, and the messages between them</td>
+</tr>
+<tr>
+<td>Needs your JavaScript</td>
+<td>no</td>
+<td>yes: you create the session</td>
+</tr>
+</tbody></table>
+<p>Use <code>&lt;scxml-view&gt;</code> to show a chart. Use <code>&lt;scxml-explorer&gt;</code> to understand a big system, or to
+operate it.</p>
+<h2 id="folds"><code>&lt;scxml-view&gt;</code> folds<a class="anchor" href="#folds" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>When a chart has more boxes than <code>max-states</code> (default 150), the view folds the largest compound
+states into single boxes until it fits. It chooses the folds around the states that are active
+when the chart loads, so they stay visible. When the machine later moves into a folded state, the
+folded box is highlighted as active. A notice says how many states are folded,
+with <strong>Expand all</strong>; each folded box has <strong>Expand</strong>, and each expanded one <strong>Collapse</strong>.</p>
+<p>A 1 000-state chart draws 137 boxes and renders in about 45 ms from a running session, or 58 ms
+from text (including parsing, compiling and loading the engine).</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> src</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"player.scxml"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> max-states</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"6"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> fit</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-view</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span></code></pre><p>Raise <code>max-states</code> to fold less (the layout slows down with the number of boxes); lower it for a
+compact overview. <code>fit</code> scales the drawing down to the element&#39;s width instead of scrolling.</p>
+<h2 id="stays-small"><code>&lt;scxml-explorer&gt;</code> stays small<a class="anchor" href="#stays-small" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The explorer never draws more than one level of the chart:</p>
+<ul>
+<li>The tree is windowed: only the rows in view are in the DOM (about 30), so scrolling through
+5 000 states stays at one frame per scroll step. It has a search field and an &quot;active only&quot;
+filter.</li>
+<li>The focus shows one compound state&#39;s children. With more than 9 children, or with crowded
+transitions, it switches from a diagram to a list; parallel states show their regions as lanes.</li>
+<li>Long lists (accepted events, transitions, machines) are grouped, filterable, and cut off with
+&quot;+N more&quot;.</li>
+</ul>
+<p>First render of a 5 000-state chart takes about 10 ms.</p>
+<h2 id="many-machines">Many machines<a class="anchor" href="#many-machines" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>A root session that invokes others is a <em>system</em>. The explorer&#39;s System level shows every
+machine, including ones that already finished, and every I/O processor, with links that light up
+while messages flow. Selecting a machine opens it at the Machine level. <code>SystemTracker</code>, from
+<code>@tinyactors/scxmljs/explorer</code>, gives you the same information for your own UI (see
+<a href="/docs/custom-ui/#build-your-own-explorer">custom UI</a>).</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/frameworks/"><small>Previous</small>Frameworks</a>
+  <a class="next" href="/docs/io-processors/"><small>Next</small>Custom I/O processors</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#the-interpreter">The interpreter</a></li>
+    <li class="depth-2"><a href="#which-element">Which element</a></li>
+    <li class="depth-2"><a href="#folds">&lt;scxml-view&gt; folds</a></li>
+    <li class="depth-2"><a href="#stays-small">&lt;scxml-explorer&gt; stays small</a></li>
+    <li class="depth-2"><a href="#many-machines">Many machines</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/large-charts.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

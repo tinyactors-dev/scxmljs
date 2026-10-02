@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM chat demo · scxmljs</title>
+<meta name="description" content="A group chat with a language model, run by statecharts: streaming, parallel tool calls from several clients, queueing, steering and stopping. Simulated in your browser, or Claude with your own key.">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/demos/llm-chat/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="LLM chat demo · scxmljs">
+<meta property="og:description" content="A group chat with a language model, run by statecharts: streaming, parallel tool calls from several clients, queueing, steering and stopping. Simulated in your browser, or Claude with your own key.">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/demos/llm-chat/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-57zc30g8.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://api.anthropic.com https://registry.wasmer.io https://cdn.wasmer.io">
+<script>window.coi = { coepCredentialless: () => false, quiet: true };</script>
+<script src="/demos/llm-chat/coi-serviceworker.js"></script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+<script type="module" src="/assets/llm-chat-s0v50bfj.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/">Docs</a>
+      <a href="/demos/" aria-current="page">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="chat-demo" data-view="chat">
+  <h1 class="page-title">LLM chat</h1>
+  <p class="lede">A group chat with a language model where statecharts make every decision: who may type, when a message waits, where a steer goes, which client runs which tool. It all runs in this tab, simulated, on one clock you can slow down, pause and step.</p>
+  <div class="chat-toolbar">
+    <div class="chat-playback" role="group" aria-label="Playback">
+      <button id="chat-play" type="button" class="chat-play" aria-label="Pause"></button>
+      <fieldset class="chat-speed">
+        <legend class="visually-hidden">Speed</legend>
+        <label><input type="radio" name="chat-speed" value="0.25"><span>¼×</span></label><label><input type="radio" name="chat-speed" value="0.5"><span>½×</span></label><label><input type="radio" name="chat-speed" value="1"><span>1×</span></label><label><input type="radio" name="chat-speed" value="2"><span>2×</span></label><label><input type="radio" name="chat-speed" value="4"><span>4×</span></label>
+      </fieldset>
+      <label class="chat-speed-compact"><span class="visually-hidden">Speed</span><select id="chat-speed-select"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+      <button id="chat-step" type="button" class="chat-step" aria-label="Step"><span class="chat-step-label">Step</span></button>
+      <span class="chat-time" id="chat-time" aria-label="Simulated time">0.0 s</span>
+    </div>
+    <div class="chat-views" role="group" aria-label="Show">
+      <button type="button" data-view="chat" aria-pressed="true">Chat</button>
+      <button type="button" data-view="inside" aria-pressed="false">Inside</button>
+    </div>
+    <div class="chat-dl" id="chat-dl" hidden>
+      <button type="button" class="chat-dl-toggle" id="chat-dl-toggle" aria-expanded="false" aria-controls="chat-dl-list">
+        <span class="chat-dl-text" id="chat-dl-text"></span>
+        <progress class="chat-dl-bar" id="chat-dl-bar" max="100" aria-label="All downloads"></progress>
+      </button>
+      <ul class="chat-dl-list" id="chat-dl-list" hidden></ul>
+    </div>
+  </div>
+  <p class="chat-caption" id="chat-caption" aria-live="polite"></p>
+  <div class="chat-panes">
+    <section class="chat-pane" id="chat-pane-chat" aria-labelledby="chat-pane-chat-title">
+      <h2 class="visually-hidden" id="chat-pane-chat-title">Chat</h2>
+      <details class="chat-setup" id="chat-setup">
+        <summary>Scenario · add a client · reset</summary>
+        <div class="chat-setup-body">
+          <div class="chat-field">
+            <label class="chat-field-label" for="chat-scenario">Scenario</label>
+            <div class="chat-combo">
+              <select id="chat-scenario"><option value="">Free play</option></select>
+              <button id="chat-run" type="button" class="chat-primary">Run</button>
+            </div>
+          </div>
+          <div class="chat-field">
+            <label class="chat-field-label" for="chat-add">Add a client</label>
+            <div class="chat-combo">
+              <select id="chat-add"></select>
+              <button id="chat-add-button" type="button">Add</button>
+            </div>
+          </div>
+          <button id="chat-reset" type="button" class="chat-quiet">Reset</button>
+        </div>
+      </details>
+      <div class="chat-switcher" id="chat-switcher" role="group" aria-label="Clients"></div>
+      <div class="chat-clients" id="chat-clients"></div>
+    </section>
+    <section class="chat-pane chat-inspect" id="chat-pane-inside" aria-labelledby="chat-inspect-title">
+      <h2 id="chat-inspect-title">Inside</h2>
+      <div class="chat-inside-grid">
+        <section class="chat-host card" aria-labelledby="chat-host-title">
+          <h3 id="chat-host-title">Host</h3>
+          <div id="chat-host-body"></div>
+        </section>
+        <div class="chat-inside-main">
+          <div class="chat-field chat-chart-picker">
+            <label class="chat-field-label" for="chat-session">Chart</label>
+            <select id="chat-session"></select>
+            <span class="chat-small">One machine at a time; the playback controls drive the whole system.</span>
+          </div>
+          <scxml-explorer></scxml-explorer>
+          <div class="chat-timeline-head">
+            <h3>Timeline</h3>
+            <label><input type="checkbox" id="chat-batches"> show log batches</label>
+          </div>
+          <ol class="chat-timeline" id="chat-timeline" aria-label="Messages between the host and the clients"></ol>
+        </div>
+      </div>
+    </section>
+  </div>
+  <p>The charts, protocols and simulated model and tools are in <a href="https://github.com/tinyactors-dev/scxmljs/tree/main/examples/llm-chat">examples/llm-chat</a>. Built with <a href="/docs/explorer/"><code>&lt;scxml-explorer&gt;</code></a>, a <a href="/docs/playback/"><code>PlaybackClock</code></a>, <a href="/docs/io-processors/">custom I/O processors</a> and <a href="/docs/invokers/">invokers</a>.</p>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/2d475f3a26e9060fa71c52a4c4ee248f12691aeb">2d475f3</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

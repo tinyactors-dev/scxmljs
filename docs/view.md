@@ -152,7 +152,7 @@ own controls (see [driving charts](driving-charts.md)).
 
 Every state has a help button (a question mark) after its name. It opens a popover with the
 state's kind, its description and its transitions. The description is the XML comment right
-before the state, plus any comments at the start of its content:
+before the state:
 
 <!-- doctest: scxml -->
 ```xml
@@ -161,17 +161,17 @@ before the state, plus any comments at the start of its content:
   <state id="cart">
     <transition event="checkout" target="paying"/>
   </state>
+  <!-- ── paying: the card form, then the bank's answer ──── -->
   <state id="paying">
-    <!-- Taking the money: the card form, then the bank's answer. -->
     <transition event="paid" target="done"/>
   </state>
   <final id="done"/>
 </scxml>
 ```
 
-When comments open a compound state's content and a child state follows them directly, the last
-comment describes the child and the ones before it the parent. Separate paragraphs with a blank
-line.
+A comment documents the element after it, so comments inside a state describe its transitions
+or child states, not the state. Divider rules (`── … ────`, `=====`) are left out, and a blank
+line inside a comment starts a new paragraph.
 
 To describe states from code instead (or for charts you can't edit), set `descriptions`. It wins
 over the comments:

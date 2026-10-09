@@ -1,45 +1,48 @@
 /**
- * What a state is about, from the chart's own source: the XML comments that
- * document it. Pure DOM reading, no layout.
+ * What a state is about, from the chart's own source: the XML comments right
+ * before it (only whitespace in between). Pure DOM reading, no layout.
  *
  *   <!-- Waiting for the customer to pay. -->        ← describes "awaiting"
  *   <state id="awaiting">
- *     <!-- Times out after 15 minutes. -->            ← describes "awaiting" too
- *     <transition event="paid" target="shipping"/>
+ *     <!-- every reminder is logged -->               ← describes the transition, not "awaiting"
+ *     <transition event="remind" type="internal">…</transition>
  *   </state>
  *
- * Two places count:
- *   1. the comments right before the element (only whitespace in between);
- *   2. the comments at the very start of its content.
- * Where the two overlap — comments opening a state's content, directly
- * followed by a child state — the last comment documents the child and the
- * ones before it the parent.
+ * A comment documents the element after it, so comments inside a state are
+ * about its transitions or children. Section dividers lose their rules:
+ * `<!-- ── intake: validate, screen ──── -->` reads "intake: validate, screen".
  */
 import type { StateNode } from "../model.ts";
 
-const STATE_TAGS = new Set(["state", "parallel", "final", "history"]);
 const COMMENT = 8;
 const TEXT = 3;
-const ELEMENT = 1;
 
 const blank = (n: Node) => n.nodeType === TEXT && !(n.nodeValue ?? "").trim();
-const isState = (n: Node | null | undefined) => n?.nodeType === ELEMENT && STATE_TAGS.has((n as Element).localName);
+/** A run of rule characters, as in `<!-- ── section ───── -->` or `<!-- ===== -->`. */
+const RULE = "[\\-‐-―─━═~=*#_+]{2,}";
+const LEADING_RULE = new RegExp(`^\\s*${RULE}\\s*`);
+const TRAILING_RULE = new RegExp(`\\s*${RULE}\\s*$`);
 
 /** A state's documentation comments, dedented and joined by blank lines; `undefined` when it has none. */
 export function sourceDescription(state: StateNode): string | undefined {
   const el = state.element;
   if (!el || state.kind === "scxml") return undefined;
-  let before: string[] = [];
-  let n: Node | null = el.previousSibling;
-  for (; n && (n.nodeType === COMMENT || blank(n)); n = n.previousSibling) if (n.nodeType === COMMENT) before.unshift(n.nodeValue ?? "");
-  // the run opens a parent state's content: the parent keeps all but the last
-  if (!n && isState(el.parentNode)) before = before.slice(-1);
-  let inside: string[] = [];
-  for (n = el.firstChild; n && (n.nodeType === COMMENT || blank(n)); n = n.nextSibling)
-    if (n.nodeType === COMMENT) inside.push(n.nodeValue ?? "");
-  if (isState(n)) inside = inside.slice(0, -1);
-  const parts = [...before, ...inside].map(dedent).filter(Boolean);
+  const before: string[] = [];
+  for (let n = el.previousSibling; n && (n.nodeType === COMMENT || blank(n)); n = n.previousSibling)
+    if (n.nodeType === COMMENT) before.unshift(n.nodeValue ?? "");
+  const parts = before.map((c) => dedent(undecorate(c))).filter(Boolean);
   return parts.length ? parts.join("\n\n") : undefined;
+}
+
+/** Remove divider rules: lines that are only a rule, and rules around a line's text. */
+function undecorate(text: string): string {
+  return text
+    .split(/\r\n?|\n/)
+    .map((line) => {
+      const bare = line.replace(LEADING_RULE, (m) => m.replace(/\S/g, "")).replace(TRAILING_RULE, "");
+      return bare.trim() ? bare : "";
+    })
+    .join("\n");
 }
 
 /** Trim a comment and remove the indentation its lines share (a first line right after `<!--` doesn't count). */

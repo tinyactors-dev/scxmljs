@@ -398,12 +398,14 @@ describe("<scxml-view>", () => {
   const DOCUMENTED = `<scxml ${NS} name="shop" initial="cart">
     <!-- The customer is still choosing. -->
     <state id="cart"><transition event="checkout" target="pay"/></state>
+    <!--
+      Taking the money.
+        Retries twice.
+    -->
     <state id="pay" initial="card">
-      <!--
-        Taking the money.
-          Retries twice.
-      -->
-      <!-- the card form -->
+      <!-- ── accepted everywhere ─────────── -->
+      <transition event="cancel" target="cart"/>
+      <!-- ── card: the form ───────────────── -->
       <state id="card"><transition event="ok" target="done"/></state>
     </state>
     <parallel id="p"><state id="r1"/><state id="r2"/></parallel>
@@ -414,9 +416,9 @@ describe("<scxml-view>", () => {
     const { el, root } = await mount({ trusted: "" }, DOCUMENTED);
     for (const id of ["cart", "pay", "card", "p", "r1", "done"]) expect(box(root, id).querySelector("button.help")).toBeTruthy();
     expect(el.describe(el.model!.states.find((s) => s.id === "cart")!)).toBe("The customer is still choosing.");
-    // a comment before a child state documents the child, not the parent
+    // a comment documents the element after it (here a transition, not "pay"); dividers lose their rules
     expect(el.describe(el.model!.states.find((s) => s.id === "pay")!)).toBe("Taking the money.\n  Retries twice.");
-    expect(el.describe(el.model!.states.find((s) => s.id === "card")!)).toBe("the card form");
+    expect(el.describe(el.model!.states.find((s) => s.id === "card")!)).toBe("card: the form");
     expect(el.describe(el.model!.states.find((s) => s.id === "r1")!)).toBeUndefined();
 
     const help = box(root, "cart").querySelector<HTMLButtonElement>("button.help")!;
@@ -437,7 +439,7 @@ describe("<scxml-view>", () => {
     expect(pop.querySelector(".help-text")?.textContent).toBe("The first region.");
     el.descriptions = (s) => (s.id === "cart" ? "Overridden." : undefined);
     expect(el.describe(el.model!.states.find((s) => s.id === "cart")!)).toBe("Overridden.");
-    expect(el.describe(el.model!.states.find((s) => s.id === "card")!)).toBe("the card form");
+    expect(el.describe(el.model!.states.find((s) => s.id === "card")!)).toBe("card: the form");
     el.remove();
   });
 

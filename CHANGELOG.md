@@ -37,7 +37,7 @@ private `--x-*` properties are not public API and can change in any release.
 - `<scxml-view>`: every compound and parallel state folds and unfolds with a chevron before its
   name (before, only the containers folded for `max-states` could be unfolded and folded again).
 - `<scxml-view>`: every state has a help button that opens a popover with its kind, description
-  and transitions. Descriptions come from the XML comments that document the state, or from the
+  and transitions. Descriptions come from the XML comment right before the state, or from the
   new `descriptions` property; `describe(state)` returns the text, and `sourceDescription(state)`
   (exported from `/view`) reads the comments. New parts `help` and `help-popover`; new `strings`:
   `helpLabel`, `noDescription`, `helpTransitions`, `zoomIn`, `zoomOut`, `zoomReset`, `zoomLevel`,

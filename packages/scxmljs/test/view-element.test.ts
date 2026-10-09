@@ -388,6 +388,99 @@ describe("<scxml-view>", () => {
     right.el.remove();
     down.el.remove();
   });
+  test("layers run top to bottom by default", async () => {
+    const { el, root } = await mount({ trusted: "" }, LIGHT);
+    expect(el.direction).toBe("down");
+    expect(Number.parseFloat(box(root, "green").style.top)).toBeGreaterThan(Number.parseFloat(box(root, "red").style.top));
+    el.remove();
+  });
+
+  const DOCUMENTED = `<scxml ${NS} name="shop" initial="cart">
+    <!-- The customer is still choosing. -->
+    <state id="cart"><transition event="checkout" target="pay"/></state>
+    <state id="pay" initial="card">
+      <!--
+        Taking the money.
+          Retries twice.
+      -->
+      <!-- the card form -->
+      <state id="card"><transition event="ok" target="done"/></state>
+    </state>
+    <parallel id="p"><state id="r1"/><state id="r2"/></parallel>
+    <final id="done"/>
+  </scxml>`;
+
+  test("every state has a help button explaining it: XML comments, or the descriptions property", async () => {
+    const { el, root } = await mount({ trusted: "" }, DOCUMENTED);
+    for (const id of ["cart", "pay", "card", "p", "r1", "done"]) expect(box(root, id).querySelector("button.help")).toBeTruthy();
+    expect(el.describe(el.model!.states.find((s) => s.id === "cart")!)).toBe("The customer is still choosing.");
+    // a comment before a child state documents the child, not the parent
+    expect(el.describe(el.model!.states.find((s) => s.id === "pay")!)).toBe("Taking the money.\n  Retries twice.");
+    expect(el.describe(el.model!.states.find((s) => s.id === "card")!)).toBe("the card form");
+    expect(el.describe(el.model!.states.find((s) => s.id === "r1")!)).toBeUndefined();
+
+    const help = box(root, "cart").querySelector<HTMLButtonElement>("button.help")!;
+    expect(help.getAttribute("aria-label")).toBe("About cart");
+    help.click();
+    const pop = root.querySelector<HTMLElement>(".help-popover")!;
+    expect(pop.hidden).toBe(false);
+    expect(help.getAttribute("aria-expanded")).toBe("true");
+    expect(pop.querySelector(".help-text")?.textContent).toBe("The customer is still choosing.");
+    expect(pop.querySelector(".help-transitions")?.textContent).toBe("checkout → pay");
+    pop.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(pop.hidden).toBe(true);
+    expect(root.activeElement).toBe(help);
+
+    box(root, "r1").querySelector<HTMLButtonElement>("button.help")!.click();
+    expect(pop.querySelector(".help-none")).toBeTruthy();
+    el.descriptions = { r1: "The first region." };
+    expect(pop.querySelector(".help-text")?.textContent).toBe("The first region.");
+    el.descriptions = (s) => (s.id === "cart" ? "Overridden." : undefined);
+    expect(el.describe(el.model!.states.find((s) => s.id === "cart")!)).toBe("Overridden.");
+    expect(el.describe(el.model!.states.find((s) => s.id === "card")!)).toBe("the card form");
+    el.remove();
+  });
+
+  test("every compound and parallel state folds and unfolds", async () => {
+    const { el, root } = await mount({ trusted: "" }, DOCUMENTED);
+    expect(box(root, "cart").querySelector(".toggle")).toBeNull();
+    for (const id of ["pay", "p"]) {
+      const toggle = box(root, id).querySelector<HTMLButtonElement>(".toggle.collapse")!;
+      expect(toggle.getAttribute("aria-expanded")).toBe("true");
+      toggle.click();
+      expect(box(root, id).classList.contains("collapsed")).toBe(true);
+    }
+    expect(box(root, "card")).toBeNull();
+    expect(box(root, "pay").querySelector(".badge-count")?.textContent).toBe("1 state");
+    box(root, "pay").querySelector<HTMLButtonElement>(".toggle.expand")!.click();
+    expect(box(root, "card")).toBeTruthy();
+    expect(root.activeElement).toBe(box(root, "pay").querySelector(".toggle"));
+    // folding by hand isn't a "large chart": no notice
+    expect(root.querySelector<HTMLElement>(".notice")!.hidden).toBe(true);
+    el.remove();
+  });
+
+  test("zoom: toolbar, keys, and back to automatic", async () => {
+    const { el, root } = await mount({ trusted: "" }, LIGHT);
+    const diagram = root.querySelector<HTMLElement>(".diagram")!;
+    expect(root.querySelector<HTMLElement>(".zoom")!.hidden).toBe(false);
+    expect(el.zoom).toBe(1);
+    root.querySelector<HTMLButtonElement>(".zoom-in")!.click();
+    expect(el.zoom).toBe(1.25);
+    expect(diagram.style.transform).toBe("scale(1.25)");
+    expect(root.querySelector(".zoom-level")?.textContent).toBe("125%");
+    const canvas = root.querySelector<HTMLElement>(".canvas")!;
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "-", bubbles: true }));
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "-", bubbles: true }));
+    expect(el.zoom).toBe(0.8);
+    el.zoom = 100;
+    expect(el.zoom).toBe(4);
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "0", bubbles: true }));
+    expect(el.zoom).toBe(1);
+    expect(diagram.style.transform).toBe("");
+    el.remove();
+  });
+
   test("authoring warnings are listed above the diagram, focus their state, and can be hidden", async () => {
     const TRAP = `<scxml ${NS} name="trap"><parallel id="floor">
         <state id="assignment"><state id="none"/><state id="team"/><transition event="assign" target="team"/></state>

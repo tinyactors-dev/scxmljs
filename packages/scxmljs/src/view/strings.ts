@@ -35,6 +35,24 @@ export interface ViewStrings {
   expand: string;
   /** Button that folds an expanded container again. */
   collapse: string;
+  /** Accessible name of the help button on a state (`name` is the state's id or kind). */
+  helpLabel: (name: string) => string;
+  /** The help popover of a state with no description (no comments in the source, none set with `descriptions`). */
+  noDescription: string;
+  /** Heading of the list of a state's transitions in its help popover. */
+  helpTransitions: string;
+  /** Button that zooms in. */
+  zoomIn: string;
+  /** Button that zooms out. */
+  zoomOut: string;
+  /** Button that goes back to the automatic size (fitted to the element's width). */
+  zoomReset: string;
+  /** The zoom level readout, e.g. "80%"; it's a button that sets 100%. */
+  zoomLevel: (percent: number) => string;
+  /** Tooltip of the zoom readout. */
+  zoomActual: string;
+  /** Accessible name of the zoom toolbar (mentions the shortcuts). */
+  zoomToolbar: string;
   /** Notice when a large chart was folded to fit `max-states`. */
   foldedNotice: (hiddenStates: number, groups: number) => string;
   /** Button in the folded-chart notice that unfolds everything. */
@@ -97,6 +115,15 @@ export const defaultViewStrings: ViewStrings = {
   statesInside: (n) => `${n} ${plural.select(n) === "one" ? "state" : "states"}`,
   expand: "Expand",
   collapse: "Collapse",
+  helpLabel: (name) => `About ${name}`,
+  noDescription: "No description: document a state with an XML comment right before it, or set the view's descriptions property.",
+  helpTransitions: "Transitions",
+  zoomIn: "Zoom in (+)",
+  zoomOut: "Zoom out (−)",
+  zoomReset: "Fit to width (0)",
+  zoomLevel: (p) => `${p}%`,
+  zoomActual: "Actual size",
+  zoomToolbar: "Zoom: Ctrl or ⌘ + scroll wheel, pinch, or + and −; drag to pan",
   foldedNotice: (hidden, groups) =>
     `Large chart: ${hidden} ${plural.select(hidden) === "one" ? "state is" : "states are"} folded into ${groups} ${plural.select(groups) === "one" ? "group" : "groups"}. Expand a group to see inside, or explore the chart level by level with <scxml-explorer>.`,
   expandAll: "Expand all",

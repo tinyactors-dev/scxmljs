@@ -19,7 +19,7 @@
  *
  * Attributes: `src`, `trusted`, `autostart` ("false" = draw without running),
  * `interactive` ("false" = labels aren't buttons), `data` (JSON initial values
- * for `<data>`), `direction` ("auto" | "right" | "down"), `max-states` (fold
+ * for `<data>`), `direction` ("down" (default) | "right" | "auto"), `max-states` (fold
  * large charts beyond this many boxes, default 150), `announce`
  * ("all" | "sends" | "off"), `fit` (scale down to the element's width),
  * `warnings` ("off" hides the list of authoring warnings — see `model.warnings`),
@@ -30,7 +30,13 @@
  * starts and disposes nothing), `options` (extra SessionOptions for sessions
  * the element creates: I/O processors, invokers, loader…), `clock` (e.g. a
  * PlaybackClock: shows play / pause / step controls), `strings`, `source`
- * (SCXML text instead of `src`), `model`, and `reload()`.
+ * (SCXML text instead of `src`), `model`, `descriptions` (what each state is
+ * about, shown by its help button; XML comments in the source otherwise),
+ * `zoom`, and `reload()`.
+ *
+ * Navigation: the diagram zooms (the toolbar, Ctrl/⌘ + wheel, pinch, `+` `-`
+ * `0` while the canvas is focused) and pans (drag, or scroll); every compound
+ * and parallel state folds and unfolds with its chevron.
  *
  * Events (bubbling, composed): `scxml-load` { session, model },
  * `scxml-error` { message, problems?, error }, `scxml-send` { session, name }
@@ -40,8 +46,8 @@
  * `state` (+ `atomic` `compound` `parallel` `parallel-region` `final`
  * `history` `collapsed` `active`), `state-name`, `transition` / `edge-label`
  * (+ `live` `fired`), `event`, `cond`, `internal`, `edge` (+ `live` `fired`),
- * `initial`, `expand`, `collapse`, `notice`, `error`, `controls`, `play`,
- * `step`, `speeds`, `clock`, `warnings`, `warning`.
+ * `initial`, `expand`, `collapse`, `help`, `help-popover`, `zoom`, `notice`,
+ * `error`, `controls`, `play`, `step`, `speeds`, `clock`, `warnings`, `warning`.
  */
 import { type Clock, PlaybackClock } from "../clock.ts";
 import type { DataModelFactory } from "../datamodel-base.ts";
@@ -49,8 +55,9 @@ import { compile, isCompound, type Model, type StateNode, type TransitionNode } 
 import { parseSCXML, SCXMLSession, type SessionOptions } from "../session.ts";
 import type { MicrostepEvent } from "../session-events.ts";
 import { Announcer } from "../ui/announcer.ts";
-import { arrowMarker } from "../ui/svg.ts";
+import { arrowMarker, icon } from "../ui/svg.ts";
 import { lazySheet, NARROW_WIDTH, themeSheet } from "../ui/theme.ts";
+import { sourceDescription } from "./describe.ts";
 import { autoCollapse, type ChartLayout, type Direction, layoutChart, type Size } from "./layout.ts";
 import { defaultViewStrings, type ViewStateKind, type ViewStrings } from "./strings.ts";
 import { VIEW_CSS } from "./styles.ts";
@@ -85,9 +92,16 @@ export interface ViewSendDetail {
   data?: unknown;
 }
 
+/**
+ * What each state is about, for its help popover: an object from state ids to
+ * text, or a function of the state. Wins over the chart's XML comments;
+ * return `undefined` to fall back to them.
+ */
+export type ViewDescriptions = Record<string, string> | ((state: StateNode) => string | null | undefined);
+
 /** SessionOptions for sessions the element creates (its own clock comes from the `clock` property). */
 export type ViewOptions = Omit<SessionOptions, "clock">;
-/** Layout direction: layers left to right, top to bottom, or `auto` (down below the 760px breakpoint). */
+/** Layout direction: layers top to bottom (the default), left to right, or `auto` (right above the 760px breakpoint, down below it). */
 export type ViewDirection = Direction | "auto";
 /** What the live region announces: every step and sent event, only sent events, or nothing. */
 export type ViewAnnounce = "all" | "sends" | "off";
@@ -95,6 +109,11 @@ export type ViewAnnounce = "all" | "sends" | "off";
 const SCXML_MIME = "application/scxml+xml";
 /** Default floor for scaling a too-wide diagram down (without `fit`); see `--scxml-min-scale`. */
 const DEFAULT_MIN_SCALE = 0.65;
+const MIN_ZOOM = 0.15;
+const MAX_ZOOM = 4;
+const ZOOM_STEP = 1.25;
+/** The diagram's margin inside the canvas, px (see `.diagram` in styles.ts). */
+const MARGIN = 12;
 const FIRED_MS = 900;
 const DEFAULT_MAX_STATES = 150;
 const MAX_INTERNAL_SHOWN = 3;
@@ -148,6 +167,9 @@ export class ScxmlView extends ElementBase {
     canvas: HTMLElement;
     diagram: HTMLElement;
     live: HTMLElement;
+    zoom: HTMLElement;
+    zoomLevel: HTMLButtonElement;
+    help: HTMLElement;
   };
 
   // what's shown
@@ -158,6 +180,7 @@ export class ScxmlView extends ElementBase {
   #options: ViewOptions = {};
   #clock?: Clock;
   #strings: ViewStrings = defaultViewStrings;
+  #descriptions?: ViewDescriptions;
   #generation = 0;
   #loadQueued = false;
   #loadForced = false;
@@ -166,6 +189,8 @@ export class ScxmlView extends ElementBase {
   #layout?: ChartLayout;
   #direction: Direction = "right";
   #collapsed = new Set<StateNode>();
+  /** The folds made for `max-states` and not touched since: what the "large chart" notice is about. */
+  #autoFolded = new Set<StateNode>();
   #foldsFor?: Model;
   #boxes = new Map<StateNode, HTMLElement>();
   #labels = new Map<TransitionNode, HTMLElement[]>();
@@ -184,6 +209,11 @@ export class ScxmlView extends ElementBase {
   #raf = 0;
   #decayRaf = 0;
   #width = 0;
+
+  // navigation: an explicit zoom (null = automatic, see #applyFit) and the open help popover
+  #zoom: number | null = null;
+  #scale = 1;
+  #helpFor?: { state: StateNode; button: HTMLElement };
 
   constructor() {
     super();
@@ -227,10 +257,10 @@ export class ScxmlView extends ElementBase {
   set interactive(v: boolean) {
     this.setAttribute("interactive", String(v));
   }
-  /** "right" (layers left to right), "down", or "auto" (down when narrower than the shared breakpoint). */
+  /** "down" (layers top to bottom, the default), "right", or "auto" (down when narrower than the shared breakpoint, right otherwise). */
   get direction(): ViewDirection {
     const d = this.getAttribute("direction");
-    return d === "right" || d === "down" ? d : "auto";
+    return d === "right" || d === "auto" ? d : "down";
   }
   /** Sets the `direction` attribute (re-lays out). */
   set direction(v: ViewDirection) {
@@ -328,6 +358,32 @@ export class ScxmlView extends ElementBase {
   set strings(s: Partial<ViewStrings>) {
     this.#strings = { ...defaultViewStrings, ...s, kinds: { ...defaultViewStrings.kinds, ...s?.kinds } };
     this.#relayout();
+  }
+
+  /** What each state is about (its help popover): an object from state ids to text, or a function of the state. Overrides the chart's XML comments. */
+  get descriptions(): ViewDescriptions | undefined {
+    return this.#descriptions;
+  }
+  /** Set what states are about; `undefined` goes back to the chart's XML comments only. */
+  set descriptions(d: ViewDescriptions | undefined) {
+    this.#descriptions = d;
+    if (this.#helpFor) this.#openHelp(this.#helpFor.state, this.#helpFor.button);
+  }
+
+  /** What a state's help popover explains: `descriptions` first, then the XML comments documenting it in the source. */
+  describe(state: StateNode): string | undefined {
+    const d = this.#descriptions;
+    const given = typeof d === "function" ? d(state) : d && Object.hasOwn(d, state.id) ? d[state.id] : undefined;
+    return given?.trim() ? given : sourceDescription(state);
+  }
+
+  /** The diagram's scale (1 = actual size). Reading it gives the scale in use; setting a number zooms, `null` goes back to automatic. */
+  get zoom(): number {
+    return this.#scale;
+  }
+  /** Zoom to this scale (clamped to 0.15–4), or `null` for the automatic scale (fitted to the element's width, see `fit`). */
+  set zoom(scale: number | null) {
+    this.#zoomTo(scale);
   }
 
   /** Load the chart again (re-reading `src` / inline source) and start a fresh session. */
@@ -617,12 +673,46 @@ export class ScxmlView extends ElementBase {
     const warnings = h("details", { class: "warnings", part: "warnings", hidden: "" }) as HTMLDetailsElement;
     const error = h("div", { class: "error", part: "error", role: "alert", hidden: "" });
     const diagram = h("div", { class: "diagram", role: "group" });
-    // focusable: a scroll container must be keyboard-scrollable, and it takes the playback shortcuts
+    // focusable: a scroll container must be keyboard-scrollable, and it takes the playback and zoom shortcuts
     const canvas = h("div", { class: "canvas", part: "canvas", tabindex: "0" }, diagram);
+    const zoomButton = (cls: string, title: string, glyph: Node | string, onClick: () => void) => {
+      const b = h("button", { class: cls, type: "button", title, "aria-label": title }, glyph) as HTMLButtonElement;
+      b.addEventListener("click", onClick);
+      return b;
+    };
+    const zoomLevel = zoomButton("zoom-level", t.zoomActual, "100%", () => this.#zoomTo(1));
+    const zoom = h(
+      "div",
+      { class: "zoom", part: "zoom", role: "toolbar", "aria-label": t.zoomToolbar, hidden: "" },
+      zoomButton("zoom-out", t.zoomOut, icon("zoom-out"), () => this.#zoomBy(1 / ZOOM_STEP)),
+      zoomLevel,
+      zoomButton("zoom-in", t.zoomIn, icon("zoom-in"), () => this.#zoomBy(ZOOM_STEP)),
+      zoomButton("zoom-reset", t.zoomReset, icon("scan"), () => this.#zoomTo(null)),
+    );
+    const help = h("div", { class: "help-popover", part: "help-popover", role: "dialog", tabindex: "-1", id: "help-popover", hidden: "" });
+    const viewport = h("div", { class: "viewport" }, canvas, zoom, help);
     const live = h("div", { class: "sr-only", role: "status", "aria-live": "polite", "aria-atomic": "true" });
-    const frame = h("div", { class: "frame", part: "frame" }, controls, notice, sendStatus, warnings, error, canvas, live);
+    const frame = h("div", { class: "frame", part: "frame" }, controls, notice, sendStatus, warnings, error, viewport, live);
     this.#shadow.append(frame);
-    this.#el = { frame, controls, play, step, speeds, clock, notice, sendStatus, warnings, error, canvas, diagram, live };
+    this.#el = {
+      frame,
+      controls,
+      play,
+      step,
+      speeds,
+      clock,
+      notice,
+      sendStatus,
+      warnings,
+      error,
+      canvas,
+      diagram,
+      live,
+      zoom,
+      zoomLevel,
+      help,
+    };
+    this.#wireNavigation();
     this.addEventListener("keydown", (e) => {
       const clockNow = this.#playback();
       const target = e.composedPath()[0] as HTMLElement;
@@ -635,6 +725,177 @@ export class ScxmlView extends ElementBase {
         this.#step();
       }
     });
+  }
+
+  // ─────────────────────────────── navigation ───────────────────────────────
+
+  /** Zoom (Ctrl/⌘ + wheel, pinch, + − 0), pan (drag), and closing the help popover. */
+  #wireNavigation() {
+    const { canvas, help } = this.#el;
+    canvas.addEventListener(
+      "wheel",
+      (e) => {
+        // pinch-zoom on a trackpad arrives as a wheel event with ctrlKey
+        if (!(e.ctrlKey || e.metaKey) || !this.#layout) return;
+        e.preventDefault();
+        // a wheel notch (~100px) zooms by about a fifth; a pinch sends many small deltas
+        const factor = Math.exp(-Math.max(-100, Math.min(100, e.deltaY * (e.deltaMode === 1 ? 20 : 1))) * 0.002);
+        this.#zoomTo(this.#scale * factor, { x: e.clientX, y: e.clientY });
+      },
+      { passive: false },
+    );
+    canvas.addEventListener("keydown", (e) => {
+      if (e.composedPath()[0] !== canvas || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key === "+" || e.key === "=") this.#zoomBy(ZOOM_STEP);
+      else if (e.key === "-" || e.key === "_") this.#zoomBy(1 / ZOOM_STEP);
+      else if (e.key === "0") this.#zoomTo(null);
+      else return;
+      e.preventDefault();
+    });
+    // drag to pan (mouse and pen; touch scrolls natively), starting anywhere but a control
+    let drag: { id: number; x: number; y: number; left: number; top: number; moved: boolean } | undefined;
+    canvas.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || e.pointerType === "touch") return;
+      const target = e.composedPath()[0] as Element;
+      if (target?.closest?.("button, a, input, select, textarea, summary")) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: canvas.scrollLeft, top: canvas.scrollTop, moved: false };
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (!drag.moved) {
+        if (Math.abs(dx) + Math.abs(dy) < 4) return;
+        drag.moved = true;
+        canvas.setPointerCapture?.(e.pointerId);
+        canvas.classList.add("panning");
+      }
+      e.preventDefault();
+      canvas.scrollLeft = drag.left - dx;
+      canvas.scrollTop = drag.top - dy;
+    });
+    const end = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag = undefined;
+      canvas.classList.remove("panning");
+      if (canvas.hasPointerCapture?.(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+    };
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+    canvas.addEventListener("scroll", () => this.#placeHelp());
+    help.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      this.#closeHelp(true);
+    });
+    this.#shadow.addEventListener("pointerdown", (e) => {
+      if (!this.#helpFor) return;
+      const path = e.composedPath();
+      if (!path.includes(help) && !path.includes(this.#helpFor.button)) this.#closeHelp(false);
+    });
+  }
+
+  #zoomBy(factor: number) {
+    this.#zoomTo(this.#scale * factor);
+  }
+
+  /**
+   * Set an explicit scale (`null`: back to automatic), keeping the diagram point under
+   * `anchor` (client coordinates; default: the middle of the canvas) where it is.
+   */
+  #zoomTo(scale: number | null, anchor?: { x: number; y: number }) {
+    const canvas = this.#el.canvas;
+    const before = this.#scale;
+    if (scale != null && !Number.isFinite(scale)) return;
+    const next = scale == null ? null : Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
+    if (next != null && this.#zoom == null) {
+      // zooming by hand: the canvas keeps the height it has now, the diagram moves inside it
+      const h = canvas.clientHeight;
+      if (h > 0) canvas.style.setProperty("height", `${h}px`);
+    }
+    if (next == null) canvas.style.removeProperty("height");
+    const r = canvas.getBoundingClientRect();
+    const ax = (anchor?.x ?? r.left + canvas.clientWidth / 2) - r.left;
+    const ay = (anchor?.y ?? r.top + canvas.clientHeight / 2) - r.top;
+    // the diagram point under the anchor
+    const px = (canvas.scrollLeft + ax - MARGIN) / before;
+    const py = (canvas.scrollTop + ay - MARGIN) / before;
+    this.#zoom = next;
+    this.#applyFit();
+    if (next == null) return;
+    canvas.scrollLeft = px * this.#scale + MARGIN - ax;
+    canvas.scrollTop = py * this.#scale + MARGIN - ay;
+  }
+
+  /** Open the help popover of `state` next to its button. */
+  #openHelp(state: StateNode, button: HTMLElement) {
+    const t = this.#strings;
+    const pop = this.#el.help;
+    if (this.#helpFor && this.#helpFor.button !== button) this.#helpFor.button.setAttribute("aria-expanded", "false");
+    this.#helpFor = { state, button };
+    button.setAttribute("aria-expanded", "true");
+    const kind = this.#kind(state);
+    const name = state.generatedId ? `(${t.kinds[kind]})` : state.id;
+    const text = this.describe(state);
+    const heading = h("div", { class: "help-head" }, h("strong", {}, name), h("span", { class: "help-kind" }, t.kinds[kind]));
+    const body = text
+      ? h("div", { class: "help-text" }, ...text.split(/\n{2,}/).map((para) => h("p", {}, para)))
+      : h("p", { class: "help-none" }, t.noDescription);
+    const shown = state.transitions.filter((tr) => tr.element);
+    const list = shown.length
+      ? [
+          h("div", { class: "help-sub" }, t.helpTransitions),
+          h(
+            "ul",
+            { class: "help-transitions" },
+            ...shown.map((tr) =>
+              h(
+                "li",
+                {},
+                [
+                  tr.events.join(" ") || t.eventless,
+                  tr.cond && `[${truncate(tr.cond, 40)}]`,
+                  tr.targets.length ? `→ ${tr.targets.map((s) => s.id).join(", ")}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" "),
+              ),
+            ),
+          ),
+        ]
+      : [];
+    pop.replaceChildren(heading, body, ...list);
+    pop.setAttribute("aria-label", t.helpLabel(name));
+    pop.hidden = false;
+    this.#placeHelp();
+    pop.focus({ preventScroll: true });
+  }
+
+  #closeHelp(refocus: boolean) {
+    const open = this.#helpFor;
+    this.#helpFor = undefined;
+    this.#el.help.hidden = true;
+    if (!open) return;
+    open.button.setAttribute("aria-expanded", "false");
+    if (refocus && open.button.isConnected) open.button.focus();
+  }
+
+  /** Keep the open popover under its button (it follows panning and zooming), inside the viewport. */
+  #placeHelp() {
+    const open = this.#helpFor;
+    const pop = this.#el.help;
+    if (!open || pop.hidden) return;
+    if (!open.button.isConnected) return this.#closeHelp(false);
+    const vp = (pop.parentElement as HTMLElement).getBoundingClientRect();
+    const b = open.button.getBoundingClientRect();
+    const w = pop.offsetWidth;
+    const ph = pop.offsetHeight;
+    const maxLeft = Math.max(4, vp.width - w - 4);
+    pop.style.setProperty("left", `${Math.min(maxLeft, Math.max(4, b.left - vp.left + b.width / 2 - 20))}px`);
+    // below the button, or above it when there's no room below
+    const below = b.bottom - vp.top + 6;
+    const above = b.top - vp.top - 6 - ph;
+    pop.style.setProperty("top", `${below + ph > vp.height - 4 && above >= 4 ? above : Math.max(4, below)}px`);
   }
 
   #playback(): PlaybackClock | undefined {
@@ -687,8 +948,10 @@ export class ScxmlView extends ElementBase {
       const session = this.#session;
       const active = new Set(session?.status === "running" ? model.states.filter((s) => session.isActiveNode(s)) : []);
       this.#collapsed = autoCollapse(model.root, this.maxStates, active);
+      this.#autoFolded = new Set(this.#collapsed);
       this.#foldsFor = model;
     }
+    this.#closeHelp(false);
     this.#boxes.clear();
     this.#labels.clear();
     this.#paths.clear();
@@ -832,36 +1095,63 @@ export class ScxmlView extends ElementBase {
       display,
     );
     if (kind === "parallel") name.append(h("span", { class: "kind" }, "∥"));
+    // the title row: [fold toggle] name [help]
+    const row = h("div", { class: "title" });
+    if (container || collapsed) {
+      const fold = h(
+        "button",
+        {
+          class: `toggle ${collapsed ? "expand" : "collapse"}`,
+          type: "button",
+          part: collapsed ? "expand" : "collapse",
+          "aria-expanded": String(!collapsed),
+          "aria-label": `${collapsed ? t.expand : t.collapse} ${display}`,
+          title: collapsed ? t.expand : t.collapse,
+        },
+        icon(collapsed ? "chevron-right" : "chevron-down"),
+      );
+      fold.addEventListener("click", () => this.#toggleFold(s));
+      row.append(fold);
+    }
+    row.append(name);
+    const help = h(
+      "button",
+      {
+        class: "help",
+        type: "button",
+        part: "help",
+        "aria-label": t.helpLabel(display),
+        "aria-expanded": "false",
+        "aria-controls": "help-popover",
+        title: t.helpLabel(display),
+      },
+      icon("circle-help"),
+    );
+    help.addEventListener("click", () => {
+      if (this.#helpFor?.button === help) this.#closeHelp(false);
+      else this.#openHelp(s, help);
+    });
+    row.append(help);
     const internal = this.#internal(s);
     if (container) {
-      el.append(h("div", { class: "head" }, name, ...(internal ? [internal] : [])));
-      if (this.#expandedFolds.has(s)) {
-        const fold = h("button", { class: "collapse", type: "button", part: "collapse" }, t.collapse);
-        fold.addEventListener("click", () => {
-          this.#collapsed.add(s);
-          this.#expandedFolds.delete(s);
-          this.#renderAll();
-        });
-        el.append(fold);
-      }
+      el.append(h("div", { class: "head" }, row, ...(internal ? [internal] : [])));
       return el;
     }
-    el.append(name);
+    el.append(row);
     if (internal) el.append(internal);
-    if (collapsed) {
-      const inside = countInside(s);
-      const expand = h("button", { class: "expand", type: "button", part: "expand" }, t.expand);
-      expand.addEventListener("click", () => {
-        this.#collapsed.delete(s);
-        this.#expandedFolds.add(s);
-        this.#renderAll();
-      });
-      el.append(h("span", { class: "badge-count" }, t.statesInside(inside)), expand);
-    }
+    if (collapsed) el.append(h("span", { class: "badge-count" }, t.statesInside(countInside(s))));
     return el;
   }
 
-  #expandedFolds = new Set<StateNode>();
+  /** Fold or unfold a container, keeping keyboard focus on its toggle. */
+  #toggleFold(s: StateNode) {
+    this.#autoFolded.delete(s);
+    if (this.#collapsed.has(s)) this.#collapsed.delete(s);
+    else this.#collapsed.add(s);
+    this.#renderAll();
+    const box = this.#boxes.get(s);
+    (box?.querySelector(".toggle") as HTMLElement | null)?.focus({ preventScroll: true });
+  }
 
   /** Targetless transitions of a state, as chips inside its box. */
   #internal(s: StateNode): HTMLElement | undefined {
@@ -931,19 +1221,20 @@ export class ScxmlView extends ElementBase {
   #renderNotice() {
     const e = this.#el;
     const t = this.#strings;
-    if (!this.#collapsed.size) {
+    const auto = [...this.#autoFolded].filter((c) => this.#collapsed.has(c));
+    if (!auto.length) {
       e.notice.hidden = true;
       return;
     }
     let hidden = 0;
-    for (const c of this.#collapsed) hidden += countInside(c);
+    for (const c of auto) hidden += countInside(c);
     const all = h("button", { type: "button" }, t.expandAll);
     all.addEventListener("click", () => {
-      for (const c of this.#collapsed) this.#expandedFolds.add(c);
       this.#collapsed.clear();
+      this.#autoFolded.clear();
       this.#renderAll();
     });
-    e.notice.replaceChildren(h("span", {}, t.foldedNotice(hidden, this.#collapsed.size)), all);
+    e.notice.replaceChildren(h("span", {}, t.foldedNotice(hidden, auto.length)), all);
     e.notice.hidden = false;
   }
 
@@ -983,24 +1274,30 @@ export class ScxmlView extends ElementBase {
   #applyFit() {
     const d = this.#el.diagram;
     const layout = this.#layout;
-    const available = this.#el.canvas.clientWidth - 24;
+    const available = this.#el.canvas.clientWidth - 2 * MARGIN;
     let scale = 1;
-    if (layout && available > 0 && available < layout.width) {
+    if (this.#zoom != null) scale = this.#zoom;
+    else if (layout && available > 0 && available < layout.width) {
       const raw = Number.parseFloat(getComputedStyle(this).getPropertyValue("--scxml-min-scale"));
       const floor = this.fit ? 0 : Number.isFinite(raw) ? Math.min(1, Math.max(0.1, raw)) : DEFAULT_MIN_SCALE;
       scale = Math.min(1, Math.max(floor, available / layout.width));
     }
+    this.#scale = scale;
+    this.#el.canvas.classList.toggle("zoomed", this.#zoom != null);
+    this.#el.zoom.hidden = !layout;
+    this.#el.zoomLevel.textContent = this.#strings.zoomLevel(Math.round(scale * 100));
     // transform, not `zoom`: WebKit's zoom shrinks the boxes but not their text. A transform
-    // doesn't change the layout box, so negative margins give the scroll area the scaled size.
+    // doesn't change the layout box, so margins give the scroll area the scaled size.
     d.dataset.scale = String(scale);
-    if (!layout || scale >= 1) {
+    if (!layout || scale === 1) {
       for (const p of ["transform", "transform-origin", "margin-right", "margin-bottom"]) d.style.removeProperty(p);
-      return;
+    } else {
+      d.style.setProperty("transform-origin", "0 0");
+      d.style.setProperty("transform", `scale(${scale})`);
+      d.style.setProperty("margin-right", `${MARGIN - layout.width * (1 - scale)}px`);
+      d.style.setProperty("margin-bottom", `${MARGIN - layout.height * (1 - scale)}px`);
     }
-    d.style.setProperty("transform-origin", "0 0");
-    d.style.setProperty("transform", `scale(${scale})`);
-    d.style.setProperty("margin-right", `${12 - layout.width * (1 - scale)}px`);
-    d.style.setProperty("margin-bottom", `${12 - layout.height * (1 - scale)}px`);
+    this.#placeHelp();
   }
 
   // ───────────────────────────── live state ─────────────────────────────
@@ -1069,7 +1366,7 @@ export class ScxmlView extends ElementBase {
       cancelAnimationFrame(this.#decayRaf);
       this.#decayRaf = requestAnimationFrame(() => this.#renderState());
     }
-    if (session.status === "done" && this.#collapsed.size === 0) {
+    if (session.status === "done" && e.notice.hidden) {
       e.notice.hidden = false;
       e.notice.replaceChildren(h("span", {}, t.terminated));
     }
@@ -1147,9 +1444,11 @@ function estimateBox(s: StateNode, collapsed: boolean): Size {
   const name = s.generatedId ? s.kind : s.id;
   const internal = s.transitions.filter((t) => !t.targets.length);
   const chipsW = internal.slice(0, MAX_INTERNAL_SHOWN).reduce((w, t) => w + estimateLabel(t).w + 4, 0);
-  const w = Math.max(64, name.length * 7.6 + 34 + (s.kind === "parallel" ? 16 : 0), Math.min(chipsW, 260) + 22);
-  const chipRows = internal.length ? Math.ceil(Math.max(chipsW, 1) / 260) : 0;
   const isContainer = !collapsed && (s.kind === "parallel" || s.children.length > 0);
+  // the help button, and the fold toggle of containers
+  const icons = 22 + (isContainer || collapsed ? 18 : 0);
+  const w = Math.max(64, name.length * 7.6 + 34 + icons + (s.kind === "parallel" ? 16 : 0), Math.min(chipsW, 260) + 22);
+  const chipRows = internal.length ? Math.ceil(Math.max(chipsW, 1) / 260) : 0;
   if (isContainer) return { w, h: 26 + chipRows * 24 };
   return { w: collapsed ? Math.max(w, 120) : w, h: 34 + chipRows * 24 + (collapsed ? 50 : 0) };
 }

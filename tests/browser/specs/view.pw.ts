@@ -78,6 +78,47 @@ test.describe("<scxml-view> layout", () => {
     await expect.poll(() => zoom(page)).toBe(1);
   });
 
+  test("zoom with Ctrl + wheel around the pointer, pan by dragging, fold, and read a state's help", async ({ page }) => {
+    await page.goto("/fixtures/view.html");
+    await ready(page);
+    await expect.poll(() => activeStates(page, "#src")).toEqual(["on", "red"]);
+    const view = page.locator("#src");
+    const scale = () => view.evaluate((v) => (v as HTMLElement & { zoom: number }).zoom);
+    const canvas = view.locator(".canvas");
+    const box = (await canvas.boundingBox())!;
+    const start = await scale();
+    await page.mouse.move(box.x + box.width / 2, box.y + 40);
+    await page.keyboard.down("Control");
+    for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -100);
+    await page.keyboard.up("Control");
+    await expect.poll(scale).toBeGreaterThan(start * 1.5);
+    // the canvas keeps its height; dragging the background pans
+    const before = await canvas.evaluate((c) => ({ left: c.scrollLeft, top: c.scrollTop }));
+    await page.mouse.move(box.x + 6, box.y + 6);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 60, box.y + 50, { steps: 5 });
+    await page.mouse.up();
+    const after = await canvas.evaluate((c) => ({ left: c.scrollLeft, top: c.scrollTop }));
+    expect(after.left + after.top).toBeLessThan(before.left + before.top);
+    await view.locator(".zoom-reset").click();
+    await expect.poll(scale).toBeLessThanOrEqual(1);
+
+    // fold the compound state "on", then unfold it
+    await view.locator("[data-state=on] .toggle").click();
+    await expect(view.locator("[data-state=red]")).toHaveCount(0);
+    await view.locator("[data-state=on] .toggle").click();
+    await expect(view.locator("[data-state=red]")).toHaveCount(1);
+
+    const help = view.locator("[data-state=red] button.help");
+    await help.click();
+    const pop = view.locator(".help-popover");
+    await expect(pop).toBeVisible();
+    await expect(pop).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(pop).toBeHidden();
+    await expect(help).toBeFocused();
+  });
+
   test("right-to-left pages: the diagram stays anchored at the start of its canvas", async ({ page }) => {
     await page.goto("/fixtures/view.html?dir=rtl");
     await ready(page);

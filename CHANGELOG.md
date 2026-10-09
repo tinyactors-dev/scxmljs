@@ -32,9 +32,23 @@ private `--x-*` properties are not public API and can change in any release.
   `row-exits`, `row-event` (`fired`), `row-detail`, `open-detail`; `card` and `lane-row` get
   `visited`, `edge-label` gets `fired`. New `strings`: `onEntry`, `eventless`, `guard`,
   `justTaken`, `lastVisited`, `openDetail`, `lastStep`.
+- `<scxml-view>` zooms and pans: a zoom toolbar, Ctrl/⌘ + wheel, pinch, `+` `-` `0`, and dragging
+  the background. The `zoom` property reads or sets the scale (`null`: automatic). New part `zoom`.
+- `<scxml-view>`: every compound and parallel state folds and unfolds with a chevron before its
+  name (before, only the containers folded for `max-states` could be unfolded and folded again).
+- `<scxml-view>`: every state has a help button that opens a popover with its kind, description
+  and transitions. Descriptions come from the XML comments that document the state, or from the
+  new `descriptions` property; `describe(state)` returns the text, and `sourceDescription(state)`
+  (exported from `/view`) reads the comments. New parts `help` and `help-popover`; new `strings`:
+  `helpLabel`, `noDescription`, `helpTransitions`, `zoomIn`, `zoomOut`, `zoomReset`, `zoomLevel`,
+  `zoomActual`, `zoomToolbar`.
 
 ### Changed
 
+- `<scxml-view>` lays charts out top to bottom by default (`direction="down"`). `direction="right"`
+  keeps the old left-to-right layout; `direction="auto"` still switches at 760 px.
+- `<scxml-view>`: the `expand` and `collapse` parts are now icon buttons (a chevron before the
+  state's name) instead of text buttons; their accessible names still say "Expand" / "Collapse".
 - `<scxml-explorer>` is quieter: one header bar (the playback controls moved into it), no
   status badges or redundant counts, sentence-case labels, hairlines instead of boxes, and colour
   only for meaning (running colour: active; waiting colour: what the last step did). The System

@@ -1158,6 +1158,27 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
       }
       if (chosen) break;
     }
+    // beside a segment, just clear of the line: either side, preferred segment first
+    for (const i of chosen ? [] : order) {
+      const [a, b] = segs[i]!;
+      const horizontal = Math.abs(a.y - b.y) < 0.01;
+      const room = horizontal ? Math.abs(b.x - a.x) - size.w : Math.abs(b.y - a.y) - size.h;
+      if (room < 0) continue;
+      const off = (horizontal ? size.h : size.w) / 2 + 4;
+      for (const t of [0.5, 0.3, 0.7]) {
+        const mx = a.x + (b.x - a.x) * t;
+        const my = a.y + (b.y - a.y) * t;
+        for (const side of [1, -1]) {
+          const r = horizontal ? rectAt(mx, my + side * off) : rectAt(mx + side * off, my);
+          if (free(inflate(r, 2))) {
+            chosen = r;
+            break;
+          }
+        }
+        if (chosen) break;
+      }
+      if (chosen) break;
+    }
     if (!chosen) {
       // step aside from the preferred segment, closest first
       const [a, b] = segs[prefer]!;
@@ -1216,8 +1237,18 @@ function distToSegment(p: Point, a: Point, b: Point): number {
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const inflate = (r: Rect, d: number): Rect => ({ x: r.x - d, y: r.y - d, w: r.w + 2 * d, h: r.h + 2 * d });
 
-/** Drop repeated points and the middle of collinear runs. */
-function simplify(points: Point[]): Point[] {
+/** Straighten sub-pixel jogs, then drop repeated points and the middle of collinear runs. */
+function simplify(input: Point[]): Point[] {
+  const points = input.map((p) => ({ ...p }));
+  // a jog of less than a pixel (ports that differ by rounding) only splits a straight line in two:
+  // move the run of points sharing the jogged coordinate onto the previous point's
+  for (let i = 1; i < points.length; i++)
+    for (const axis of ["x", "y"] as const) {
+      const d = Math.abs(points[i]![axis] - points[i - 1]![axis]);
+      if (!(d > 0.01 && d < 1)) continue;
+      const old = points[i]![axis];
+      for (let j = i; j < points.length && Math.abs(points[j]![axis] - old) < 0.01; j++) points[j]![axis] = points[i - 1]![axis];
+    }
   const out: Point[] = [];
   for (const p of points) {
     const last = out[out.length - 1];

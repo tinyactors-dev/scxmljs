@@ -64,9 +64,9 @@ from the page, it disposes the session it created.
 | `autostart` | `true` | `"false"` draws the chart without starting the session |
 | `interactive` | `true` | `"false"` makes transition labels plain text instead of buttons |
 | `data` | | JSON object of initial values; each key replaces the `<data>` element with that id |
-| `direction` | `auto` | `right` (left to right), `down` (top to bottom), or `auto` (`down` when the element is 760 px wide or less) |
+| `direction` | `down` | `down` (top to bottom), `right` (left to right), or `auto` (`down` when the element is 760 px wide or less, `right` otherwise) |
 | `max-states` | `150` | fold the largest compound states until at most this many boxes are drawn |
-| `fit` | absent | scale the diagram all the way down to the element's width instead of scrolling. Without it, a diagram wider than the element is still scaled down, but not below `--scxml-min-scale` (0.65), and the rest scrolls |
+| `fit` | absent | scale the diagram all the way down to the element's width instead of scrolling. Without it, a diagram wider than the element is still scaled down, but not below `--scxml-min-scale` (0.65), and the rest scrolls. Either way this is the automatic zoom; [zooming by hand](#zoom-pan-and-folding) overrides it |
 | `event-data` | | JSON object from event names to the data a click on that event's label sends, e.g. `{"login": {"user": "ada"}}`. Host code can also set `detail.data` in an `scxml-send` listener |
 | `announce` | `all` | what the live region reads out: `all` (steps and sent events), `sends`, or `off` |
 | `warnings` | `show` | `off` hides the list of authoring warnings above the diagram |
@@ -85,6 +85,9 @@ Every attribute has a matching property (`maxStates` for `max-states`). In addit
 | `options` | extra `SessionOptions` for sessions the element creates: I/O processors, invokers, a loader… (not `clock`) |
 | `clock` | the clock for sessions the element creates. A `PlaybackClock` adds play, pause, step and speed controls. |
 | `strings` | translations; see [custom UI and translations](custom-ui.md) |
+| `descriptions` | what states are about, for their help buttons: an object from state ids to text, or a function of the state (`undefined` falls back to the chart's comments); see [describing states](#describing-states) |
+| `describe(state)` | the text a state's help button shows |
+| `zoom` | the diagram's scale (1 = actual size); set a number (0.15–4) to zoom, `null` to go back to the automatic scale |
 | `reload()` | load the chart again and start a fresh session |
 
 Setting `options` or `clock` reloads the chart.
@@ -135,16 +138,66 @@ view.addEventListener("scxml-send", (e) => {
 Use `scxml-load` to reach the session the element created, for example to send events from your
 own controls (see [driving charts](driving-charts.md)).
 
+## Zoom, pan and folding
+
+- **Zoom** with the toolbar in the corner (zoom out, the current level, which resets to 100%,
+  zoom in, fit to width), with Ctrl or ⌘ and the scroll wheel, with a trackpad pinch, or with
+  `+`, `-` and `0` (fit to width) while the diagram has focus. Zooming keeps the point under the
+  pointer in place, and fixes the canvas at the height it had, so the page doesn't jump.
+- **Pan** by dragging the diagram's background, or by scrolling.
+- **Fold** any compound or parallel state with the chevron before its name: it becomes a single
+  box that says how many states it holds. The chevron of a folded box unfolds it.
+
+## Describing states
+
+Every state has a help button (a question mark) after its name. It opens a popover with the
+state's kind, its description and its transitions. The description is the XML comment right
+before the state, plus any comments at the start of its content:
+
+<!-- doctest: scxml -->
+```xml
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="cart">
+  <!-- The customer is still choosing. -->
+  <state id="cart">
+    <transition event="checkout" target="paying"/>
+  </state>
+  <state id="paying">
+    <!-- Taking the money: the card form, then the bank's answer. -->
+    <transition event="paid" target="done"/>
+  </state>
+  <final id="done"/>
+</scxml>
+```
+
+When comments open a compound state's content and a child state follows them directly, the last
+comment describes the child and the ones before it the parent. Separate paragraphs with a blank
+line.
+
+To describe states from code instead (or for charts you can't edit), set `descriptions`. It wins
+over the comments:
+
+<!-- doctest: check -->
+```ts
+import "@tinyactors/scxmljs/view";
+
+const view = document.querySelector("scxml-view")!;
+view.descriptions = { cart: "The customer is still choosing." };
+// or compute them; return undefined to fall back to the chart's comments
+view.descriptions = (state) => (state.id.startsWith("pay") ? "Anything to do with money." : undefined);
+```
+
 ## Large charts
 
 When a chart has more boxes than `max-states`, the element folds the largest compound states into
-single boxes, shows a notice, and keeps the active states visible. Each folded box has an
-**Expand** button, and the notice has **Expand all**. See [large charts](large-charts.md).
+single boxes, shows a notice, and keeps the active states visible. Unfold a box with its chevron,
+or everything with **Expand all** in the notice. See [large charts](large-charts.md).
 
 ## Keyboard and screen readers
 
 - Transition labels are buttons: Tab to them, Enter or Space sends the event.
-- The diagram scrolls with the arrow keys once it has focus.
+- The diagram scrolls with the arrow keys once it has focus; `+`, `-` and `0` zoom.
+- Fold toggles and help buttons are buttons too, named "Collapse pay" or "About cart". The help
+  popover takes focus; Escape closes it and returns focus to its button.
 - With a `PlaybackClock`: Space plays and pauses, `.` steps to the next event.
 - A polite live region announces each step ("go: now in busy") and each sent event.
 - Colour is never the only signal: active states also get a dot and a bolder border, and the
@@ -152,7 +205,7 @@ single boxes, shows a notice, and keeps the active states visible. Each folded b
 - When the session has terminated, the states it ended in stay marked, with the `reached`
   modifier (their accessible name says "reached"): the spec empties the configuration on exit,
   so without it a finished chart would show nothing.
-- The diagram's geometry is left to right, also on right-to-left pages; the rest of the element
+- The diagram's geometry is the same on right-to-left pages; the rest of the element
   (controls, notices, text in labels) follows the page's direction.
 
 ## Styling
@@ -170,7 +223,9 @@ The element uses the shared `--scxml-*` tokens and exposes these parts:
 | `internal` | | a targetless transition listed inside its state's box |
 | `edge` | `live` `fired` | an arrow |
 | `initial` | | the initial-state marker |
-| `expand`, `collapse` | | fold buttons |
+| `expand`, `collapse` | | the fold toggle of a folded / an expanded container |
+| `help`, `help-popover` | | a state's help button, and the popover it opens |
+| `zoom` | | the zoom toolbar |
 | `empty` | | the hint shown while there's nothing to show |
 | `notice` | | the "large chart" notice |
 | `send-status` | | what became of an event sent by clicking a label, when it changed nothing or raised an error |

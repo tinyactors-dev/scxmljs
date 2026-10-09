@@ -17,9 +17,12 @@
  *
  * @packageDocumentation
  */
+
+export { sourceDescription } from "./view/describe.ts";
 export {
   ScxmlView,
   type ViewAnnounce,
+  type ViewDescriptions,
   type ViewDirection,
   type ViewErrorDetail,
   type ViewLoadDetail,

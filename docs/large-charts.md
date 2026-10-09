@@ -43,7 +43,7 @@ When a chart has more boxes than `max-states` (default 150), the view folds the 
 states into single boxes until it fits. It chooses the folds around the states that are active
 when the chart loads, so they stay visible. When the machine later moves into a folded state, the
 folded box is highlighted as active. A notice says how many states are folded,
-with **Expand all**; each folded box has **Expand**, and each expanded one **Collapse**.
+with **Expand all**; every container has a chevron before its name that folds or unfolds it.
 
 A 1 000-state chart draws 137 boxes and renders in about 45 ms from a running session, or 58 ms
 from text (including parsing, compiling and loading the engine).

@@ -7,8 +7,10 @@
  *            chart), doors in/out of the focus, and the events accepted right now
  *   State    detail for one state: actions, transitions, invokes, data
  *
- * No canvas, no pan/zoom: navigation is tree + breadcrumbs + drill-in, and the
- * layout collapses to one pane with bottom tabs in narrow containers.
+ * No canvas, no pan/zoom: navigation is tree + breadcrumbs + drill-in. The focus
+ * fills the element; the tree and the inspector float over it as panels (two when
+ * wide, one with two pages when medium, a bottom sheet when narrow), playback and
+ * Follow sit in the bottom corners.
  * Big charts: the tree is windowed, lists are grouped/filterable and cut off
  * with "+N more", the focus switches from diagram to list when it gets crowded.
  *
@@ -17,7 +19,7 @@
  *   detail:<id>         in that state's detail pane
  *   event:<descriptor>  in the row of that accepted event (e.g. a form for its data)
  *   service:<alias>     in that service's card at the System level
- *   toolbar             in the header, before the Follow toggle
+ *   toolbar             in the panel's head, after the breadcrumb
  *   empty-tree, empty-events, empty-detail   replace the empty-state messages
  *
  *   const x = document.querySelector("scxml-explorer");
@@ -41,7 +43,9 @@ import { isAtomic, type StateNode, type TransitionNode } from "../model.ts";
 // types only: the explorer must never pull in a data model (and with it QuickJS)
 import type { IOProcessor, SCXMLSession as Session } from "../session.ts";
 import { Announcer } from "../ui/announcer.ts";
-import { arrowMarker } from "../ui/svg.ts";
+import * as icons from "../ui/icons.ts";
+import { actionGlyphs, eventName, glyph, NOTATION_CSS } from "../ui/notation.ts";
+import { arrowMarker, type IconDef, icon } from "../ui/svg.ts";
 import { lazySheet, themeSheet } from "../ui/theme.ts";
 import { type LabelRequest, placeLabels } from "./layout.ts";
 import { defaultStrings, type ExplorerStrings, type StateKindName } from "./strings.ts";
@@ -68,7 +72,11 @@ import {
 } from "./viewmodel.ts";
 
 type Level = "system" | "machine";
-type Tab = "system" | "tree" | "focus" | "events" | "detail";
+/** How the panels sit over the focus: a bottom sheet (narrow), one side panel, or two. */
+type PanelLayout = "sheet" | "panel" | "panels";
+/** With one panel (or the sheet): which page it shows. */
+type Page = "tree" | "inspector";
+type SheetHeight = "low" | "half" | "full";
 type Inspector = "events" | "detail";
 type EventScopeFilter = "here" | "inherited" | "all";
 
@@ -76,6 +84,12 @@ const DEFAULT_ROW = 30; // tree row height (px) unless --scxml-row-height says o
 const DIAGRAM_MAX_CHILDREN = 9;
 const LIST_PAGE = 40;
 const DOORS_SHOWN = 6;
+/** From this width on, the tree and the inspector each get a panel. */
+const WIDE_WIDTH = 1280;
+/** The sheet's lowest height (px): its handle and the strip of accepted events. */
+const SHEET_LOW = 88;
+/** How far from the top the sheet stops when it's all the way up (px). */
+const SHEET_TOP = 8;
 
 /** Only the kinds that behave differently get a mark; plain states and containers go without. */
 const KIND_MARK: Record<string, string> = { parallel: "∥", final: "◎", history: "H" };
@@ -170,7 +184,9 @@ export class ScxmlExplorer extends ElementBase {
   #selected?: StateNode;
   #selectedService?: string;
   #follow = true;
-  #tab: Tab = "focus";
+  #page: Page = "tree";
+  #sheet: SheetHeight = "low";
+  #layout: PanelLayout = "panels";
   #inspector: Inspector = "events";
   #crumbsExpanded = false;
 
@@ -192,8 +208,6 @@ export class ScxmlExplorer extends ElementBase {
   #fired = new Set<TransitionNode>();
   #visited = new Set<StateNode>();
   #strings: ExplorerStrings = defaultStrings;
-  /** layout breakpoint, measured on the host (container queries decide the CSS) */
-  #narrow = false;
   /** the tree's keyboard cursor (roving tabindex) */
   #treeCursor?: StateNode;
   #typeahead = { text: "", at: 0 };
@@ -217,7 +231,7 @@ export class ScxmlExplorer extends ElementBase {
 
   // persistent shell elements
   #el!: {
-    levels: HTMLElement;
+    toolbar: HTMLElement;
     crumbs: HTMLElement;
     follow: HTMLButtonElement;
     treePane: HTMLElement;
@@ -231,8 +245,13 @@ export class ScxmlExplorer extends ElementBase {
     inspectorBody: HTMLElement;
     eventsHead: HTMLElement;
     eventData: HTMLInputElement;
-    tabs: HTMLElement;
     strip: HTMLElement;
+    panel: HTMLElement;
+    panelBody: HTMLElement;
+    sidePanel: HTMLElement;
+    handle: HTMLButtonElement;
+    back: HTMLButtonElement;
+    toInspector: HTMLButtonElement;
     live: HTMLElement;
     treeTitle: HTMLElement;
     treeSearch: HTMLInputElement;
@@ -291,7 +310,7 @@ export class ScxmlExplorer extends ElementBase {
     const width = Math.round(this.getBoundingClientRect().width || this.clientWidth);
     if (width === this.#width) return;
     this.#width = width;
-    this.#narrow = width > 0 && width <= NARROW_WIDTH;
+    this.#setLayout(width === 0 ? "panels" : width <= NARROW_WIDTH ? "sheet" : width < WIDE_WIDTH ? "panel" : "panels");
     this.#schedule();
   }
 
@@ -547,7 +566,6 @@ export class ScxmlExplorer extends ElementBase {
       this.#focusShowAll = false;
       this.#doorsShowAll = { exits: false, entries: false };
       if (this.#focus !== this.#lastFocus) this.#openRows.clear();
-      this.#tab = "focus";
       const exp = this.#expanded.get(this.#machineKey);
       if (exp) for (const a of pathTo(s)) if (a.children.length) exp.add(a);
     });
@@ -555,12 +573,17 @@ export class ScxmlExplorer extends ElementBase {
 
   #setLevel(level: Level) {
     this.#level = level;
-    this.#tab = level === "system" ? "system" : "focus";
   }
 
   #showInspector(which: Inspector) {
     this.#inspector = which;
-    this.#tab = which;
+    this.#showPage("inspector");
+  }
+
+  /** With one panel: show its tree or its inspector page (the sheet opens up from its low height to show it). */
+  #showPage(page: Page) {
+    this.#page = page;
+    if (this.#layout === "sheet" && this.#sheet === "low") this.#sheet = "half";
     this.#schedule();
   }
 
@@ -580,15 +603,15 @@ export class ScxmlExplorer extends ElementBase {
     const session = this.#machine?.session;
     if (session) this.#emit<ExplorerSelectDetail>("scxml-select", { session, state: s });
     this.#inspector = "detail";
-    this.#tab = "detail";
-    this.#schedule();
+    this.#showPage("inspector");
   }
 
   // ──────────────────────────────── shell ────────────────────────────────
 
   #buildShell() {
     const h = html;
-    const levels = h("div", { class: "levels", part: "levels", role: "group" });
+    // the toolbar slot sits in the title row, after the title
+    const toolbar = h("slot", { name: "toolbar" });
     const crumbs = h("nav", { class: "crumbs", part: "crumbs" });
     const follow = h("button", { class: "follow", part: "follow", type: "button" }) as HTMLButtonElement;
     follow.addEventListener("click", () => this.#setFollow(!this.#follow));
@@ -602,12 +625,18 @@ export class ScxmlExplorer extends ElementBase {
       this.#treeScroll().scrollTop = 0;
       this.#schedule();
     });
-    const activeOnly = h("input", { type: "checkbox" }) as HTMLInputElement;
-    activeOnly.addEventListener("change", () => {
-      this.#activeOnly = activeOnly.checked;
+    // "only active states": the funnel glyph, a toggle
+    const activeOnly = h(
+      "button",
+      { class: "filter", type: "button", part: "active-only", "aria-pressed": "false" },
+      icon(icons.funnel, 16),
+    ) as HTMLButtonElement;
+    activeOnly.addEventListener("click", () => {
+      this.#activeOnly = !this.#activeOnly;
+      activeOnly.setAttribute("aria-pressed", String(this.#activeOnly));
       this.#schedule();
     });
-    const activeOnlyText = h("span", {});
+    const activeOnlyText = activeOnly;
     const treeViewport = h("div", { class: "tree-viewport", part: "tree", role: "tree" });
     treeViewport.addEventListener("keydown", (e) => this.#treeKey(e));
     const treeScroll = h("div", { class: "pane-scroll" }, treeViewport);
@@ -616,7 +645,7 @@ export class ScxmlExplorer extends ElementBase {
       "section",
       { class: "pane tree-pane", part: "tree-pane", "data-tab": "tree" },
       h("div", { class: "pane-head" }, treeTitle, treeCount),
-      h("div", { class: "search" }, treeSearch, h("label", { class: "toggle" }, activeOnly, activeOnlyText)),
+      h("div", { class: "search" }, treeSearch, activeOnly),
       treeScroll,
     );
 
@@ -678,20 +707,38 @@ export class ScxmlExplorer extends ElementBase {
       }
     });
 
-    const tabs = h("nav", { class: "tabs", part: "tabs", role: "tablist" });
     const strip = h("div", { class: "events-strip", part: "strip", role: "group" });
     // polite live region: steps and sent events for screen readers (see `announce`)
     const live = h("div", { class: "sr-only", role: "status", "aria-live": "polite", "aria-atomic": "true" });
-    const shell = h(
-      "div",
-      { class: "shell" },
-      h("div", { class: "top", part: "top" }, levels, crumbs, h("slot", { name: "toolbar" }), playback, follow),
-      h("div", { class: "body" }, treePane, center, inspector, strip, tabs),
-      live,
-    );
+
+    // the panels float over the focus, like a map's: one at the side (tree, then the inspector as a
+    // page of it), two on wide screens (tree left, inspector right), a bottom sheet on narrow ones
+    const back = button("", () => this.#showPage("tree"), { class: "back", part: "back" }) as HTMLButtonElement;
+    const toInspector = button("", () => this.#showInspector("events"), {
+      class: "to-inspector",
+      part: "to-inspector",
+    }) as HTMLButtonElement;
+    treePane.querySelector(".pane-head")!.append(toInspector);
+    inspector.prepend(h("div", { class: "page-back" }, back));
+    const handle = h("button", { class: "sheet-handle", part: "sheet-handle", type: "button" }) as HTMLButtonElement;
+    handle.addEventListener("click", () => {
+      // the click that ends a drag isn't a tap on the handle
+      if (this.#dragged) {
+        this.#dragged = false;
+        return;
+      }
+      this.#update(() => (this.#sheet = this.#sheet === "low" ? "half" : this.#sheet === "half" ? "full" : "low"));
+    });
+    const panelBody = h("div", { class: "panel-body" }, treePane, inspector);
+    const panel = h("section", { class: "panel", part: "panel" }, handle, panelBody, strip);
+    const sidePanel = h("section", { class: "panel side-panel", part: "side-panel" });
+    playback.classList.add("corner", "corner-start");
+    follow.classList.add("corner", "corner-end");
+    const stage = h("div", { class: "stage" }, center, panel, sidePanel, playback, follow);
+    const shell = h("div", { class: "shell" }, stage, live);
     this.#shadow.append(shell);
     this.#el = {
-      levels,
+      toolbar,
       crumbs,
       follow,
       treePane,
@@ -705,8 +752,13 @@ export class ScxmlExplorer extends ElementBase {
       inspectorBody,
       eventsHead,
       eventData,
-      tabs,
       strip,
+      panel,
+      panelBody,
+      sidePanel,
+      handle,
+      back,
+      toInspector,
       live,
       treeTitle,
       treeSearch,
@@ -723,23 +775,102 @@ export class ScxmlExplorer extends ElementBase {
       shell,
     };
     this.#applyShellStrings();
+    this.#wireSheet();
+    this.#applyLayout();
+  }
+
+  /** How the panels sit: moves the inspector between the side panel and the single panel. */
+  #setLayout(layout: PanelLayout) {
+    if (layout === this.#layout) return;
+    this.#layout = layout;
+    this.#applyLayout();
+  }
+
+  #applyLayout() {
+    const { shell, inspector, panelBody, sidePanel } = this.#el;
+    shell.dataset.layout = this.#layout;
+    const home = this.#layout === "panels" ? sidePanel : panelBody;
+    if (inspector.parentElement !== home) home.append(inspector);
+  }
+
+  /** What the sheet covers, so the focus keeps its content (and the corners) clear of it. */
+  #syncSheetHeight(panel = this.#el.panel) {
+    const covered = this.#layout === "sheet" ? panel.offsetHeight : 0;
+    this.#el.shell.style.setProperty("--sheet-h", `${covered || SHEET_LOW}px`);
+  }
+
+  /** Set while a drag on the sheet's handle is in progress or just ended (so it isn't also a click). */
+  #dragged = false;
+
+  /** The sheet: drag its handle (or its head) to any height; it settles at the nearest of three. */
+  #wireSheet() {
+    const { panel, handle } = this.#el;
+    let drag: { id: number; y: number; h: number; el: HTMLElement; to: number } | undefined;
+    const startOn = [handle];
+    const move = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dy = e.clientY - drag.y;
+      if (!this.#dragged && Math.abs(dy) < 6) return;
+      this.#dragged = true;
+      panel.classList.add("dragging");
+      const max = (this.#el.shell.clientHeight || 600) - SHEET_TOP;
+      drag.to = Math.min(max, Math.max(SHEET_LOW, drag.h - dy));
+      panel.style.height = `${drag.to}px`;
+    };
+    const end = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const { el, to: h } = drag;
+      drag = undefined;
+      if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      panel.classList.remove("dragging");
+      if (!this.#dragged) return;
+      // the nearest height wins (the one the drag asked for: the panel may still be animating)
+      const total = this.#el.shell.clientHeight || 600;
+      const heights: [SheetHeight, number][] = [
+        ["low", SHEET_LOW],
+        ["half", total / 2],
+        ["full", total - SHEET_TOP],
+      ];
+      heights.sort((a, b) => Math.abs(a[1] - h) - Math.abs(b[1] - h));
+      panel.style.removeProperty("height");
+      this.#update(() => (this.#sheet = heights[0]![0]));
+    };
+    for (const el of startOn) {
+      el.addEventListener("pointerdown", (e) => {
+        if (this.#layout !== "sheet" || e.button !== 0) return;
+        const target = e.composedPath()[0] as Element;
+        if (el !== handle && target.closest?.("button, a, input")) return;
+        // captured from the start: the pointer leaves the sheet as soon as it moves up
+        el.setPointerCapture?.(e.pointerId);
+        const h = panel.getBoundingClientRect().height;
+        drag = { id: e.pointerId, y: e.clientY, h, el, to: h };
+        this.#dragged = false;
+      });
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", end);
+      el.addEventListener("pointercancel", end);
+    }
+    // the corners ride on the sheet as it moves (drags, and the transition between heights)
+    if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this.#syncSheetHeight()).observe(panel);
   }
 
   /** The shell's static text, from `strings` (called again when they change). */
   #applyShellStrings() {
     const t = this.#strings;
     const e = this.#el;
-    e.levels.setAttribute("aria-label", t.levelLabel);
     // landmarks need unique names: with several explorers on a page, each host's aria-label
     // (if the page gives one) names its breadcrumb
     const host = this.getAttribute("aria-label");
     e.crumbs.setAttribute("aria-label", host ? `${host}: ${t.breadcrumbLabel}` : t.breadcrumbLabel);
-    e.follow.textContent = t.follow;
+    // the crosshair, then the name (on a phone only the crosshair shows; the name stays its accessible name)
+    e.follow.replaceChildren(icon(this.#follow ? icons.locateFixed : icons.locate, 16), html("span", { class: "follow-label" }, t.follow));
     e.follow.title = t.followHint;
-    e.treeTitle.textContent = t.statesPane;
+    // the tree's heading is for screen readers: the tree speaks for itself
+    e.treeTitle.replaceChildren(srText(t.statesPane));
     e.treeSearch.placeholder = t.findState;
     e.treeSearch.setAttribute("aria-label", t.filterStates);
-    e.activeOnlyText.textContent = t.activeOnly;
+    e.activeOnlyText.setAttribute("aria-label", t.activeOnly);
+    e.activeOnlyText.title = t.activeOnly;
     e.treeViewport.setAttribute("aria-label", t.treeLabel);
     e.eventSearch.placeholder = t.findEvent;
     e.eventSearch.setAttribute("aria-label", t.filterEvents);
@@ -747,12 +878,20 @@ export class ScxmlExplorer extends ElementBase {
     e.dataLabel.textContent = t.eventData;
     e.eventData.setAttribute("aria-label", t.eventDataLabel);
     e.playToggle.title = t.playHint;
-    e.stepButton.textContent = t.step;
+    e.stepButton.replaceChildren(icon(icons.stepForward, 16));
+    e.stepButton.setAttribute("aria-label", t.step);
     e.stepButton.title = t.stepHint;
     e.speeds.setAttribute("aria-label", t.speedLabel);
     e.speeds.title = t.speedLabel;
     e.lastStep.setAttribute("aria-label", t.lastStep);
     e.strip.setAttribute("aria-label", t.acceptedEventsLabel);
+    // named from the start; the first render puts in the count
+    e.toInspector.textContent = `${t.accepts(0)} ›`;
+    e.back.textContent = t.backToStates;
+    e.back.setAttribute("aria-label", t.backToStatesLabel);
+    // landmarks: unique names with several explorers on a page (see the breadcrumb above)
+    e.panel.setAttribute("aria-label", host ? `${host}: ${t.panelLabel}` : t.panelLabel);
+    e.sidePanel.setAttribute("aria-label", host ? `${host}: ${t.inspectorLabel}` : t.inspectorLabel);
   }
 
   #treeScroll() {
@@ -780,7 +919,13 @@ export class ScxmlExplorer extends ElementBase {
     if (!clock) return;
     const t = this.#strings;
     const { playToggle, stepButton, speeds, clockTime } = this.#el;
-    playToggle.textContent = clock.playing ? t.pause : t.play;
+    // icons with names: play / pause, step
+    const playing = String(clock.playing);
+    if (playToggle.dataset.playing !== playing) {
+      playToggle.dataset.playing = playing;
+      playToggle.replaceChildren(icon(clock.playing ? icons.pause : icons.play, 16));
+      playToggle.setAttribute("aria-label", clock.playing ? t.pause : t.play);
+    }
     playToggle.setAttribute("aria-pressed", String(!clock.playing));
     stepButton.disabled = clock.pending === 0;
     const speed = String(clock.speed);
@@ -838,49 +983,35 @@ export class ScxmlExplorer extends ElementBase {
     if (this.#level === "system") this.#renderSystem();
     else this.#renderFocus(m);
     this.#renderInspector(m);
-    this.#renderTabs();
+    this.#renderPanels(m);
   }
 
   #renderTop(m: MachineInfo) {
     const h = html;
     const t = this.#strings;
-    const { levels, crumbs, follow } = this.#el;
-    levels.replaceChildren(
-      ...(["system", "machine"] as const).map((lv) =>
-        button(lv === "system" ? t.levelSystem : t.levelMachine, () => this.#navigate(() => this.#setLevel(lv), true), {
-          "aria-pressed": String(this.#level === lv),
-        }),
-      ),
-    );
+    const { crumbs, follow } = this.#el;
     follow.setAttribute("aria-pressed", String(this.#follow));
+    // a map's locate button: a crosshair; while following, a ring in its centre (shape, not only colour)
+    const crosshair = this.#follow ? icons.locateFixed : icons.locate;
+    if (follow.firstElementChild?.getAttribute("class") !== `icon icon-${crosshair[0]}`)
+      follow.firstElementChild?.replaceWith(icon(crosshair, 16));
 
-    type Crumb = { text: string; go: () => void; current?: boolean };
-    const list: Crumb[] = [
-      {
-        text: t.levelSystem,
-        go: () => this.#navigate(() => this.#setLevel("system"), true),
-        current: this.#level === "system",
-      },
-    ];
+    // the breadcrumb is the title's first line: the places above the focus (the focus itself is
+    // the title). "System" is the way to the System level
+    type Crumb = { text: string; go: () => void };
+    const list: Crumb[] = [];
     if (this.#level === "machine") {
-      // machines above this one (invoke chain)
+      list.push({ text: t.levelSystem, go: () => this.#navigate(() => this.#setLevel("system"), true) });
+      // machines above this one (invoke chain), and this one unless it is the focus
       const chain: MachineInfo[] = [];
       for (let x: MachineInfo | undefined = m; x; x = x.parentKey ? this.#tracker!.machines.get(x.parentKey) : undefined) chain.unshift(x);
-      for (const x of chain)
-        list.push({
-          text: x.name,
-          go: () => this.#navigate(() => this.#openMachine(x.key)),
-          current: x === m && this.#focus === m.session.model.root && !this.#selected,
-        });
-      for (const s of pathTo(this.#focus!).slice(1))
-        list.push({ text: label(s), go: () => this.#focusOn(s), current: s === this.#focus && !this.#selected });
-      if (this.#selected && this.#selected !== this.#focus)
-        list.push({ text: label(this.#selected), go: () => this.#select(this.#selected!), current: true });
+      const atRoot = this.#focus === m.session.model.root;
+      for (const x of chain) if (x !== m || !atRoot) list.push({ text: x.name, go: () => this.#navigate(() => this.#openMachine(x.key)) });
+      for (const s of pathTo(this.#focus!).slice(1, -1)) list.push({ text: label(s), go: () => this.#focusOn(s) });
     }
+    // long paths: the first place (the way to the System level), "…", and the place right above
     let shown: (Crumb | "…")[] = list;
-    const narrow = this.#narrow;
-    if (!this.#crumbsExpanded && list.length > (narrow ? 2 : 5))
-      shown = narrow ? ["…", ...list.slice(-2)] : [list[0]!, list[1]!, "…", ...list.slice(-2)];
+    if (!this.#crumbsExpanded && list.length > 3) shown = [list[0]!, "…", list.at(-1)!];
     crumbs.replaceChildren(
       ...shown.flatMap((c, i) => {
         const sep = i ? [h("span", { class: "sep", "aria-hidden": "true" }, "›")] : [];
@@ -889,12 +1020,11 @@ export class ScxmlExplorer extends ElementBase {
             ...sep,
             button("…", () => this.#update(() => (this.#crumbsExpanded = true)), { title: t.showWholePath, "aria-label": t.showWholePath }),
           ];
-        const b = button(c.text, c.go, { title: c.text, part: parts("crumb", c.current && "current") });
-        if (c.current) b.setAttribute("aria-current", "page");
-        return [...sep, b];
+        return [...sep, button(c.text, c.go, { title: c.text, part: "crumb" })];
       }),
+      shown.length ? h("span", { class: "sep", "aria-hidden": "true" }, "›") : "",
     );
-    crumbs.scrollLeft = crumbs.scrollWidth; // narrow screens: keep the current place visible
+    crumbs.hidden = !shown.length;
   }
 
   // ── tree ──
@@ -1110,18 +1240,25 @@ export class ScxmlExplorer extends ElementBase {
             : "diagram"
           : this.#focusMode;
 
-    const layoutName = { auto: t.layoutAuto, diagram: t.layoutDiagram, list: t.layoutList } as const;
+    // list or diagram: two icon toggles; with neither pressed, the explorer picks ("auto")
+    const toggle = (md: "list" | "diagram", glyphDef: IconDef, name: string) => {
+      const b = button("", () => this.#update(() => (this.#focusMode = this.#focusMode === md ? "auto" : md)), {
+        class: "icon-toggle",
+        "aria-pressed": String(this.#focusMode === md),
+        "aria-label": name,
+        title: name,
+      });
+      b.append(icon(glyphDef, 16));
+      return b;
+    };
     const modeSwitch =
       focus.kind === "parallel"
         ? ""
         : h(
             "div",
             { class: "mode", role: "group", "aria-label": t.layoutLabel },
-            ...(["auto", "diagram", "list"] as const).map((md) =>
-              button(layoutName[md], () => this.#update(() => (this.#focusMode = md)), {
-                "aria-pressed": String(this.#focusMode === md),
-              }),
-            ),
+            toggle("list", icons.list, t.layoutList),
+            toggle("diagram", icons.network, t.layoutDiagram),
           );
     // the status in words only when it isn't the normal case (an active focus)
     const status =
@@ -1130,18 +1267,18 @@ export class ScxmlExplorer extends ElementBase {
         : isActive(focus) || focus.kind === "scxml"
           ? srText(t.active)
           : h("span", { class: "status" }, t.inactive);
+    // one place says where we are: the breadcrumb (the places above) and the focus as the title.
+    // Its kind and size are for screen readers; the last step shows in the colours, not a sentence
     const header = [
-      h("h2", { class: "title", part: "title" }, label(focus)),
       h(
-        "p",
-        { class: "subtitle" },
-        h("span", {}, t.focusSummary(t.kind(kindOf(focus)), scope.children.length, descendantCount(focus))),
+        "div",
+        { class: "title-row" },
+        h("div", { class: "place" }, this.#el.crumbs, h("h2", { class: "title", part: "title" }, label(focus))),
         status,
-        focus.parent ? button(t.up(label(focus.parent)), () => this.#focusOn(focus.parent!), { class: "drill" }) : "",
-        h("span", { class: "spacer" }),
+        this.#el.toolbar,
         modeSwitch,
       ),
-      this.#el.lastStep,
+      srText(t.focusSummary(t.kind(kindOf(focus)), scope.children.length, descendantCount(focus))),
     ];
 
     let body: Node;
@@ -1155,15 +1292,15 @@ export class ScxmlExplorer extends ElementBase {
       const showAll = this.#doorsShowAll[kind];
       const shown = showAll ? all : all.slice(0, DOORS_SHOWN);
       return [
-        h("div", { class: "section-title" }, kind === "exits" ? t.leavesTo : t.enteredFrom),
         h(
           "div",
-          { class: "doors", part: "doors" },
+          { class: "doors", part: "doors", role: "group", "aria-label": kind === "exits" ? t.leavesTo : t.enteredFrom },
           ...shown.map((d) => {
             const live = kind === "exits" && (d.child === focus ? isActive(focus) : isActive(d.child));
             const where = kind === "exits" ? label(d.other) : `${label(d.other)} → ${label(d.child)}`;
             const context = `${t.inState(d.other.parent ? label(d.other.parent) : t.machine)}${kind === "exits" && d.child !== focus ? ` · ${t.fromState(label(d.child))}` : ""}`;
-            const events = d.events.slice(0, 3).join(", ") + (d.events.length > 3 ? ` +${d.events.length - 3}` : "");
+            // a door: its glyph (out, or in), where it leads, and its events as notation; where
+            // it sits ("in …, from …") is in the tooltip and the accessible name
             const el = h(
               "div",
               {
@@ -1171,12 +1308,13 @@ export class ScxmlExplorer extends ElementBase {
                 part: parts("door", kind === "exits" ? "exit" : "entry", live && "live"),
                 role: "link",
                 tabindex: "0",
-                title: `${t.transitions(d.transitions.length)}: ${d.events.join(", ")}`,
+                title: `${kind === "exits" ? t.leavesTo : t.enteredFrom} ${where} · ${context}\n${d.events.join(", ")}`,
                 "aria-label": `${kind === "exits" ? t.leavesTo : t.enteredFrom}: ${where}, ${context}; ${d.events.join(", ")}`,
               },
+              glyph(kind === "exits" ? icons.doorOpen : icons.cornerDownRight, kind === "exits" ? t.leavesTo : t.enteredFrom, true),
               h("span", { class: "where" }, where),
-              h("span", { class: "context" }, context),
-              h("span", { class: "events" }, events),
+              // the first event, and how many more (all of them in the tooltip)
+              h("span", { class: "events" }, this.#eventName(d.events[0] ?? ""), d.events.length > 1 ? ` +${d.events.length - 1}` : ""),
             );
             activate(el, () => this.#focusOn(d.other));
             return el;
@@ -1262,8 +1400,8 @@ export class ScxmlExplorer extends ElementBase {
     );
     const meta = [
       waiting ? h("span", { class: "status" }, t.waiting) : "",
-      c.descendants ? button(t.inside(c.descendants), (e) => this.#drillInto(e, s), { class: "drill" }) : "",
-      c.invokes ? h("span", {}, t.invokes(c.invokes)) : "",
+      this.#does(s) ?? "",
+      c.descendants ? this.#inside(s, c.descendants) : "",
     ].filter(Boolean);
     const card = h(
       "div",
@@ -1404,7 +1542,6 @@ export class ScxmlExplorer extends ElementBase {
     d.prepend(svg);
     const labels = requests.map((r) => {
       const e = r.edge;
-      const text = e.events.length === 1 ? e.events[0]! : `${e.events[0]} +${e.events.length - 1}`;
       const lab = html(
         "span",
         {
@@ -1413,7 +1550,7 @@ export class ScxmlExplorer extends ElementBase {
           title: `${e.events.join("\n")}${r.fired ? `\n(${this.#strings.justTaken})` : ""}`,
           tabindex: "-1",
         },
-        html("span", { class: "full" }, text),
+        html("span", { class: "full" }, this.#eventName(e.events[0]!), e.events.length > 1 ? ` +${e.events.length - 1}` : ""),
         html("span", { class: "short" }, String(e.events.length)),
       );
       d.append(lab);
@@ -1450,19 +1587,19 @@ export class ScxmlExplorer extends ElementBase {
       if (activeChildren.has(e.to)) neighbours.add(e.from);
     }
     const matches = children.filter((c) => !q || c.node.id.toLowerCase().includes(q));
-    const groups: [string, ChildSummary[]][] = [
+    // the order says how near each state is: the active path (headed), then the states one
+    // transition from it, then the rest. No headings for those two: the order is enough
+    const groups: [string | undefined, ChildSummary[]][] = [
       [t.groupActivePath, matches.filter((c) => activeChildren.has(c.node))],
-      [t.groupOneStep, matches.filter((c) => !activeChildren.has(c.node) && neighbours.has(c.node))],
-      [t.groupElse, matches.filter((c) => !activeChildren.has(c.node) && !neighbours.has(c.node))],
+      [undefined, matches.filter((c) => !activeChildren.has(c.node) && neighbours.has(c.node))],
+      [undefined, matches.filter((c) => !activeChildren.has(c.node) && !neighbours.has(c.node))],
     ];
 
     let budget = this.#focusShowAll ? Infinity : LIST_PAGE;
     const rows: Node[] = [];
     for (const [title, list] of groups) {
       if (!list.length) continue;
-      // a count only where it helps: a long tail of other states
-      const heading = title === t.groupElse && list.length > 12 ? t.groupCount(title, list.length) : title;
-      rows.push(h("div", { class: "list-group", role: "presentation" }, heading));
+      if (title) rows.push(h("div", { class: "list-group", role: "presentation" }, title));
       for (const c of list) {
         if (budget-- <= 0) break;
         rows.push(this.#listRow(c, session));
@@ -1520,12 +1657,6 @@ export class ScxmlExplorer extends ElementBase {
       { type: "button", class: "name select", "aria-label": rowName, ...(leaf ? { "aria-expanded": String(open) } : {}) },
       label(s),
     );
-    const does = [
-      ...s.invokes.map((i) =>
-        `invoke ${i.element.getAttribute("id") ?? i.element.getAttribute("src") ?? i.element.getAttribute("type") ?? ""}`.trim(),
-      ),
-      ...s.onentry.flatMap((b) => Array.from(b.children, describeAction)),
-    ];
     const txs = s.transitions;
     const cls = ["list-row", c.onActivePath && "path", c.active && leaf && "active", visited && "visited", open && "open"];
     const row = h(
@@ -1543,18 +1674,9 @@ export class ScxmlExplorer extends ElementBase {
         select,
         kindMark(s),
         visited ? h("span", { class: "visited-mark", part: "visited", "aria-hidden": "true" }, t.lastVisited) : "",
-        c.descendants
-          ? button(t.inside(c.descendants), (e) => this.#drillInto(e, s), { class: "drill", title: t.statesInside(c.descendants) })
-          : "",
+        !open ? (this.#does(s) ?? "") : "",
+        c.descendants ? this.#inside(s, c.descendants) : "",
       ),
-      does.length && !open
-        ? h(
-            "div",
-            { class: "does", part: "row-actions", title: does.join("\n") },
-            h("span", { class: "label" }, t.onEntry),
-            ` ${does.slice(0, 2).join(" · ")}${does.length > 2 ? ` +${does.length - 2}` : ""}`,
-          )
-        : "",
       txs.length
         ? h(
             "div",
@@ -1587,13 +1709,21 @@ export class ScxmlExplorer extends ElementBase {
       title: `${ev}${tr.cond ? ` [${tr.cond}]` : ""} → ${to}${fired ? ` · ${t.justTaken}` : ""}`,
     };
     const content = [
-      h("span", { class: "ev" }, ev),
-      tr.cond ? h("span", { class: "guard", title: t.guard(tr.cond) }, full ? t.guard(tr.cond) : t.columnIf) : "",
+      h("span", { class: "ev" }, ...(tr.events.length ? tr.events.flatMap((e, i) => [i ? " " : "", this.#eventName(e)]) : [t.eventless])),
+      tr.cond
+        ? full
+          ? h("span", { class: "guard" }, glyph(icons.diamond, t.guard(tr.cond), true), tr.cond)
+          : glyph(icons.diamond, t.guard(tr.cond))
+        : "",
       h("span", { class: "to" }, `→ ${to}`),
       fired ? srText(`, ${t.justTaken}`) : "",
     ];
     if (!name) return h("span", { ...attrs, role: "listitem" }, ...content);
-    const b = h("button", { ...attrs, type: "button", "aria-label": `${t.sendEvent(name)} → ${to}` }, ...content);
+    const b = h(
+      "button",
+      { ...attrs, class: `${attrs.class} ev-chip`, type: "button", "aria-label": `${t.sendEvent(name)} → ${to}` },
+      ...content,
+    );
     b.addEventListener("click", (e) => {
       e.stopPropagation();
       this.#send(name);
@@ -1962,12 +2092,12 @@ export class ScxmlExplorer extends ElementBase {
         const c = h(
           "button",
           {
-            class: `chip${name ? "" : " muted"}`,
+            class: `chip ev-chip${name ? "" : " muted"}`,
             type: "button",
             title: e.transitions.map((x) => `${label(x.source)} → ${x.targets.map(label).join(" ") || t.internal}`).join("\n"),
             ...(name ? { "aria-label": t.sendEvent(name) } : { disabled: "" }),
           },
-          e.descriptor,
+          this.#eventName(e.descriptor),
         );
         if (name) c.addEventListener("click", () => this.#send(name));
         return c;
@@ -2022,12 +2152,13 @@ export class ScxmlExplorer extends ElementBase {
     const x = e.transitions[0]!;
     const name = sendableName(e.descriptor);
     // the event's name is its send button
-    const send = button(e.descriptor, () => name && this.#send(name), {
-      class: "ev send",
+    const send = button("", () => name && this.#send(name), {
+      class: "ev send ev-chip",
       part: "send",
       title: name ? t.sendEvent(name) : t.cannotSendWildcard,
       "aria-label": name ? t.sendEvent(name) : `${e.descriptor}: ${t.cannotSendWildcard}`,
     });
+    send.append(this.#eventName(e.descriptor));
     if (!name) send.setAttribute("disabled", "");
     return h(
       "div",
@@ -2042,8 +2173,8 @@ export class ScxmlExplorer extends ElementBase {
             .join("\n"),
         },
         `${label(x.source)} `,
-        x.guarded ? h("span", { class: "guard" }, `${t.guard(truncate(x.transition.cond ?? "", 28))} `) : "",
-        `→ ${x.targets.map(label).join(", ") || t.stays}`,
+        x.guarded ? glyph(icons.diamond, t.guard(x.transition.cond ?? "")) : "",
+        ` → ${x.targets.map(label).join(", ") || t.stays}`,
         e.transitions.length > 1 ? ` · +${e.transitions.length - 1}` : "",
         // the scope in words, not only the colour of the event name
         e.scope !== "here" ? " · " : "",
@@ -2056,6 +2187,33 @@ export class ScxmlExplorer extends ElementBase {
   #sendDescriptor(descriptor: string) {
     const name = sendableName(descriptor);
     if (name) this.#send(name);
+  }
+
+  /** An event's name, as written: the namespace quieter, its kind as the state colours. */
+  #eventName(descriptor: string): HTMLElement {
+    return eventName(descriptor);
+  }
+
+  /** What a state does on entry / exit and what it invokes, as glyphs. */
+  #does(s: StateNode): HTMLElement | undefined {
+    const t = this.#strings;
+    return actionGlyphs(
+      s,
+      { onEntry: t.onEntry, onExit: t.onExit, invokes: t.invokesGlyph, sends: t.sendsGlyph, logs: t.logsGlyph },
+      describeAction,
+    );
+  }
+
+  /** A container's size: the layers glyph and its number of states; the button that goes inside. */
+  #inside(s: StateNode, n: number): HTMLElement {
+    const t = this.#strings;
+    const b = button("", (e) => this.#drillInto(e, s), {
+      class: "drill inside",
+      title: t.statesInside(n),
+      "aria-label": t.statesInside(n),
+    });
+    b.append(glyph(icons.layers, t.statesInside(n), true), html("span", { class: "n" }, String(n)));
+    return b;
   }
 
   #send(name: string) {
@@ -2247,47 +2405,32 @@ export class ScxmlExplorer extends ElementBase {
     );
   }
 
-  // ── tabs (narrow layout) ──
+  // ── panels ──
 
-  #renderTabs() {
-    const s = this.#strings;
-    const tabs: [Tab, string][] = [
-      ["system", s.tabSystem],
-      ["tree", s.tabStates],
-      ["focus", s.tabFocus],
-      ["events", s.tabEvents],
-      ["detail", s.tabDetail],
-    ];
-    const paneFor: Record<Tab, HTMLElement> = {
-      system: this.#el.center,
-      tree: this.#el.treePane,
-      focus: this.#el.center,
-      events: this.#el.inspector,
-      detail: this.#el.inspector,
-    };
-    for (const p of [this.#el.treePane, this.#el.center, this.#el.inspector])
-      p.toggleAttribute("data-tab-active", paneFor[this.#tab] === p);
-    this.#el.tabs.replaceChildren(
-      ...tabs.map(([t, text]) =>
-        button(
-          text,
-          () => {
-            this.#tab = t;
-            if (t === "system") this.#level = "system";
-            if (t === "focus" || t === "events") this.#level = "machine";
-            if (t === "events" || t === "detail") this.#inspector = t;
-            this.#renderNow();
-          },
-          { role: "tab", part: parts("tab", this.#tab === t && "selected"), "aria-selected": String(this.#tab === t) },
-        ),
-      ),
-    );
+  /** Which page the single panel shows, the sheet's height, and the links between the pages. */
+  #renderPanels(m: MachineInfo) {
+    const t = this.#strings;
+    const { shell, back, toInspector, handle, panel } = this.#el;
+    const system = this.#level === "system";
+    // the System level has no tree: its panel is the inspector (services)
+    const page: Page = system ? "inspector" : this.#page;
+    shell.dataset.page = page;
+    shell.dataset.sheet = this.#sheet;
+    back.hidden = system;
+    const session = m.session;
+    const accepted = session.status === "running" ? acceptedEvents(session, this.#focus!).filter((e) => e.scope !== "elsewhere").length : 0;
+    toInspector.textContent = `${t.accepts(accepted)} ›`;
+    const open = this.#sheet !== "low";
+    handle.setAttribute("aria-expanded", String(open));
+    handle.setAttribute("aria-label", this.#sheet === "full" ? t.sheetCollapse : t.sheetExpand);
+    handle.title = handle.getAttribute("aria-label")!;
+    this.#syncSheetHeight(panel);
   }
 }
 
 // ───────────────────────────────── helpers ─────────────────────────────────
 
-const explorerSheet = lazySheet(EXPLORER_CSS);
+const explorerSheet = lazySheet(EXPLORER_CSS + NOTATION_CSS);
 
 /** Make a focusable element behave like a button: click, Enter and Space all run `fn`. */
 function activate(el: HTMLElement, fn: () => void) {

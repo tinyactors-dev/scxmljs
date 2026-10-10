@@ -33,13 +33,13 @@ export interface ExplorerStrings {
   followHint: string;
 
   // ── playback ──
-  /** Play button (while paused). English: "▶ Play". */
+  /** Play button's name (while paused; the button is its icon). English: "Play". */
   play: string;
-  /** Pause button (while playing). English: "⏸ Pause". */
+  /** Pause button's name (while playing). English: "Pause". */
   pause: string;
   /** Tooltip of the play/pause button. English: "Play / pause (Space)". */
   playHint: string;
-  /** Step button. English: "Step ⏭". */
+  /** Step button's name (the button is its icon). English: "Step". */
   step: string;
   /** Tooltip of the step button. English: "Run until the next step of any machine (.)". */
   stepHint: string;
@@ -47,7 +47,7 @@ export interface ExplorerStrings {
   speedLabel: string;
   /** Tooltip of the virtual time readout. English: "virtual time". */
   virtualTime: string;
-  /** Virtual time display, e.g. "t = 12.4 s". */
+  /** Virtual time display, e.g. "12.4 s". */
   clockTime: (formatted: string) => string;
   /** Tasks ready to run now. */
   queued: (n: number) => string;
@@ -67,7 +67,7 @@ export interface ExplorerStrings {
   findState: string;
   /** Accessible name of the tree filter. English: "Filter states". */
   filterStates: string;
-  /** Label of the "active states only" toggle. English: "active". */
+  /** Name of the "active states only" filter (the button is the funnel glyph). English: "Only active states". */
   activeOnly: string;
   /** Accessible name of the tree. English: "States". */
   treeLabel: string;
@@ -139,12 +139,6 @@ export interface ExplorerStrings {
   events: (n: number) => string;
   /** List group: children on the active path. English: "On the active path". */
   groupActivePath: string;
-  /** List group: children one transition away from the active path. English: "One step away". */
-  groupOneStep: string;
-  /** List group: all other children. English: "Everything else". */
-  groupElse: string;
-  /** Count after a list group title. */
-  groupCount: (title: string, n: number) => string;
   /** Title of a list row's drill-in button. */
   statesInside: (n: number) => string;
   /** More targets than shown. */
@@ -155,8 +149,17 @@ export interface ExplorerStrings {
   showAll: (n: number) => string;
   /** Open a lane that has more states than shown. */
   openLane: (n: number) => string;
-  /** Label before a list row's entry actions and invokes. English: "on entry". */
+  /** Name of the entry actions' glyph. English: "on entry". */
   onEntry: string;
+  /** Name of the exit actions' glyph. English: "on exit". */
+  onExit: string;
+  /** Name of the invokes' glyph. English: "invokes". */
+  invokesGlyph: string;
+  /** Name of the "sends" glyph (send, raise). English: "sends". */
+  sendsGlyph: string;
+  /** Name of the "logs" glyph. English: "logs". */
+  logsGlyph: string;
+
   /** A transition without an event. English: "always". */
   eventless: string;
   /** Tooltip and screen-reader text of a transition's condition. English: "if <cond>". */
@@ -288,17 +291,19 @@ export interface ExplorerStrings {
   /** Transitions table column: target. English: "to". */
   columnTo: string;
 
-  // ── narrow layout tabs ──
-  /** Narrow layout tab: System. English: "System". */
-  tabSystem: string;
-  /** Narrow layout tab: tree. English: "States". */
-  tabStates: string;
-  /** Narrow layout tab: focus. English: "Focus". */
-  tabFocus: string;
-  /** Narrow layout tab: accepted events. English: "Accepts". */
-  tabEvents: string;
-  /** Narrow layout tab: detail. English: "Detail". */
-  tabDetail: string;
+  // ── panels ──
+  /** The single panel's link back to the tree. English: "‹ States". */
+  backToStates: string;
+  /** Accessible name of that link. */
+  backToStatesLabel: string;
+  /** Accessible name of the panel with the tree (and, when there's one panel, the inspector). */
+  panelLabel: string;
+  /** Accessible name of the inspector's own panel (wide layouts). */
+  inspectorLabel: string;
+  /** The sheet's handle (narrow layouts), while it can open further. */
+  sheetExpand: string;
+  /** The sheet's handle, when it's all the way up. */
+  sheetCollapse: string;
 
   // ── live region (screen readers) ──
   /** Announced after a step: machine, event and the transitions taken. */
@@ -321,14 +326,14 @@ export const defaultStrings: ExplorerStrings = {
   follow: "Follow",
   followHint: "Keep the focus on the part of the machine that is moving",
 
-  play: "▶ Play",
-  pause: "⏸ Pause",
+  play: "Play",
+  pause: "Pause",
   playHint: "Play / pause (Space)",
-  step: "Step ⏭",
+  step: "Step",
   stepHint: "Run until the next step of any machine (.)",
   speedLabel: "Speed",
   virtualTime: "virtual time",
-  clockTime: (t) => `t = ${t}`,
+  clockTime: (t) => `${t}`,
   queued: (n) => `${n} queued`,
   nextTimer: (t) => `next timer in ${t}`,
   idle: "idle",
@@ -338,7 +343,7 @@ export const defaultStrings: ExplorerStrings = {
   statesPane: "States",
   findState: "Find state…",
   filterStates: "Filter states",
-  activeOnly: "active",
+  activeOnly: "Only active states",
   treeLabel: "States",
   matchesOf: (m, t) => `${m} / ${t}`,
   noStateMatches: "No state matches.",
@@ -374,15 +379,16 @@ export const defaultStrings: ExplorerStrings = {
   staysInside: "transitions that stay inside",
   events: (n) => count(n, "event", "events"),
   groupActivePath: "On the active path",
-  groupOneStep: "One step away",
-  groupElse: "Everything else",
-  groupCount: (title, n) => `${title} · ${n}`,
   statesInside: (n) => `${count(n, "state", "states")} inside`,
   moreTargets: (n) => `+${count(n, "target", "targets")}`,
   findAmongStates: (n) => `Find among ${count(n, "state", "states")}…`,
   showAll: (n) => `Show all ${n}`,
   openLane: (n) => `+${n} more — open lane`,
   onEntry: "on entry",
+  onExit: "on exit",
+  invokesGlyph: "invokes",
+  sendsGlyph: "sends",
+  logsGlyph: "logs",
   eventless: "always",
   guard: (cond) => `if ${cond}`,
   justTaken: "just taken",
@@ -450,11 +456,12 @@ export const defaultStrings: ExplorerStrings = {
   columnIf: "if",
   columnTo: "to",
 
-  tabSystem: "System",
-  tabStates: "States",
-  tabFocus: "Focus",
-  tabEvents: "Accepts",
-  tabDetail: "Detail",
+  backToStates: "‹ States",
+  backToStatesLabel: "Back to the states",
+  panelLabel: "States and events",
+  inspectorLabel: "Inspector",
+  sheetExpand: "Show more",
+  sheetCollapse: "Show less",
 
   announceStep: (s) => `${s.machine}: ${s.moves.length ? s.moves.join(", ") : `${s.event ?? "start"}, no transition`}`,
   announceSent: (name, machine) => `Sent ${name} to ${machine}`,

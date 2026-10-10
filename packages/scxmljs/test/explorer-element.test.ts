@@ -156,8 +156,7 @@ describe("<scxml-explorer>", () => {
     $(".step")!.click();
     expect([steps, session.activeStateIds()]).toEqual([2, ["c"]]);
     await frame();
-    expect($(".clock-time")?.textContent).toBe("t = 2.0 s");
-    expect($(".last-step")?.textContent).toContain("t2");
+    expect($(".clock-time")?.textContent).toBe("2.0 s");
     clock.dispose();
     session.dispose();
     el.remove();
@@ -173,19 +172,60 @@ describe("<scxml-explorer>", () => {
     el.remove();
   });
 
-  test("narrow-layout tabs switch the visible pane", async () => {
+  test("panels: two side by side when wide; one with a tree page and an inspector page; a sheet when narrow", async () => {
     const { $, $$, el, session } = await mount(SHOP);
-    const tab = (label: string) => $$(".tabs button").find((b) => b.textContent === label)!;
-    expect($$(".tabs button").map((b) => b.textContent)).toEqual(["System", "States", "Focus", "Accepts", "Detail"]);
-    tab("States").click();
-    expect($(".tree-pane")?.hasAttribute("data-tab-active")).toBe(true);
-    tab("Accepts").click();
-    expect($(".inspector")?.hasAttribute("data-tab-active")).toBe(true);
-    expect($(".tree-pane")?.hasAttribute("data-tab-active")).toBe(false);
-    tab("System").click();
+    const shell = () => $(".shell") as HTMLElement;
+    const resize = async (width: number) => {
+      el.getBoundingClientRect = () => ({ width, height: 700 }) as DOMRect;
+      el.remove();
+      document.body.append(el); // connectedCallback measures again
+      await frame();
+    };
+    // wide: the inspector has a panel of its own
+    await resize(1400);
+    expect(shell().dataset.layout).toBe("panels");
+    expect($(".side-panel .inspector")).not.toBeNull();
+    // one panel: the inspector becomes its second page, with links between the two
+    await resize(1000);
+    expect(shell().dataset.layout).toBe("panel");
+    expect($(".panel-body .inspector")).not.toBeNull();
+    expect(shell().dataset.page).toBe("tree");
+    const toInspector = $(".to-inspector") as HTMLButtonElement;
+    expect(toInspector.textContent).toMatch(/^Accepts \d+ ›$/);
+    toInspector.click();
+    await frame();
+    expect(shell().dataset.page).toBe("inspector");
+    ($(".back") as HTMLButtonElement).click();
+    await frame();
+    expect(shell().dataset.page).toBe("tree");
+    // narrow: a sheet; its handle opens it step by step, showing a page opens it too
+    await resize(390);
+    expect(shell().dataset.layout).toBe("sheet");
+    expect(shell().dataset.sheet).toBe("low");
+    const handle = $(".sheet-handle") as HTMLButtonElement;
+    expect(handle.getAttribute("aria-expanded")).toBe("false");
+    handle.click();
+    await frame();
+    expect(shell().dataset.sheet).toBe("half");
+    handle.click();
+    await frame();
+    expect(shell().dataset.sheet).toBe("full");
+    expect(handle.getAttribute("aria-label")).toBe("Show less");
+    handle.click();
+    await frame();
+    expect(shell().dataset.sheet).toBe("low");
+    $$(".events-strip .more")[0]?.click() ?? toInspector.click();
+    await frame();
+    expect(shell().dataset.page).toBe("inspector");
+    expect(shell().dataset.sheet).toBe("half");
+    // the System level: no tree, its panel is the inspector
+    $$(".crumbs button")
+      .find((b) => b.textContent === "System")!
+      .click();
     await frame();
     expect($(".system")).not.toBeNull();
-    expect($$(".machine").map((m) => m.querySelector(".name")?.textContent)).toEqual(["shop"]);
+    expect(shell().dataset.page).toBe("inspector");
+    expect(($(".back") as HTMLElement).hidden).toBe(true);
     session.dispose();
     el.remove();
   });
@@ -339,13 +379,17 @@ describe("<scxml-explorer> views", () => {
     expect($("h2.title")?.textContent).toBe("main");
     // happy-dom has no layout (width 0), so "auto" picks the list
     expect($$(".list-row").length).toBe(11); // hub, s1…s8, par, kidHost
-    expect($$(".list-group").map((g) => g.textContent)).toEqual(["On the active path", "One step away"]); // no counts
-    byText(".mode button", "Diagram")!.click();
+    // only the active path has a heading; the order says the rest: one step away, then everything else
+    expect($$(".list-group").map((g) => g.textContent)).toEqual(["On the active path"]);
+    const pathRows = $$(".list-row").map((r) => r.classList.contains("path"));
+    expect(pathRows[0]).toBe(true);
+    expect(pathRows.lastIndexOf(true)).toBeLessThan(pathRows.indexOf(false));
+    ($('.mode button[aria-label="Diagram"]') as HTMLButtonElement).click();
     await frame();
     await frame();
     expect($(".diagram")).not.toBeNull();
     expect($$(".diagram .card").length).toBe(11);
-    byText(".mode button", "List")!.click();
+    ($('.mode button[aria-label="List"]') as HTMLButtonElement).click();
     await frame();
     // doors: 8 distinct targets outside the focus, 6 shown
     expect($$(".door").length).toBe(6 + 1); // 6 exits + 1 entry (far → s3)
@@ -374,7 +418,8 @@ describe("<scxml-explorer> views", () => {
     (clock as VirtualClock).run();
     await frame();
     expect(session.isActive("busy")).toBe(true);
-    expect($(".last-step")?.textContent).toBe("shop: go · idle → busy");
+    // the last step shows in the colours (the transition taken), not in a sentence
+    expect($(".last-step")).toBeNull();
     // back to "work" (following moved the focus into busy)
     $$(".tree-row")
       .find((r) => r.querySelector(".name")?.textContent === "work")!
@@ -401,7 +446,8 @@ describe("<scxml-explorer> views", () => {
     // the focus is "main". A leaf row says what the state does and how it leaves; hub is active,
     // so its events are buttons that send them
     const hub = () => byText(".list-row .name", "hub")!.closest<HTMLElement>(".list-row")!;
-    expect(hub().querySelector(".does")?.textContent).toBe("on entry if x > 0 … · foreach i in [1, 2] +1");
+    // what it does: glyphs, named for screen readers and in the tooltip
+    expect(hub().querySelector(".does-glyphs")?.getAttribute("aria-label")).toMatch(/^on entry: if x > 0 …, foreach i in \[1, 2\]/);
     const exits = [...hub().querySelectorAll<HTMLElement>(".exits .tx")];
     expect(exits.map((x) => x.textContent)).toEqual(["go.1→ s1", "go.2→ s2", "go.3→ s3"]);
     expect(exits.map((x) => x.localName)).toEqual(["button", "button", "button"]);
@@ -412,7 +458,10 @@ describe("<scxml-explorer> views", () => {
     await frame();
     expect(hub().querySelector(".select")?.getAttribute("aria-expanded")).toBe("true");
     expect(hub().querySelectorAll(".exits .tx").length).toBe(12);
-    expect(hub().querySelector('.tx [title="if x > 100"]')?.textContent).toBe("if x > 100");
+    // a condition, opened: the diamond glyph and the condition
+    expect([...hub().querySelectorAll(".tx .guard")].some((g) => g.textContent === "x > 100" && g.querySelector(".glyph-diamond"))).toBe(
+      true,
+    );
     expect(hub().querySelector('[part~="row-detail"] .actions')?.textContent).toContain("foreach i in [1, 2]");
     expect(selected).toBe("");
     // …and links to the full detail
@@ -479,9 +528,9 @@ describe("<scxml-explorer> views", () => {
     expect($(".tree-viewport .empty")?.textContent).toBe("No state matches.");
     search.value = "";
     search.dispatchEvent(new window.Event("input") as unknown as Event);
-    const activeOnly = $(".tree-pane input[type=checkbox]") as HTMLInputElement;
-    activeOnly.checked = true;
-    activeOnly.dispatchEvent(new window.Event("change") as unknown as Event);
+    const activeOnly = $(".tree-pane .filter") as HTMLButtonElement;
+    activeOnly.click();
+    expect(activeOnly.getAttribute("aria-pressed")).toBe("true");
     await frame();
     expect(names()).toContain("hub");
     expect(names()).not.toContain("r1");
@@ -540,7 +589,7 @@ describe("<scxml-explorer> views", () => {
   test("system level: machines, services, traffic and opening a child machine", async () => {
     const { $, $$, byText, el, session, send } = await mountRich();
     await send("to.kid");
-    byText(".levels button", "System")!.click();
+    byText(".crumbs button", "System")!.click();
     await frame();
     expect($(".shell")?.getAttribute("data-level")).toBe("system"); // the CSS hides the state tree
     expect($(".inspector .pane-head")?.textContent).toBe("Service"); // services, not the machine's events
@@ -553,7 +602,8 @@ describe("<scxml-explorer> views", () => {
     byText(".machine .name", "kid")!.closest<HTMLElement>(".machine")!.click();
     await frame();
     expect($("h2.title")?.textContent).toBe("kid");
-    expect($$(".crumbs button").map((b) => b.textContent)).toEqual(["System", "rich", "kid"]);
+    // the breadcrumb: the places above the title
+    expect($$(".crumbs button").map((b) => b.textContent)).toEqual(["System", "rich"]);
     $$(".crumbs button")[1]!.click(); // back to the root machine
     await frame();
     expect($("h2.title")?.textContent).toBe("rich");
@@ -567,7 +617,7 @@ describe("<scxml-explorer> views", () => {
       (_, i) => `<invoke id="k${i}"><content><scxml ${NS} name="worker${i}"><state id="w"/></scxml></content></invoke>`,
     ).join("");
     const { $, $$, el, session } = await mount(`<scxml ${NS} name="boss"><state id="b">${kids}</state></scxml>`);
-    for (const b of $$(".levels button")) if (b.textContent === "System") b.click();
+    for (const b of $$(".crumbs button")) if (b.textContent === "System") b.click();
     await frame();
     expect($$(".machine.compact").length).toBe(11);
     const filter = $(".system input[type=search]") as HTMLInputElement;
@@ -612,19 +662,13 @@ describe("<scxml-explorer> views", () => {
     clock.step(() => false);
     await frame();
     expect($("h2.title")?.textContent).toBe("e");
-    // wide: first two, "…", last two
-    expect($$(".crumbs button").map((b) => b.textContent)).toEqual(["System", "deep", "…", "d", "e"]);
-    // narrow (measured on the host; happy-dom has no layout, so give it a width): "…" plus the last two
-    el.getBoundingClientRect = () => ({ width: 500, height: 600 }) as DOMRect;
-    el.remove();
-    document.body.append(el); // connectedCallback measures again
-    await frame();
-    expect($$(".crumbs button").map((b) => b.textContent)).toEqual(["…", "d", "e"]);
+    // the breadcrumb (the places above the title), shortened: the first, "…", the one right above
+    expect($$(".crumbs button").map((b) => b.textContent)).toEqual(["System", "…", "d"]);
     $$(".crumbs button")
       .find((b) => b.textContent === "…")!
       .click();
     await frame();
-    expect($$(".crumbs button").length).toBe(7);
+    expect($$(".crumbs button").length).toBe(6);
     ($(".follow") as HTMLButtonElement).click();
     expect(el.follow).toBe(false);
     ($(".follow") as HTMLButtonElement).click();
@@ -637,7 +681,8 @@ describe("<scxml-explorer> views", () => {
     session.send("t");
     el.dispatchEvent(new window.KeyboardEvent("keydown", { key: ".", bubbles: true }) as unknown as Event);
     await frame();
-    expect($(".last-step")?.textContent).toContain("deep: t");
+    // the step is announced (the screen shows it in the colours, not a sentence)
+    expect($('[role="status"]')?.textContent).toContain("deep:");
     const speeds = $(".speeds") as HTMLSelectElement;
     expect([...speeds.options].map((o) => o.textContent)).toEqual(["¼×", "½×", "1×", "2×", "4×"]);
     speeds.value = "2";
@@ -757,16 +802,16 @@ describe("<scxml-explorer> accessibility and i18n", () => {
     el.strings = {
       levelSystem: "Système",
       statesPane: "États",
-      tabStates: "États",
+      backToStates: "‹ États",
       focusSummary: (kind, n) => `${kind} · ${n} états`,
       kind: (k) => ({ compound: "composé", atomic: "atomique" })[k as "compound" | "atomic"] ?? k,
       sendEvent: (name) => `Envoyer ${name}`,
     };
     await frame();
-    expect($$(".levels button")[0]?.textContent).toBe("Système");
+    expect($$(".crumbs button")[0]?.textContent).toBe("Système");
     expect($(".pane-title")?.textContent).toBe("États");
-    expect($$(".tabs button").map((b) => b.textContent)).toContain("États");
-    expect($(".subtitle span")?.textContent).toBe("composé · 2 états");
+    expect($(".back")?.textContent).toBe("‹ États");
+    expect($$(".sr-only").map((x) => x.textContent)).toContain("composé · 2 états");
     expect($$(".ev-row .send")[0]?.getAttribute("aria-label")).toMatch(/^Envoyer /);
     expect($(".follow")?.textContent).toBe("Follow"); // not overridden
     expect(el.strings.follow).toBe("Follow");
@@ -810,7 +855,7 @@ describe("<scxml-explorer> accessibility and i18n", () => {
 
   test("slots: toolbar, per-event and empty states (with their default text)", async () => {
     const { $, $$, root, el, session } = await mount(SHOP);
-    expect($('.top slot[name="toolbar"]')).not.toBeNull();
+    expect($('.title-row slot[name="toolbar"]')).not.toBeNull();
     expect($$(".ev-row slot").map((s) => s.getAttribute("name"))).toContain("event:go");
     const search = root.querySelector<HTMLInputElement>('input[part="tree-search"]')!;
     search.value = "zzz";

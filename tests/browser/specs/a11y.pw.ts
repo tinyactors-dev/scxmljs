@@ -26,7 +26,7 @@ async function audit(page: Page, include: string) {
 
 const scenarios: [string, (page: Page) => Promise<void>][] = [
   ["explorer, machine level", async () => {}],
-  ["explorer, System level", async (page) => page.locator("#wide [part~=levels] button", { hasText: "System" }).click()],
+  ["explorer, System level", async (page) => page.locator("#wide [part~=crumb]", { hasText: "System" }).click()],
   ["explorer, state detail", async (page) => page.locator("#wide [part~=tree-row]", { hasText: "stopped" }).click()],
   [
     "explorer, list with an opened row",

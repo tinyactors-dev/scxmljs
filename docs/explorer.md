@@ -21,12 +21,23 @@ It has two levels:
     button that sends it; event data sits behind a disclosure), and the details of the selected
     state. At the System level it shows the selected service, and the tree is hidden.
 
-The header holds the levels, the breadcrumb, the playback controls and the Follow toggle. Under
-the title, one line says what the last step did. Colour means one thing each: the running colour
+Under the title, one line says what the last step did. Colour means one thing each: the running colour
 marks what is active, the waiting colour what just happened (the arrow the last step took, the
 transition just taken and the state it left, marked "last visited").
 
-Below 760 px of width, the panes become tabs.
+The focus fills the explorer, and the other panels float over it, solid with a hairline border,
+like a map's:
+
+- **Wide (1280 px and more):** the tree on the left, the inspector on the right.
+- **Medium:** one panel on the left. It shows the tree, and the inspector as its second page:
+  "Accepts n ›" opens it, "‹ States" goes back, and selecting a state opens its detail there.
+- **Narrow (760 px or less):** the same panel as a bottom sheet. At its lowest it shows the
+  breadcrumb and the accepted events as buttons that send them. Drag its handle, or tap it, to
+  open it to half or full height.
+
+The panel's head holds the System and Machine levels and the breadcrumb, which shortens long paths
+to "…" and the last two places (tap "…" to show the whole path). The playback controls sit in the
+bottom-left corner of what the panels leave free, and the Follow toggle in the bottom-right.
 
 ## Use
 
@@ -67,7 +78,7 @@ session: that's yours to do.
 | `attach({ session, processors?, clock? })` | show a root session. `clock` defaults to `session.clock`. |
 | `detach()` | stop showing it |
 | `session`, `processors`, `clock` | the same three, one at a time. Setting one re-attaches. |
-| `follow` | keep the focus on the part of the machine that is moving. Reflected as the `follow` attribute; the header has a toggle for it. |
+| `follow` | keep the focus on the part of the machine that is moving. Reflected as the `follow` attribute; the bottom-right corner has a toggle for it. |
 | `announce` | as the attribute |
 | `announceInterval` | while a clock plays, announce steps at most this often (ms, default 3000) |
 | `strings` | translations; see [custom UI and translations](custom-ui.md#translations) |
@@ -110,7 +121,7 @@ they work with any framework and any styling.
 | `detail:<id>` | in the detail pane of state `<id>` |
 | `event:<descriptor>` | in the row of that accepted event, e.g. a form for its data (`event:order.placed`) |
 | `service:<name>` | in that service's card at the System level (`<name>` is the I/O processor's first alias, or its type) |
-| `toolbar` | in the header, before the Follow toggle |
+| `toolbar` | in the panel's head, after the breadcrumb |
 | `empty-tree`, `empty-events`, `empty-detail` | replace the "nothing here" messages |
 
 <!-- doctest: html -->
@@ -156,14 +167,14 @@ Parts, with their modifiers (added while they apply):
 
 | Area | Parts |
 |---|---|
-| Header | `top`, `levels`, `crumbs`, `crumb` (`current`), `follow` |
-| Playback (in the header) | `playback`, `play`, `step`, `speeds` (a `<select>`), `clock` |
+| Panels | `panel` (the tree, and in one-panel layouts the inspector), `side-panel` (the inspector, wide layouts), `top` (the panel's head), `levels`, `crumbs`, `crumb` (`current`), `to-inspector`, `back`, `sheet-handle` |
+| Corners | `playback`, `play`, `step`, `speeds` (a `<select>`), `clock` (bottom left), `follow` (bottom right) |
 | Tree | `tree-pane`, `tree-search`, `tree`, `tree-row` (`path` `active` `match`) |
 | Focus | `focus-pane`, `title`, `last-step`, `diagram`, `card` (`path` `active` `waiting` `final` `selected` `visited`), `edges`, `edge-label` (`live` `fired` `collapsed`), `list`, `list-row` (`path` `active` `visited` `open`), `visited`, `row-actions`, `row-exits`, `row-event` (`fired`), `row-detail`, `open-detail`, `lanes`, `lane` (`path`), `lane-row` (`active` `visited`), `doors`, `door` (`exit` or `entry`, `live`) |
 | Accepted events | `inspector`, `event-search`, `scopes`, `event-data` (a `<details>`), `events`, `event-group`, `event-row` (`here`, `inherited` or `elsewhere`), `send` (the event's name) |
 | Details | `detail`, `warning` |
 | System level | `system`, `machine` (`running` `done` `hot`), `service` (`selected` `hot`) |
-| Narrow layout | `tabs`, `tab` (`selected`), `strip` |
+| Narrow layout (sheet) | `strip` (the accepted events at the sheet's lowest height) |
 | Anywhere | `empty` |
 
 ## The view-model

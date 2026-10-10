@@ -35,7 +35,7 @@ test("explorer, 390px @visual", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 780 });
   await page.goto("/fixtures/explorer.html");
   await ready(page);
-  await expect(page.locator("#wide [part~=tabs]")).toBeVisible();
+  await expect(page.locator("#wide [part~=sheet-handle]")).toBeVisible();
   await expect(page.locator("#wide")).toHaveScreenshot("explorer-narrow.png");
 });
 

@@ -1,0 +1,42 @@
+<!--
+  The classic microwave: two parallel regions, the engine and the door, coordinated with In().
+  It only cooks while the door is closed, pauses when it opens, and switches itself off when
+  the cooking time is up.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="microwave" initial="oven">
+  <datamodel>
+    <data id="cookTime" expr="5"/>
+    <data id="timer" expr="0"/>
+  </datamodel>
+  <parallel id="oven">
+    <state id="engine" initial="off">
+      <state id="off">
+        <transition event="turn.on" target="on"/>
+      </state>
+      <state id="on" initial="idle">
+        <onentry><assign location="timer" expr="0"/></onentry>
+        <transition event="turn.off" target="off"/>
+        <transition cond="timer &gt;= cookTime" target="off"/>
+        <state id="idle">
+          <transition cond="In('closed')" target="cooking"/>
+        </state>
+        <state id="cooking">
+          <onentry><send id="tick" event="time" delay="1s"/></onentry>
+          <onexit><cancel sendid="tick"/></onexit>
+          <transition cond="In('open')" target="idle"/>
+          <transition event="time" target="cooking">
+            <assign location="timer" expr="timer + 1"/>
+          </transition>
+        </state>
+      </state>
+    </state>
+    <state id="door" initial="closed">
+      <state id="closed">
+        <transition event="door.open" target="open"/>
+      </state>
+      <state id="open">
+        <transition event="door.close" target="closed"/>
+      </state>
+    </state>
+  </parallel>
+</scxml>

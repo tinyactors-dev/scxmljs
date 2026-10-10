@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>scxmljs</title>
+  <rect width="32" height="32" rx="6" fill="#1F5E4A"/>
+  <rect x="5" y="9" width="10" height="14" rx="3" fill="none" stroke="#FAF6EE" stroke-width="2"/>
+  <rect x="19" y="9" width="8" height="14" rx="3" fill="#FAF6EE"/>
+  <path d="M15 16h3" stroke="#FAF6EE" stroke-width="2"/>
+  <path d="M16.5 13.5 19 16l-2.5 2.5" fill="none" stroke="#FAF6EE" stroke-width="2"/>
+</svg>

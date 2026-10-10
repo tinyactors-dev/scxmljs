@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Payment for one order, invoked by fulfillment.scxml.
+  authorize → (3-D Secure challenge for large amounts) → capture.
+  Declined authorizations are retried with backoff; progress is reported to
+  the parent as payment.* events; the outcome comes back as donedata.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"
+       name="payment" initial="authorizing">
+  <datamodel>
+    <data id="orderId" expr="''"/>
+    <data id="amount" expr="0"/>
+    <data id="currency" expr="'EUR'"/>
+    <data id="tier" expr="'standard'"/>
+    <data id="attempts" expr="0"/>
+    <data id="maxAttempts" expr="3"/>
+    <data id="backoffMs" expr="1500"/>
+    <data id="authCode" expr="null"/>
+    <data id="captureId" expr="null"/>
+  </datamodel>
+
+  <state id="authorizing">
+    <onentry>
+      <assign location="attempts" expr="attempts + 1"/>
+      <send target="#_parent" event="payment.authorizing"><param name="attempt" expr="attempts"/></send>
+      <send type="payments" event="authorize">
+        <param name="orderId" expr="orderId"/>
+        <param name="amount" expr="amount"/>
+        <param name="currency" expr="currency"/>
+      </send>
+    </onentry>
+    <transition event="payments.authorize.done" cond="_event.data &amp;&amp; _event.data.challenge" target="challenge"/>
+    <transition event="payments.authorize.done" target="authorized">
+      <assign location="authCode" expr="_event.data.authCode"/>
+    </transition>
+    <transition event="payments.authorize.error" cond="attempts &lt; maxAttempts" target="retryWait"/>
+    <transition event="payments.authorize.error" target="declined"/>
+  </state>
+
+  <state id="retryWait">
+    <onentry>
+      <send target="#_parent" event="payment.retrying"><param name="attempt" expr="attempts"/></send>
+      <send id="paymentRetry" event="retry" delayexpr="(backoffMs * attempts) + 'ms'"/>
+    </onentry>
+    <onexit><cancel sendid="paymentRetry"/></onexit>
+    <transition event="retry" target="authorizing"/>
+  </state>
+
+  <!-- 3-D Secure: the customer confirms in their banking app, then we verify -->
+  <state id="challenge" initial="awaitingCustomer">
+    <onentry><send target="#_parent" event="payment.challenge"/></onentry>
+    <state id="awaitingCustomer">
+      <transition event="payments.challenge.completed" target="verifying"/>
+    </state>
+    <state id="verifying">
+      <onentry><send type="payments" event="verify"><param name="orderId" expr="orderId"/></send></onentry>
+      <transition event="payments.verify.done" target="verified">
+        <assign location="authCode" expr="_event.data.authCode"/>
+      </transition>
+      <transition event="payments.verify.error" target="awaitingCustomer"/>
+    </state>
+    <final id="verified"/>
+    <transition event="payments.challenge.failed" target="declined"/>
+    <transition event="done.state.challenge" target="authorized"/>
+  </state>
+
+  <state id="authorized">
+    <onentry>
+      <send target="#_parent" event="payment.authorized"><param name="authCode" expr="authCode"/></send>
+      <send type="payments" event="capture">
+        <param name="orderId" expr="orderId"/>
+        <param name="authCode" expr="authCode"/>
+        <param name="amount" expr="amount"/>
+      </send>
+    </onentry>
+    <transition event="payments.capture.done" target="captured">
+      <assign location="captureId" expr="_event.data.captureId"/>
+    </transition>
+    <transition event="payments.capture.error" target="declined"/>
+  </state>
+
+  <final id="captured">
+    <onentry><send target="#_parent" event="payment.captured"><param name="captureId" expr="captureId"/></send></onentry>
+    <donedata>
+      <param name="status" expr="'captured'"/>
+      <param name="authCode" expr="authCode"/>
+      <param name="captureId" expr="captureId"/>
+      <param name="amount" expr="amount"/>
+    </donedata>
+  </final>
+
+  <final id="declined">
+    <onentry><send target="#_parent" event="payment.declined"><param name="attempts" expr="attempts"/></send></onentry>
+    <donedata>
+      <param name="status" expr="'declined'"/>
+      <param name="attempts" expr="attempts"/>
+    </donedata>
+  </final>
+</scxml>

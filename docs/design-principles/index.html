@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design principles · scxmljs</title>
+<meta name="description" content="These are the visual rules for &lt;scxml-view&gt;, &lt;scxml-explorer&gt; and the demos on the website. They are for contributors and coding agents who change the elements' UI. Two things take precedence over…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/design-principles/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Design principles · scxmljs">
+<meta property="og:description" content="These are the visual rules for &lt;scxml-view&gt;, &lt;scxml-explorer&gt; and the demos on the website. They are for contributors and coding agents who change the elements' UI. Two things take precedence over…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/design-principles/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-t2nft38v.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z" fill="currentColor"/></svg></button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/design-principles/" aria-current="page">Design principles</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="design-principles">Design principles</h1>
+<p>These are the visual rules for <code>&lt;scxml-view&gt;</code>, <code>&lt;scxml-explorer&gt;</code> and the demos on the website.
+They are for contributors and coding agents who change the elements&#39; UI. Two things take
+precedence over them: the user&#39;s own words (every string can be replaced, see
+<a href="/docs/custom-ui/#translations">Custom UI</a>), and the theme tokens (<code>--scxml-*</code>, see
+<a href="/docs/theming/">Theming</a>).</p>
+<h2 id="notation-over-narration">Notation over narration<a class="anchor" href="#notation-over-narration" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Text is for names and values: state names, event names, data values. Everything else is carried
+by shape, a glyph, position or colour. That includes the kind of a thing, its role, its
+relationships, counts, and whether it is active.</p>
+<p>Every glyph still has a text name. The name is the element&#39;s accessible name and its tooltip,
+so screen readers lose nothing.</p>
+<h2 id="shape-tells-the-kind">Shape tells the kind<a class="anchor" href="#shape-tells-the-kind" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The elements use statechart notation, the same as <code>&lt;scxml-view&gt;</code>&#39;s diagram:</p>
+<ul>
+<li>A rounded box is a state.</li>
+<li>A double outline is a final state.</li>
+<li><code>H</code> and <code>H*</code> are shallow and deep history.</li>
+<li><code>∥</code> marks a parallel state.</li>
+</ul>
+<p>Don&#39;t write &quot;compound&quot; or &quot;atomic&quot;. A container&#39;s number of states is a badge with the layers
+glyph. The badge is also the container&#39;s &quot;go inside&quot; button. Write <code>44</code> with the glyph, not
+&quot;44 inside →&quot;.</p>
+<h2 id="one-small-fixed-set-of-glyphs">One small, fixed set of glyphs<a class="anchor" href="#one-small-fixed-set-of-glyphs" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The glyphs are <a href="https://lucide.dev">Lucide</a> icons (ISC licence): a 24×24 grid, 2px stroke,
+round caps and joins, drawn in <code>currentColor</code>. There are at most about a dozen meanings. Each
+glyph has exactly one meaning, and both elements share them.</p>
+<table>
+<thead>
+<tr>
+<th>Lucide glyph</th>
+<th>Meaning</th>
+<th>Replaces</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>log-in</code></td>
+<td>actions on entry</td>
+<td>&quot;on entry …&quot;</td>
+</tr>
+<tr>
+<td><code>log-out</code></td>
+<td>actions on exit</td>
+<td>&quot;on exit …&quot;</td>
+</tr>
+<tr>
+<td><code>send</code></td>
+<td>sends an event or message</td>
+<td>&quot;send email:onHold&quot;</td>
+</tr>
+<tr>
+<td><code>logs</code></td>
+<td>logs</td>
+<td>&quot;log on hold&quot;</td>
+</tr>
+<tr>
+<td><code>diamond</code></td>
+<td>the transition has a condition (the guard; UML&#39;s decision diamond)</td>
+<td>&quot;if In(&#39;active&#39;)&quot;</td>
+</tr>
+<tr>
+<td><code>workflow</code></td>
+<td>invokes a child machine</td>
+<td>&quot;2 invokes&quot;</td>
+</tr>
+<tr>
+<td><code>layers</code></td>
+<td>a container and its number of states; opens it</td>
+<td>&quot;44 inside →&quot;</td>
+</tr>
+<tr>
+<td><code>door-open</code></td>
+<td>a way out of the focused state (an exit)</td>
+<td>&quot;Leaves to … in … · from …&quot;</td>
+</tr>
+<tr>
+<td><code>corner-down-right</code></td>
+<td>a way into the focused state (an entry)</td>
+<td>&quot;Entered from …&quot;</td>
+</tr>
+<tr>
+<td><code>locate</code> / <code>locate-fixed</code></td>
+<td>Follow off / on (a map&#39;s &quot;show my location&quot;)</td>
+<td>a dot</td>
+</tr>
+<tr>
+<td><code>list</code> / <code>network</code></td>
+<td>show the focus as a list / as a diagram</td>
+<td>&quot;List&quot; / &quot;Diagram&quot;</td>
+</tr>
+<tr>
+<td><code>funnel</code></td>
+<td>only active states</td>
+<td>an &quot;active&quot; checkbox</td>
+</tr>
+<tr>
+<td><code>play</code>, <code>pause</code>, <code>step-forward</code></td>
+<td>playback</td>
+<td>&quot;▶ Play&quot;, &quot;Step ⏭&quot;</td>
+</tr>
+<tr>
+<td><code>chevron-down</code> / <code>chevron-right</code></td>
+<td>fold / unfold a container</td>
+<td></td>
+</tr>
+<tr>
+<td><code>circle-help</code></td>
+<td>what a state is about (its description)</td>
+<td></td>
+</tr>
+<tr>
+<td><code>scan</code>, <code>minus</code>, <code>plus</code></td>
+<td>fit, zoom out, zoom in</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>A new glyph is added to this table first. The table is the only list of glyphs. An icon that
+means something else in another place is a bug.</p>
+<h2 id="how-icons-are-made">How icons are made<a class="anchor" href="#how-icons-are-made" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Icons are SVG, built as DOM nodes inside the components: <code>icon()</code> in
+<code>packages/scxmljs/src/ui/svg.ts</code> draws one icon from <code>packages/scxmljs/src/ui/icons.ts</code>, where each
+icon is its own export of Lucide element and attribute pairs (so a bundle carries only the icons
+its element uses).
+Icons are never fetched or bundled as files. They are never parsed from markup either, because
+the elements must work under Trusted Types and a strict Content-Security-Policy (see
+<a href="/docs/csp/">CSP</a>).</p>
+<p>Icons are decorative and <code>aria-hidden</code>. The button or element around an icon carries the name.</p>
+<p>Sizes: 16px in controls, 14px inline in text.</p>
+<h2 id="event-names-the-event-chip">Event names: the event chip<a class="anchor" href="#event-names-the-event-chip" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>An event name is never broken up and never gets a glyph inside it. It is shown the way the
+system shows code, in IBM Plex Mono, exactly as written, built from two parts the Tinyactors
+design system already has:</p>
+<ul>
+<li><strong>The name.</strong> The namespace is quieter (<code>--scxml-fg-muted</code>) and the last part is at full
+strength: <code>email.paymentFailed.</code> then <code>done</code>. When there isn&#39;t room, the namespace is cut from
+the left (<code>…Failed.done</code>), never the last part. The target of a transition is never cut either.</li>
+<li><strong>The event chip.</strong> Where an event is something you can click (it sends the event), it sits in
+the event chip: a pill with a hairline border, like the playground&#39;s suggested events. Where it
+is only mentioned (a transition that can&#39;t be sent now, an exit, a label on an arrow), it is
+plain text, like inline code.</li>
+<li><strong>Its kind, in the state colours.</strong> A completion (<code>done.state.*</code>, <code>done.invoke.*</code>, or any name
+whose last part is <code>done</code>) takes the done pair, <code>--scxml-done</code> on <code>--scxml-done-bg</code>, like a
+&quot;done&quot; status pill. An error (<code>error</code>, <code>error.*</code>, or any name whose last part is <code>error</code>) takes
+the error pair, <code>--scxml-error</code> on <code>--scxml-error-bg</code>. Plain text takes the colour; a chip takes
+the tinted pill. A wildcard (<code>carrier.*</code>) keeps its <code>*</code> as text, quieter.</li>
+</ul>
+<p>The colour never stands alone: the kind is also in the name itself (<code>done</code>, <code>error</code>, <code>*</code>).</p>
+<p>The builders live in <code>packages/scxmljs/src/ui/notation.ts</code>: <code>eventName()</code> for event names (with
+<code>eventKind()</code>), <code>actionGlyphs()</code> for what a state does, <code>glyph()</code> for one named glyph. Give the
+element around a clickable event name the <code>ev-chip</code> class and it takes the tint. Use them rather
+than building names or glyphs by hand.</p>
+<h2 id="one-place-says-where-you-are">One place says where you are<a class="anchor" href="#one-place-says-where-you-are" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The breadcrumb is the title. Its last place is large, and its parents are small before it.
+Don&#39;t repeat the location in a subtitle or a second header.</p>
+<h2 id="show-what-happened-dont-write-it">Show what happened, don&#39;t write it<a class="anchor" href="#show-what-happened-dont-write-it" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>The last step is shown in two ways: the transition taken gets the &quot;just happened&quot; colour, and
+the state entered gets a brief highlight. Screen readers hear the step from the polite live
+region. No sentences on screen narrate the steps.</p>
+<h2 id="controls-are-icons-with-names">Controls are icons with names<a class="anchor" href="#controls-are-icons-with-names" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Playback, zoom, view switches and filters are icon buttons. Each has an accessible name and a
+tooltip. Numbers and values stay text: <code>¼×</code>, <code>0.7 s</code>, <code>65%</code>.</p>
+<h2 id="colour-means-one-thing-each">Colour means one thing each<a class="anchor" href="#colour-means-one-thing-each" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>This is the explorer&#39;s rule (see the header comment of
+<code>packages/scxmljs/src/explorer/styles.ts</code>), and it applies to both elements:</p>
+<ul>
+<li>The running colour marks what is active.</li>
+<li>The waiting colour marks what just happened.</li>
+<li>The done and error colours mark completion and error events (and finished or failed machines).</li>
+<li>The accent colour marks keyboard focus.</li>
+</ul>
+<p>Never use colour alone. Pair it with a shape or a glyph.</p>
+<h2 id="surfaces">Surfaces<a class="anchor" href="#surfaces" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<ul>
+<li>Surfaces are solid, with a hairline border. No translucency, no blur.</li>
+<li>Floating controls sit in fixed, logical places: on the bottom edge, inset like the content.
+Playback is bottom left, view controls are bottom right.</li>
+<li>Panels float over the content, like the panels of a map.</li>
+<li>Controls show only what is useful now, but they don&#39;t jump around. Prefer a control that is
+disabled in place. If a control must appear, it appears at the outer edge, so nothing else
+moves.</li>
+</ul>
+<h2 id="before-and-after">Before and after<a class="anchor" href="#before-and-after" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>A row in the focus list, before:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>paymentFailed ▸</span></span>
+<span class="line"><span>on entry  send email:paymentFailed</span></span>
+<span class="line"><span>customer.payment.retry → paying</span></span>
+<span class="line"><span>email.paymentFailed.done → closed</span></span></code></pre><p>After:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span>paymentFailed                         ⇥ ↗</span></span>
+<span class="line"><span>…payment.retry → paying    …paymentFailed.done → closed</span></span></code></pre><p>Here <code>⇥</code> and <code>↗</code> stand for the log-in and send glyphs: the state has actions on entry, and they
+send something. The names of the actions are in the glyphs&#39; tooltips. The namespaces are cut from
+the left, never the last part. The last event is a completion: it is shown in the done colour.</p>
+
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/custom-ui/"><small>Previous</small>Custom UI and translations</a>
+  <a class="next" href="/docs/frameworks/"><small>Next</small>Frameworks</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#notation-over-narration">Notation over narration</a></li>
+    <li class="depth-2"><a href="#shape-tells-the-kind">Shape tells the kind</a></li>
+    <li class="depth-2"><a href="#one-small-fixed-set-of-glyphs">One small, fixed set of glyphs</a></li>
+    <li class="depth-2"><a href="#how-icons-are-made">How icons are made</a></li>
+    <li class="depth-2"><a href="#event-names-the-event-chip">Event names: the event chip</a></li>
+    <li class="depth-2"><a href="#one-place-says-where-you-are">One place says where you are</a></li>
+    <li class="depth-2"><a href="#show-what-happened-dont-write-it">Show what happened, don&#39;t write it</a></li>
+    <li class="depth-2"><a href="#controls-are-icons-with-names">Controls are icons with names</a></li>
+    <li class="depth-2"><a href="#colour-means-one-thing-each">Colour means one thing each</a></li>
+    <li class="depth-2"><a href="#surfaces">Surfaces</a></li>
+    <li class="depth-2"><a href="#before-and-after">Before and after</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/design-principles.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>@tinyactors/scxmljs 0.2.0-dev.0 · MIT licence · <a href="https://github.com/tinyactors-dev/scxmljs/commit/56b7d9b76d8a8cb9f41c3705a5fab174f99ae259">56b7d9b</a></span>
+    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

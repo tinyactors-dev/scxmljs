@@ -1,0 +1,28 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="traffic-light" initial="on">
+  <datamodel>
+    <data id="cycles" expr="0"/>
+  </datamodel>
+  <state id="on" initial="red">
+    <transition event="power.off" target="off"/>
+    <state id="red">
+      <onentry><send id="timer" event="timer" delay="3s"/></onentry>
+      <onexit><cancel sendid="timer"/></onexit>
+      <transition event="timer" target="green"/>
+    </state>
+    <state id="green">
+      <onentry><send id="timer" event="timer" delay="3s"/></onentry>
+      <onexit><cancel sendid="timer"/></onexit>
+      <transition event="timer" target="yellow"/>
+    </state>
+    <state id="yellow">
+      <onentry><send id="timer" event="timer" delay="1s"/></onentry>
+      <onexit><cancel sendid="timer"/></onexit>
+      <transition event="timer" target="red">
+        <assign location="cycles" expr="cycles + 1"/>
+      </transition>
+    </state>
+  </state>
+  <final id="off">
+    <donedata><param name="cycles" expr="cycles"/></donedata>
+  </final>
+</scxml>

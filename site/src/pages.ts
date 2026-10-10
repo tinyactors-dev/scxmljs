@@ -360,7 +360,7 @@ export function playground(): string {
     </section>
     <section class="pg-run" id="pg-panel-run" aria-label="Running chart">
       <div class="pg-stage card">
-        <scxml-view class="pg-view" id="pg-view" fit aria-label="The chart, running"></scxml-view>
+        <scxml-view class="pg-view" id="pg-view" aria-label="The chart, running"></scxml-view>
         <scxml-explorer class="pg-explorer" id="pg-explorer" aria-label="The chart in the explorer"></scxml-explorer>
       </div>
       <form class="pg-send" id="pg-send" aria-label="Send an event">

@@ -145,6 +145,11 @@ own controls (see [driving charts](driving-charts.md)).
   `+`, `-` and `0` (fit to width) while the diagram has focus. Zooming keeps the point under the
   pointer in place, and fixes the canvas at the height it had, so the page doesn't jump.
 - **Pan** by dragging the diagram's background, or by scrolling.
+- **Touch:** one finger scrolls the diagram, two fingers pinch-zoom it (not the page). Icon buttons
+  get a larger hit area on touch screens.
+- **Following:** when the chart doesn't fit, the element scrolls to the active states, and keeps
+  them in view as the machine moves. It stops as soon as you scroll, drag or zoom; fit to width
+  (`0`) turns it back on.
 - **Fold** any compound or parallel state with the chevron before its name: it becomes a single
   box that says how many states it holds. The chevron of a folded box unfolds it.
 

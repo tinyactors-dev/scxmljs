@@ -119,6 +119,57 @@ test.describe("<scxml-view> layout", () => {
     await expect(help).toBeFocused();
   });
 
+  test("a chart taller than its element follows the active state; touch pinch zooms the diagram", async ({ page, browserName }) => {
+    await page.goto("/fixtures/view.html");
+    await ready(page);
+    const chain = Array.from(
+      { length: 16 },
+      (_, i) => `<state id="s${i}"><transition event="next" target="s${(i + 1) % 16}"/></state>`,
+    ).join("");
+    await page.evaluate((states) => {
+      const v = document.querySelector("#inline") as HTMLElement & { source: string };
+      v.style.setProperty("--scxml-height", "320px");
+      v.source = `<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s0">${states}</scxml>`;
+    }, chain);
+    const view = page.locator("#inline");
+    await expect(view.locator("[data-state=s15]")).toHaveCount(1);
+    const visible = (id: string) =>
+      view.evaluate((v, id) => {
+        const r = v.shadowRoot!;
+        const c = r.querySelector(".canvas")!.getBoundingClientRect();
+        const b = r.querySelector(`[data-state="${id}"]`)!.getBoundingClientRect();
+        return b.top >= c.top && b.bottom <= c.bottom;
+      }, id);
+    expect(await visible("s0")).toBe(true);
+    expect(await visible("s12")).toBe(false);
+    await page.evaluate(() => {
+      const v = document.querySelector("#inline") as HTMLElement & { session: { send(n: string): void } };
+      for (let i = 0; i < 12; i++) v.session.send("next");
+    });
+    await expect.poll(() => visible("s12")).toBe(true);
+
+    test.skip(browserName !== "chromium", "synthetic Touch objects: Chromium");
+    const zoom = () => view.evaluate((v) => (v as HTMLElement & { zoom: number }).zoom);
+    const before = await zoom();
+    await view.evaluate((v) => {
+      const canvas = v.shadowRoot!.querySelector(".canvas")!;
+      const r = canvas.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const touches = (d: number) =>
+        [0, 1].map((i) => new Touch({ identifier: i, target: canvas, clientX: cx + (i ? d : -d), clientY: cy }));
+      const fire = (type: string, d: number) => {
+        const t = touches(d);
+        canvas.dispatchEvent(new TouchEvent(type, { touches: t, targetTouches: t, changedTouches: t, bubbles: true, cancelable: true }));
+      };
+      fire("touchstart", 40);
+      fire("touchmove", 60);
+      fire("touchmove", 80);
+      canvas.dispatchEvent(new TouchEvent("touchend", { touches: [], bubbles: true }));
+    });
+    expect(await zoom()).toBeCloseTo(before * 2, 1);
+  });
+
   test("right-to-left pages: the diagram stays anchored at the start of its canvas", async ({ page }) => {
     await page.goto("/fixtures/view.html?dir=rtl");
     await ready(page);

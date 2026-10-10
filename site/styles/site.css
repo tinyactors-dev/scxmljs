@@ -1187,6 +1187,8 @@ h3 {
 @media (max-width: 640px) {
   .playground {
     padding: var(--space-4) var(--space-4) var(--space-10);
+    /* the diagram gets the screen, less the tabs above it */
+    --pg-height: max(420px, calc(100svh - var(--header-h) - 64px));
   }
   .pg-intro .lede {
     font-size: var(--fs-16);

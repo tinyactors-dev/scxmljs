@@ -34,6 +34,9 @@ private `--x-*` properties are not public API and can change in any release.
   `justTaken`, `lastVisited`, `openDetail`, `lastStep`.
 - `<scxml-view>` zooms and pans: a zoom toolbar, Ctrl/⌘ + wheel, pinch, `+` `-` `0`, and dragging
   the background. The `zoom` property reads or sets the scale (`null`: automatic). New part `zoom`.
+- `<scxml-view>` on phones: two fingers pinch-zoom the diagram, icon buttons get finger-sized
+  hit areas, and the playback bar stays on one line. A chart that doesn't fit scrolls to its
+  active states and keeps them in view as it runs, until you scroll or zoom yourself.
 - `<scxml-view>`: every compound and parallel state folds and unfolds with a chevron before its
   name (before, only the containers folded for `max-states` could be unfolded and folded again).
 - `<scxml-view>`: every state has a help button that opens a popover with its kind, description

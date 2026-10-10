@@ -15,6 +15,8 @@ export const VIEW_CSS = /* css */ `
 .canvas:focus-visible { outline: 2px solid var(--x-accent); outline-offset: -2px; }
 .viewport { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .canvas { overflow: auto; min-height: 0; flex: 1 1 auto; overscroll-behavior: contain; cursor: grab; }
+/* one finger scrolls; two pinch-zoom the diagram (handled by the element), not the page */
+.canvas { touch-action: pan-x pan-y; }
 .canvas.panning { cursor: grabbing; user-select: none; -webkit-user-select: none; }
 .canvas.panning * { cursor: grabbing !important; }
 .diagram { position: relative; margin: 12px; }
@@ -96,6 +98,13 @@ button.label:disabled, button.chip:disabled { cursor: default; }
 .toggle:focus-visible, .help:focus-visible { outline: 2px solid var(--x-accent); outline-offset: 0; }
 .toggle.expand { color: var(--x-accent-fg); }
 .icon { display: block; pointer-events: none; }
+/* fingers: the same small icons, with a hit area of about 34px */
+@media (pointer: coarse) {
+  .toggle, .help { position: relative; }
+  .toggle::after, .help::after { content: ""; position: absolute; inset: -8px; }
+  .zoom button { height: 34px; min-width: 34px; }
+  .controls button { height: 32px; }
+}
 
 /* ── help popover ──────────────────────────────────────── */
 .help-popover {
@@ -154,6 +163,14 @@ button.label:disabled, button.chip:disabled { cursor: default; }
 .controls .speeds button { border: 0; border-radius: 0; height: 24px; padding: 0 7px; background: none; color: var(--x-fg3); min-width: 0; }
 .controls .speeds button[aria-pressed="true"] { background: var(--x-s3); color: var(--x-fg1); }
 .controls .clock { font: 500 12px var(--x-mono); color: var(--x-fg2); font-variant-numeric: tabular-nums; }
+/* narrow elements: the playback bar stays on one line */
+.frame { container-type: inline-size; }
+@container (max-width: 420px) {
+  .controls { gap: 6px; padding: 6px 8px; }
+  .controls button { padding: 0 8px; }
+  .controls .play { min-width: 0; }
+  .controls .speeds button { padding: 0 5px; }
+}
 ${SR_ONLY_CSS}
 
 /* the diagram's geometry is left-to-right; keep it anchored at the start of the canvas in RTL pages */

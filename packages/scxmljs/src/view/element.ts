@@ -214,6 +214,10 @@ export class ScxmlView extends ElementBase {
   #zoom: number | null = null;
   #scale = 1;
   #helpFor?: { state: StateNode; button: HTMLElement };
+  /** Keep the active states in view (until the user pans, scrolls or zooms; "fit to width" resumes). */
+  #follow = true;
+  /** The active states last revealed, so a step that changes nothing doesn't scroll. */
+  #revealed = "";
 
   constructor() {
     super();
@@ -735,6 +739,7 @@ export class ScxmlView extends ElementBase {
     canvas.addEventListener(
       "wheel",
       (e) => {
+        this.#follow = false;
         // pinch-zoom on a trackpad arrives as a wheel event with ctrlKey
         if (!(e.ctrlKey || e.metaKey) || !this.#layout) return;
         e.preventDefault();
@@ -749,9 +754,13 @@ export class ScxmlView extends ElementBase {
       if (e.key === "+" || e.key === "=") this.#zoomBy(ZOOM_STEP);
       else if (e.key === "-" || e.key === "_") this.#zoomBy(1 / ZOOM_STEP);
       else if (e.key === "0") this.#zoomTo(null);
-      else return;
+      else {
+        if (/^(Arrow|Page|Home$|End$)/.test(e.key) || e.key === " ") this.#follow = false;
+        return;
+      }
       e.preventDefault();
     });
+    this.#wirePinch();
     // drag to pan (mouse and pen; touch scrolls natively), starting anywhere but a control
     let drag: { id: number; x: number; y: number; left: number; top: number; moved: boolean } | undefined;
     canvas.addEventListener("pointerdown", (e) => {
@@ -767,6 +776,7 @@ export class ScxmlView extends ElementBase {
       if (!drag.moved) {
         if (Math.abs(dx) + Math.abs(dy) < 4) return;
         drag.moved = true;
+        this.#follow = false;
         canvas.setPointerCapture?.(e.pointerId);
         canvas.classList.add("panning");
       }
@@ -795,6 +805,84 @@ export class ScxmlView extends ElementBase {
     });
   }
 
+  /**
+   * Touch: one finger scrolls (natively), two pinch-zoom the diagram around their midpoint
+   * instead of the page (`touch-action: pan-x pan-y` on the canvas keeps the browser out of it).
+   */
+  #wirePinch() {
+    const canvas = this.#el.canvas;
+    let pinch: { dist: number; scale: number } | undefined;
+    const dist = (t: TouchList) => Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY);
+    const mid = (t: TouchList) => ({ x: (t[0]!.clientX + t[1]!.clientX) / 2, y: (t[0]!.clientY + t[1]!.clientY) / 2 });
+    canvas.addEventListener(
+      "touchstart",
+      (e) => {
+        this.#follow = false;
+        if (e.touches.length === 2 && this.#layout) pinch = { dist: dist(e.touches), scale: this.#scale };
+      },
+      { passive: true },
+    );
+    canvas.addEventListener(
+      "touchmove",
+      (e) => {
+        if (!pinch || e.touches.length !== 2) return;
+        e.preventDefault();
+        const d = dist(e.touches);
+        if (pinch.dist > 0 && d > 0) this.#zoomTo(pinch.scale * (d / pinch.dist), mid(e.touches));
+      },
+      { passive: false },
+    );
+    const end = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinch = undefined;
+    };
+    canvas.addEventListener("touchend", end);
+    canvas.addEventListener("touchcancel", end);
+    // WebKit's own pinch gesture on the page
+    canvas.addEventListener("gesturestart", (e) => e.preventDefault());
+  }
+
+  /**
+   * Scroll the active states into view when they aren't (the whole chart doesn't fit), unless the
+   * user has taken over the view. `smooth`: animate (not with reduced motion).
+   */
+  #revealActive(smooth: boolean) {
+    const session = this.#session;
+    const layout = this.#layout;
+    const canvas = this.#el.canvas;
+    if (!this.#follow || !session || !layout || session.status !== "running") return;
+    const active = layout.boxes.filter(
+      (b) => b.kind !== "root" && session.isActiveNode(b.node) && !layout.boxes.some((k) => k.node.parent === b.node),
+    );
+    const key = active.map((b) => b.node.id).join(" ");
+    if (!active.length || key === this.#revealed) return;
+    this.#revealed = key;
+    const s = this.#scale;
+    const x0 = Math.min(...active.map((b) => b.rect.x)) * s + MARGIN;
+    const y0 = Math.min(...active.map((b) => b.rect.y)) * s + MARGIN;
+    const x1 = Math.max(...active.map((b) => b.rect.x + b.rect.w)) * s + MARGIN;
+    const y1 = Math.max(...active.map((b) => b.rect.y + b.rect.h)) * s + MARGIN;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (!(w > 0 && h > 0)) return;
+    const pad = 16;
+    const inView =
+      x0 >= canvas.scrollLeft + pad &&
+      x1 <= canvas.scrollLeft + w - pad &&
+      y0 >= canvas.scrollTop + pad &&
+      y1 <= canvas.scrollTop + h - pad;
+    if (inView) return;
+    // centre them; if they don't fit, show their top-left corner
+    const left = x1 - x0 + 2 * pad > w ? x0 - pad : (x0 + x1) / 2 - w / 2;
+    const top = y1 - y0 + 2 * pad > h ? y0 - pad : (y0 + y1) / 2 - h / 2;
+    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const behavior: ScrollBehavior = smooth && !reduce ? "smooth" : "auto";
+    if (typeof canvas.scrollTo === "function") canvas.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior });
+    else {
+      canvas.scrollLeft = Math.max(0, left);
+      canvas.scrollTop = Math.max(0, top);
+    }
+  }
+
   #zoomBy(factor: number) {
     this.#zoomTo(this.#scale * factor);
   }
@@ -821,8 +909,13 @@ export class ScxmlView extends ElementBase {
     const px = (canvas.scrollLeft + ax - MARGIN) / before;
     const py = (canvas.scrollTop + ay - MARGIN) / before;
     this.#zoom = next;
+    this.#follow = next == null;
+    this.#revealed = "";
     this.#applyFit();
-    if (next == null) return;
+    if (next == null) {
+      this.#revealActive(true);
+      return;
+    }
     canvas.scrollLeft = px * this.#scale + MARGIN - ax;
     canvas.scrollTop = py * this.#scale + MARGIN - ay;
   }
@@ -1047,6 +1140,7 @@ export class ScxmlView extends ElementBase {
     this.#renderNotice();
     this.#renderWarnings();
     this.#applyFit();
+    this.#revealed = "";
     this.#renderState();
   }
 
@@ -1370,6 +1464,8 @@ export class ScxmlView extends ElementBase {
       e.notice.hidden = false;
       e.notice.replaceChildren(h("span", {}, t.terminated));
     }
+    // the first reveal after a layout jumps, later ones (steps) glide
+    this.#revealActive(this.#revealed !== "");
   }
 
   #renderControls(clock: PlaybackClock) {

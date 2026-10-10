@@ -76,8 +76,18 @@ export interface LayoutOptions {
   labelSize: (transition: TransitionNode) => Size;
   /** Containers drawn as a single box. */
   collapsed?: ReadonlySet<StateNode>;
+  /**
+   * Transitions not to route: the element lists them in their source's box instead
+   * (see `portalTransitions`). They take no part in the layout.
+   */
+  portals?: ReadonlySet<TransitionNode>;
   /** Override some of the default gaps. */
   spacing?: Partial<Spacing>;
+  /**
+   * Width to stay within where the layout has a choice (px): with `direction: "down"`,
+   * parallel regions that would sit side by side wrap into fewer columns, down to one.
+   */
+  maxWidth?: number;
 }
 
 /** How a box is drawn: `region` is a child of a `<parallel>`, `collapsed` a folded container. */
@@ -153,6 +163,8 @@ export interface ChartLayout {
 
 const DEFAULT_SPACING: Spacing = { node: 18, layer: 44, padding: 14, edge: 10, label: 6 };
 const INITIAL_DOT = 10;
+/** down: how wide a box may grow to put the labels of its outgoing edges side by side */
+const LABEL_ROW = 320;
 
 // ───────────────────────────────── helpers ─────────────────────────────────
 
@@ -258,9 +270,10 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
   // every transition, grouped by the container that routes it (filled while lifting)
   const transitions: TransitionNode[] = [];
   const all: StateNode[] = [];
+  const portals = opts.portals ?? new Set<TransitionNode>();
   const walk = (s: StateNode) => {
     all.push(s);
-    for (const t of s.transitions) transitions.push(t);
+    for (const t of s.transitions) if (!portals.has(t)) transitions.push(t);
     for (const k of [...s.children, ...s.history]) walk(k);
   };
   walk(root);
@@ -317,7 +330,15 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
     // many regions wrap into a grid
     const n = kids.length;
     const stack = n <= 4 ? n : Math.ceil(Math.sqrt(n));
-    const cols = down ? stack : Math.ceil(n / stack);
+    let cols = down ? stack : Math.ceil(n / stack);
+    // down, in a narrow space: fewer columns (the regions then stack, as rows)
+    const gridW = (c: number) =>
+      Array.from({ length: c }, (_, ci) => Math.max(0, ...kids.filter((_, i) => i % c === ci).map((k) => sizes.get(k)!.w))).reduce(
+        (a, b) => a + b,
+        0,
+      ) +
+      sp.node * (c - 1);
+    if (down && opts.maxWidth) while (cols > 1 && gridW(cols) + 2 * sp.padding > opts.maxWidth) cols--;
     const rows = Math.ceil(n / cols);
     const colW = Array.from({ length: cols }, (_, ci) =>
       Math.max(0, ...kids.filter((_, i) => i % cols === ci).map((k) => sizes.get(k)!.w)),
@@ -521,7 +542,10 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
     });
     info.layers = layers;
 
-    // boxes sending several labelled edges forward grow so every label gets its own port
+    // boxes sending several labelled edges forward grow so every label gets its own port. Across
+    // the layers that costs a label's height when they run right, but its whole width when they run
+    // down: then a box grows only up to LABEL_ROW (or its own width), and the labels that don't fit
+    // side by side stack in the gap below it instead (5a)
     const outgoing = new Map<LNode, number>();
     for (const t of transitions) {
       if (!within(t.source, c) || t.source === c) continue;
@@ -535,11 +559,20 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
         if (b && b !== from && info.nodes.get(b)!.layer > a.layer) outgoing.set(a, (outgoing.get(a) ?? 0) + (down ? l.w : l.h) + sp.label);
       }
     }
-    for (const [n, need] of outgoing) if (need + sp.label > n.h) n.h = need + sp.label;
+    /** down: how many rows the labels leaving each box need */
+    const labelRows = new Map<LNode, number>();
+    for (const [n, need] of outgoing) {
+      const room = down ? Math.max(n.h, LABEL_ROW) : Number.POSITIVE_INFINITY;
+      if (down && need + sp.label > room) labelRows.set(n, Math.ceil((need + sp.label) / room));
+      const want = Math.min(need + sp.label, room);
+      if (want > n.h) n.h = want;
+    }
 
     // 5a. gaps between layers: room for labels (at the source side) and bend channels
     const gapLabel = Array.from({ length: Math.max(0, layers.length - 1) }, () => 0);
     const gapChannels = Array.from({ length: Math.max(0, layers.length - 1) }, () => 0);
+    /** down: labels leaving a box that couldn't put them side by side stack, in rows */
+    const stack = (_g: number, from: StateNode, t: TransitionNode) => labelAlong(t) * (labelRows.get(info.nodes.get(from)!) ?? 1);
     for (const t of transitions) {
       if (!within(t.source, c) || t.source === c) continue;
       const a = childOf(c, drawn(t.source));
@@ -554,12 +587,12 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
           const lo = Math.min(na.layer, nb.layer);
           const hi = Math.max(na.layer, nb.layer);
           const lg = nb.layer > na.layer ? na.layer : na.layer - 1;
-          gapLabel[lg] = Math.max(gapLabel[lg]!, labelAlong(t));
+          if (lg >= 0) gapLabel[lg] = Math.max(gapLabel[lg]!, stack(lg, a, t));
           for (let l = lo; l < hi; l++) gapChannels[l]!++;
         } else if (na.layer < layers.length - 1) {
           // same layer: a short loop through the gap after it (or the right margin)
           gapChannels[na.layer]!++;
-          gapLabel[na.layer] = Math.max(gapLabel[na.layer]!, labelAlong(t));
+          gapLabel[na.layer] = Math.max(gapLabel[na.layer]!, stack(na.layer, a, t));
         } else info.rightMargin++;
       }
     }
@@ -645,7 +678,10 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
     }
     const minY = Math.min(...layers.flat().map((n) => n.y));
     for (const n of layers.flat()) n.y -= minY;
-    for (const [l, layer] of layers.entries()) for (const n of layer) n.x = info.layerX[l]! + (info.layerW[l]! - n.w) / 2;
+    // boxes start at the beginning of their layer (a short box beside a tall one doesn't float in
+    // the middle of it); dummies keep to the middle, where the corridor runs
+    for (const [l, layer] of layers.entries())
+      for (const n of layer) n.x = info.layerX[l]! + (n.kind === "dummy" ? (info.layerW[l]! - n.w) / 2 : 0);
     info.canonH = Math.max(0, ...layers.flat().map((n) => n.y + n.h));
 
     const canonTotalH = info.canonH;
@@ -699,7 +735,7 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
   place(root, 0);
 
   const routed = routeEdges({ root, down, sp, opts, infos, abs, drawn, transitions, collapsed });
-  return {
+  return contain({
     width: rootSize.w,
     height: rootSize.h,
     direction,
@@ -707,7 +743,51 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
     edges: routed.edges,
     initials: routed.initials,
     inside: routed.inside,
+  });
+}
+
+/**
+ * Edges routed around a container's outside, and their labels, can reach past the root's box:
+ * move everything so nothing has a negative coordinate, and grow the size to hold it all.
+ */
+function contain(layout: ChartLayout): ChartLayout {
+  const xs: number[] = [0];
+  const ys: number[] = [0];
+  const xe: number[] = [layout.width];
+  const ye: number[] = [layout.height];
+  const rect = (r: Rect) => {
+    xs.push(r.x);
+    ys.push(r.y);
+    xe.push(r.x + r.w);
+    ye.push(r.y + r.h);
   };
+  const point = (p: Point, r = 0) => rect({ x: p.x - r, y: p.y - r, w: 2 * r, h: 2 * r });
+  for (const e of layout.edges) {
+    for (const p of e.points) point(p);
+    if (e.label) rect(e.label);
+  }
+  for (const m of layout.initials) point(m.at, INITIAL_DOT / 2);
+  const dx = -Math.min(...xs);
+  const dy = -Math.min(...ys);
+  if (dx === 0 && dy === 0 && Math.max(...xe) <= layout.width && Math.max(...ye) <= layout.height) return layout;
+  const move = (p: Point) => {
+    p.x += dx;
+    p.y += dy;
+  };
+  for (const b of layout.boxes) if (b.kind !== "root") move(b.rect);
+  for (const e of layout.edges) {
+    e.points.forEach(move);
+    if (e.label) move(e.label);
+  }
+  for (const m of layout.initials) {
+    move(m.at);
+    m.points.forEach(move);
+  }
+  layout.width = Math.max(...xe) + dx;
+  layout.height = Math.max(...ye) + dy;
+  const root = layout.boxes.find((b) => b.kind === "root");
+  if (root) root.rect = { x: 0, y: 0, w: layout.width, h: layout.height };
+  return layout;
 }
 
 // ──────────────────────────────── routing ────────────────────────────────
@@ -733,6 +813,8 @@ interface Attachment {
   key: number;
   /** assigned position along the side (canonical) */
   at: number;
+  /** room the edge wants beside its port: its label's width across the layers (down), or 0 */
+  room: number;
 }
 
 /**
@@ -816,15 +898,15 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
 
   // ── 2. ports: attachments per box side, spread evenly, ordered by where the other end is ──
   const attachments = new Map<string, Attachment[]>();
-  const attach = (box: StateNode, side: Side, key: number): Attachment => {
-    const a: Attachment = { side, key, at: 0 };
+  const attach = (box: StateNode, side: Side, key: number, room = 0): Attachment => {
+    const a: Attachment = { side, key, at: 0, room };
     const k = `${box.id}|${side}`;
     (attachments.get(k) ?? attachments.set(k, []).get(k)!).push(a);
     return a;
   };
   const boxOf = new Map<Attachment, StateNode>();
-  const at = (box: StateNode, side: Side, key: number) => {
-    const a = attach(box, side, key);
+  const at = (box: StateNode, side: Side, key: number, room = 0) => {
+    const a = attach(box, side, key, room);
     boxOf.set(a, box);
     return a;
   };
@@ -833,7 +915,8 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
   for (const p of pending) {
     switch (p.route) {
       case "forward":
-        p.start = at(p.from, "far", cy(p.to));
+        // down, a label sits across its edge just below the port: its width is the room it needs
+        p.start = at(p.from, "far", cy(p.to), down ? labelCanon(p.transition).h + sp.label : 0);
         p.end = at(p.to, "near", cy(p.from));
         break;
       case "reversed":
@@ -866,11 +949,21 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
     // on containers, keep ports clear of the header band
     const headerAcross = info && !down ? info.header : 0;
     const headerAlong = info && down ? info.header : 0;
-    list.forEach((a, i) => {
-      const f = (i + 1) / (list.length + 1);
-      if (a.side === "bottom") a.at = r.x + headerAlong + (r.w - headerAlong) * f;
-      else a.at = r.y + headerAcross + (r.h - headerAcross) * f;
-    });
+    const span = a0(list[0]!.side === "bottom" ? r.w - headerAlong : r.h - headerAcross);
+    const start = list[0]!.side === "bottom" ? r.x + headerAlong : r.y + headerAcross;
+    const rooms = list.map((a) => Math.max(a.room, sp.edge));
+    const total = rooms.reduce((x, y) => x + y, 0);
+    if (list.some((a) => a.room > 0) && total <= span) {
+      // ports in slots as wide as their labels, the row of slots centred on the side
+      let x = start + (span - total) / 2;
+      list.forEach((a, i) => {
+        a.at = x + rooms[i]! / 2;
+        x += rooms[i]!;
+      });
+    } else
+      list.forEach((a, i) => {
+        a.at = start + span * ((i + 1) / (list.length + 1));
+      });
   }
 
   // ── 3. bend channels per gap (in order of the source port) and lanes per parallel state ──
@@ -1014,7 +1107,7 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
         const out = exit(p.from, A, { x: S.x + S.w, y: p.start!.at }, 1);
         const inn = enter(p.to, B, { x: T.x, y: p.end!.at }, -1);
         pts = [...out, ...corridor(p, c, layerOf(c, A), layerOf(c, B), out[out.length - 1]!.y, inn[0]!.y), ...inn];
-        prefer = out.length - 1; // the segment leaving the source's layer
+        prefer = 0; // at the source: a label further along reads as belonging to something else
         break;
       }
       case "reversed": {
@@ -1024,7 +1117,7 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
         const out = exit(p.to, B, { x: T.x + T.w, y: p.end!.at }, 1);
         const inn = enter(p.from, A, { x: S.x, y: p.start!.at }, -1);
         pts = [...out, ...corridor(p, c, layerOf(c, B), layerOf(c, A), out[out.length - 1]!.y, inn[0]!.y), ...inn].reverse();
-        prefer = inn.length - 1; // the segment leaving the source backwards
+        prefer = 0; // (reversed) at the source too
         break;
       }
       case "same": {
@@ -1034,7 +1127,7 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
         const inn = enter(p.to, B, { x: T.x + T.w, y: p.end!.at }, 1);
         const x = channelX(p, c, layerOf(c, A));
         pts = [...out, { x, y: out[out.length - 1]!.y }, { x, y: inn[0]!.y }, ...inn];
-        prefer = out.length - 1;
+        prefer = 0;
         break;
       }
       case "regions": {
@@ -1054,7 +1147,7 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
         const out = exit(p.from, childOf(p.to, p.from)!, { x: S.x + S.w, y: p.start!.at }, 1);
         const last = out[out.length - 1]!;
         pts = [...out, { x: T.x + T.w - 2, y: last.y }];
-        prefer = out.length - 1;
+        prefer = 0;
         break;
       }
       case "to-descendant": {
@@ -1128,12 +1221,14 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
     labelled.add(edge.transition);
     const size = labelCanon(edge.transition);
     const segs = points.slice(1).map((b, i) => [points[i]!, b] as const);
+    // the preferred segment, then the ones next to it along the route (a label far from its source
+    // reads as belonging to something else), longer ones first among equals
     const order = [
       prefer,
       ...segs
         .map((_, i) => i)
         .filter((i) => i !== prefer)
-        .sort((i, j) => segLen(segs[j]!) - segLen(segs[i]!)),
+        .sort((i, j) => Math.abs(i - prefer) - Math.abs(j - prefer) || segLen(segs[j]!) - segLen(segs[i]!)),
     ];
     let chosen: Rect | undefined;
     const rectAt = (x: number, y: number): Rect => ({ x: x - size.w / 2, y: y - size.h / 2, w: size.w, h: size.h });
@@ -1224,6 +1319,7 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
   return { edges: routed.map((r) => r.edge), initials, inside };
 }
 
+const a0 = (n: number) => Math.max(0, n);
 const segLen = ([a, b]: readonly [Point, Point]) => Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
 
 function distToSegment(p: Point, a: Point, b: Point): number {
@@ -1314,6 +1410,50 @@ function feedbackArcOrder<N>(nodes: N[], edges: { from: N; to: N; weight: number
     left.push(best!);
   }
   return new Map([...left, ...right].map((n, i) => [n, i]));
+}
+
+/** How many container borders a transition crosses from `from` to `to` (their boxes, as drawn). */
+function borders(from: StateNode, to: StateNode): number {
+  let lca: StateNode | null = from.parent;
+  while (lca && !within(to, lca)) lca = lca.parent;
+  if (!lca) return 0;
+  return from.depth - lca.depth - 1 + (to.depth - lca.depth - 1);
+}
+
+/** A transition crossing at least this many container borders is listed, not routed. */
+export const PORTAL_BORDERS = 3;
+
+/**
+ * Transitions better listed in their source's box ("event → target") than drawn as edges:
+ * a container's transitions into its own descendants ("from anywhere in here"), and
+ * transitions that cross `PORTAL_BORDERS` or more container borders on their way. Both
+ * would otherwise run long lines across the chart. Pass the result to `layoutChart` as
+ * `portals`. Deterministic; depends on which containers are `collapsed`.
+ */
+export function portalTransitions(root: StateNode, collapsed: ReadonlySet<StateNode> = new Set()): Set<TransitionNode> {
+  const drawn = (s: StateNode): StateNode => {
+    let top = s;
+    for (let n = s.parent; n; n = n.parent) if (collapsed.has(n)) top = n;
+    return top;
+  };
+  const out = new Set<TransitionNode>();
+  const walk = (s: StateNode) => {
+    for (const t of s.transitions) {
+      if (!t.targets.length) continue;
+      const from = drawn(t.source);
+      const far = t.targets.every((target) => {
+        const to = drawn(target);
+        if (to === from) return false;
+        if (within(to, from)) return true; // from anywhere inside `from`
+        if (within(from, to)) return false; // out to an ancestor: a short hop through its border
+        return borders(from, to) >= PORTAL_BORDERS;
+      });
+      if (far) out.add(t);
+    }
+    for (const k of [...s.children, ...s.history]) walk(k);
+  };
+  walk(root);
+  return out;
 }
 
 /**

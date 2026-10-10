@@ -53,6 +53,10 @@ run = "biome check --write ."
 description = "Check what `npm pack` would ship for @tinyactors/scxmljs (builds first)"
 run = "bun scripts/check-pack.ts"
 
+[tasks."layout:metrics"]
+description = "How <scxml-view>'s layout uses space over every chart (size, fill, label distance, overlaps); -- --json out.json, --compare a.json b.json, --max-width 550"
+run = "bun scripts/layout-metrics.ts"
+
 [tasks.size]
 description = "Check browser bundle sizes of every entry point against size-budgets.json"
 run = "bun scripts/size.ts"

@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { Glob } from "bun";
 import { Window } from "happy-dom";
 import { compile, type Model, parseSCXML, type StateNode } from "../src/index.ts";
-import { autoCollapse, type ChartLayout, type Direction, layoutChart, type Rect } from "../src/view/layout.ts";
+import { autoCollapse, type ChartLayout, type Direction, layoutChart, portalTransitions, type Rect } from "../src/view/layout.ts";
 
 const domParser = new new Window().DOMParser() as unknown as DOMParser;
 const NS = `xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript"`;
@@ -19,10 +19,17 @@ const load = async (text: string): Promise<Model> =>
 
 const byId = (m: Model, id: string) => m.states.find((s) => s.id === id)!;
 
-const lay = (model: Model, direction: Direction = "right", collapsed?: Set<StateNode>) =>
+const lay = (
+  model: Model,
+  direction: Direction = "right",
+  collapsed?: Set<StateNode>,
+  extra: { maxWidth?: number; portals?: boolean } = {},
+) =>
   layoutChart(model.root, {
     direction,
     collapsed,
+    maxWidth: extra.maxWidth,
+    portals: extra.portals ? portalTransitions(model.root, collapsed) : undefined,
     measure: (s, folded) => ({ w: Math.max(64, s.id.length * 7.6 + 28), h: folded ? 48 : s.children.length ? 30 : 36 }),
     labelSize: (t) => ({ w: t.events.join(" ").length * 6.9 + 14, h: 20 }),
   });
@@ -51,6 +58,16 @@ function check(layout: ChartLayout) {
     expect(e.points.length).toBeGreaterThanOrEqual(2);
     expect(onBorder(e.points[0]!, rect.get(e.from)!)).toBe(true);
     expect(onBorder(e.points.at(-1)!, rect.get(e.to)!)).toBe(true);
+  }
+  // nothing reaches past the drawing: no negative coordinates, labels and routes inside its size
+  for (const e of layout.edges) {
+    for (const p of e.points) {
+      expect(p.x).toBeGreaterThanOrEqual(-0.5);
+      expect(p.y).toBeGreaterThanOrEqual(-0.5);
+      expect(p.x).toBeLessThanOrEqual(layout.width + 0.5);
+      expect(p.y).toBeLessThanOrEqual(layout.height + 0.5);
+    }
+    if (e.label) expect(inside(e.label, { x: 0, y: 0, w: layout.width, h: layout.height })).toBe(true);
   }
   // every transition's label is placed once
   const labelled = layout.edges.filter((e) => e.label).map((e) => e.transition);
@@ -114,6 +131,58 @@ describe("layoutChart", async () => {
     expect(l.boxes.find((b) => b.node.id === "done")!.kind).toBe("final");
     expect(l.boxes.find((b) => b.node.id === "h")!.kind).toBe("history");
     expect(l.inside.get(byId(m, "a"))!.map((t) => t.events[0])).toEqual(["noop"]);
+  });
+});
+
+describe("layoutChart: space", () => {
+  test("down: a box starts at the top of its layer, beside a taller one", async () => {
+    const m =
+      await load(`<scxml ${NS} initial="a"><state id="a"><transition event="go" target="tall"/><transition event="x" target="b"/></state>
+      <state id="b"><transition event="y" target="c"/></state>
+      <state id="tall" initial="t1"><state id="t1"><transition event="n" target="t2"/></state><state id="t2"><transition event="n" target="t3"/></state><state id="t3"/></state>
+      <state id="c"/></scxml>`);
+    const l = lay(m, "down");
+    check(l);
+    const r = (id: string) => l.boxes.find((b) => b.node.id === id)!.rect;
+    expect(r("b").y).toBe(r("tall").y);
+  });
+
+  test("portals: a container's transitions into itself, and far ones, are listed instead of routed", async () => {
+    const m = await load(`<scxml ${NS} initial="top"><state id="top" initial="a">
+        <transition event="reset" target="a"/>
+        <state id="a" initial="a1"><state id="a1" initial="a2"><state id="a2" initial="deep"><state id="deep"><transition event="bail" target="out"/></state></state></state></state>
+        <state id="near"><transition event="back" target="a"/></state>
+        <state id="out"/>
+      </state></scxml>`);
+    const portals = portalTransitions(m.root);
+    const names = [...portals].map((t) => t.events[0]).sort();
+    expect(names).toEqual(["bail", "reset"]); // "back" crosses no border: an edge
+    const l = lay(m, "down", undefined, { portals: true });
+    check(l);
+    expect(l.edges.some((e) => names.includes(e.transition.events[0]!))).toBe(false);
+    expect(l.edges.some((e) => e.transition.events[0] === "back")).toBe(true);
+    // folding the deep container brings "bail" closer: from the folded box it crosses fewer borders
+    expect([...portalTransitions(m.root, new Set([byId(m, "a")]))].map((t) => t.events[0])).toEqual(["reset"]);
+  });
+
+  test("maxWidth: parallel regions wrap into fewer columns when they run down", async () => {
+    const region = (r: string) =>
+      `<state id="${r}" initial="${r}1"><state id="${r}1"><transition event="n" target="${r}2"/></state><state id="${r}2"/></state>`;
+    const m = await load(`<scxml ${NS}><parallel id="p">${["alpha", "beta", "gamma"].map(region).join("")}</parallel></scxml>`);
+    const x = (l: ChartLayout, id: string) => l.boxes.find((b) => b.node.id === id)!.rect.x;
+    const wide = lay(m, "down");
+    expect(new Set(["alpha", "beta", "gamma"].map((id) => x(wide, id))).size).toBe(3);
+    const narrow = lay(m, "down", undefined, { maxWidth: 200 });
+    check(narrow);
+    expect(new Set(["alpha", "beta", "gamma"].map((id) => x(narrow, id))).size).toBe(1);
+    expect(narrow.width).toBeLessThan(wide.width);
+  });
+
+  test("every playground chart, with portals and as for a phone, stays within its drawing", async () => {
+    for await (const f of new Glob("*.scxml").scan(CHARTS)) {
+      const m = await load(await Bun.file(CHARTS + f).text());
+      for (const d of ["down", "right"] as const) check(lay(m, d, undefined, { portals: true, maxWidth: 550 }));
+    }
   });
 });
 

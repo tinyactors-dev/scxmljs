@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>scxml-view layout</title>
+    <!-- One chart, drawn whole at 100% (no running, no scaling): for reviewing the layout.
+         ?chart=fulfillment.scxml (from /charts/), &direction=down|right, &theme=dark,
+         &width=390 (the element's width: narrow ones wrap parallel regions) -->
+    <script src="/fixtures/common.js"></script>
+    <!--importmap-->
+    <link rel="stylesheet" href="/fixtures/fixtures.css" />
+    <style>
+      body { margin: 0; padding: 0; }
+      scxml-view { display: block; --scxml-min-scale: 1; }
+    </style>
+    <script type="module">
+      import "@tinyactors/scxmljs/view";
+      const q = new URLSearchParams(location.search);
+      const view = document.createElement("scxml-view");
+      view.setAttribute("autostart", "false");
+      view.setAttribute("warnings", "off");
+      view.setAttribute("max-states", "1000");
+      view.setAttribute("direction", q.get("direction") ?? "down");
+      view.style.width = `${q.get("width") ?? 2400}px`;
+      view.setAttribute("src", `/charts/${q.get("chart") ?? "fulfillment.scxml"}`);
+      if (q.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
+      view.addEventListener("scxml-load", () => requestAnimationFrame(() => requestAnimationFrame(() => (document.body.dataset.ready = "")))); 
+      document.body.append(view);
+    </script>
+  </head>
+  <body></body>
+</html>

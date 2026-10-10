@@ -145,8 +145,10 @@ async function render(entry) {
       await page.mouse.move(width - 1, height - 1);
       await frame(ms);
     };
+    // the System level is the breadcrumb's first place; back down, the root machine's card
     const level = async (name) => {
-      await x.locator("[part~=levels] button", { hasText: name }).click();
+      if (name === "System") await x.locator("[part~=crumb]", { hasText: "System" }).click();
+      else await x.locator("[part~=machine]").first().click();
       await page.mouse.move(width - 1, height - 1);
     };
 

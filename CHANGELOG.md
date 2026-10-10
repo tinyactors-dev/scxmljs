@@ -72,7 +72,8 @@ private `--x-*` properties are not public API and can change in any release.
     number of states; exits and entries are a door glyph, the target and the first event; the
     breadcrumb is the title's first line (with "System", the way to the System level); list and
     diagram are icon toggles, "only active states" a funnel, playback icons. The last-step line
-    is gone from the screen (the live region still announces it).
+    is gone from the screen, and with it the `last-step` part (the live region still announces
+    each step).
   - New `strings` (explorer): `onExit`, `invokesGlyph`, `sendsGlyph`, `logsGlyph`.
 - `<scxml-view>`: every compound and parallel state folds and unfolds with a chevron before its
   name (before, only the containers folded for `max-states` could be unfolded and folded again).

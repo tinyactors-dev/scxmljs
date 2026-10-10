@@ -264,7 +264,6 @@ export class ScxmlExplorer extends ElementBase {
     stepButton: HTMLButtonElement;
     speeds: HTMLSelectElement;
     clockTime: HTMLElement;
-    lastStep: HTMLElement;
     shell: HTMLElement;
   };
 
@@ -691,8 +690,6 @@ export class ScxmlExplorer extends ElementBase {
     });
     const clockTime = h("span", { class: "clock-time", part: "clock" });
     const playback = h("div", { class: "playback", part: "playback", hidden: "" }, playToggle, stepButton, speeds, clockTime);
-    // what the last step did: shown under the title of the center pane
-    const lastStep = h("p", { class: "last-step", part: "last-step" });
     this.addEventListener("keydown", (e) => {
       const target = e.composedPath()[0] as HTMLElement;
       if (!this.#clock || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName)) return;
@@ -771,7 +768,6 @@ export class ScxmlExplorer extends ElementBase {
       stepButton,
       speeds,
       clockTime,
-      lastStep,
       shell,
     };
     this.#applyShellStrings();
@@ -883,10 +879,11 @@ export class ScxmlExplorer extends ElementBase {
     e.stepButton.title = t.stepHint;
     e.speeds.setAttribute("aria-label", t.speedLabel);
     e.speeds.title = t.speedLabel;
-    e.lastStep.setAttribute("aria-label", t.lastStep);
     e.strip.setAttribute("aria-label", t.acceptedEventsLabel);
     // named from the start; the first render puts in the count
     e.toInspector.textContent = `${t.accepts(0)} ›`;
+    e.handle.setAttribute("aria-label", t.sheetExpand);
+    e.handle.title = t.sheetExpand;
     e.back.textContent = t.backToStates;
     e.back.setAttribute("aria-label", t.backToStatesLabel);
     // landmarks: unique names with several explorers on a page (see the breadcrumb above)
@@ -942,18 +939,6 @@ export class ScxmlExplorer extends ElementBase {
     clockTime.title = queue.join(" · ");
   }
 
-  /** The last step of any machine: "machine: event · source → target". */
-  #renderLastStep() {
-    const t = this.#strings;
-    const el = this.#el.lastStep;
-    const ls = this.#tracker?.lastStep;
-    el.hidden = !ls;
-    el.textContent = ls
-      ? `${ls.machine}: ${ls.event ?? t.start}${ls.moves.length ? ` · ${ls.moves.slice(0, 2).join(" · ")}${ls.moves.length > 2 ? ` +${ls.moves.length - 2}` : ""}` : ` · ${t.noTransition}`}`
-      : "";
-    el.title = ls ? [ls.event ?? t.start, ...ls.moves].join("\n") : "";
-  }
-
   // ─────────────────────────────── render ───────────────────────────────
 
   #schedule() {
@@ -976,7 +961,6 @@ export class ScxmlExplorer extends ElementBase {
       this.#emit<ExplorerFocusDetail>("scxml-focus", { session: m.session, state: this.#focus });
     }
     this.#renderPlayback();
-    this.#renderLastStep();
     this.#el.shell.dataset.level = this.#level;
     this.#renderTop(m);
     this.#renderTree();
@@ -1962,7 +1946,6 @@ export class ScxmlExplorer extends ElementBase {
           [...t.links.values()].reduce((n, l) => n + total(l), 0),
         ),
       ),
-      this.#el.lastStep,
       sys,
     );
     out.scrollTop = scroll;
@@ -2197,11 +2180,13 @@ export class ScxmlExplorer extends ElementBase {
   /** What a state does on entry / exit and what it invokes, as glyphs. */
   #does(s: StateNode): HTMLElement | undefined {
     const t = this.#strings;
-    return actionGlyphs(
+    const el = actionGlyphs(
       s,
       { onEntry: t.onEntry, onExit: t.onExit, invokes: t.invokesGlyph, sends: t.sendsGlyph, logs: t.logsGlyph },
       describeAction,
     );
+    el?.setAttribute("part", "row-actions");
+    return el;
   }
 
   /** A container's size: the layers glyph and its number of states; the button that goes inside. */

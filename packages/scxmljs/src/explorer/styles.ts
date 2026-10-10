@@ -66,7 +66,7 @@ h2.title.small { font: 600 15px/1.3 var(--x-sans); letter-spacing: 0; }
 .shell[data-layout="panels"] .center .pane-scroll {
   padding-left: calc(var(--panel-w-start) + 2 * var(--gap) + 12px); padding-right: calc(var(--panel-w-end) + 2 * var(--gap) + 12px);
 }
-.shell[data-layout="panels"][data-level="system"] .center .pane-scroll { padding-left: 24px; padding-top: 72px; }
+.shell[data-layout="panels"][data-level="system"] .center .pane-scroll { padding-left: 24px; }
 .shell[data-layout="panel"] .center .pane-scroll { padding-left: calc(var(--panel-w) + 2 * var(--gap) + 12px); }
 .shell[data-layout="sheet"] .center .pane-scroll { padding: 12px 12px calc(var(--sheet-h, 88px) + 64px); }
 
@@ -78,7 +78,8 @@ h2.title.small { font: 600 15px/1.3 var(--x-sans); letter-spacing: 0; }
 }
 .shell[data-layout="panels"] .panel { top: var(--gap); bottom: var(--gap); left: var(--gap); width: var(--panel-w-start); }
 .shell[data-layout="panels"] .side-panel { left: auto; right: var(--gap); width: var(--panel-w-end); }
-.shell[data-layout="panels"][data-level="system"] .panel:not(.side-panel) { bottom: auto; }
+/* the System level has no tree: with two panels, the left one has nothing to show */
+.shell[data-layout="panels"][data-level="system"] .panel:not(.side-panel) { display: none; }
 .shell:not([data-layout="panels"]) .side-panel { display: none; }
 .shell[data-layout="panel"] .panel { top: var(--gap); bottom: var(--gap); left: var(--gap); width: var(--panel-w); }
 .panel-head {
@@ -87,13 +88,13 @@ h2.title.small { font: 600 15px/1.3 var(--x-sans); letter-spacing: 0; }
 }
 .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .panel-body > .pane, .side-panel > .pane { flex: 1; }
-.levels, .mode { display: inline-flex; gap: 2px; flex: none; }
-.levels button, .mode button, .scopes button {
+.mode { display: inline-flex; gap: 2px; flex: none; }
+.mode button, .scopes button {
   border: 0; background: none; padding: 2px 8px; min-height: 24px; border-radius: var(--x-r); cursor: pointer;
   font: 500 12px var(--x-sans); color: var(--x-fg3);
 }
-.levels button:hover, .mode button:hover, .scopes button:hover { color: var(--x-fg1); }
-.levels button[aria-pressed="true"], .mode button[aria-pressed="true"], .scopes button[aria-pressed="true"] { background: var(--x-s3); color: var(--x-fg1); }
+.mode button:hover, .scopes button:hover { color: var(--x-fg1); }
+.mode button[aria-pressed="true"], .scopes button[aria-pressed="true"] { background: var(--x-s3); color: var(--x-fg1); }
 .crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1 1 100%; overflow-x: auto; scrollbar-width: none; }
 .crumbs button { border: 0; background: none; padding: 2px 4px; min-height: 24px; border-radius: var(--x-r); cursor: pointer; color: var(--x-fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
 .crumbs button:hover { background: var(--x-s2); color: var(--x-fg1); }
@@ -211,9 +212,6 @@ h2.title.small { font: 600 15px/1.3 var(--x-sans); letter-spacing: 0; }
 .tree-row:focus-visible { outline-offset: -2px; }
 
 /* ── focus ─────────────────────────────────────────────── */
-.last-step { margin: 0 0 16px; font: 12px var(--x-mono); color: var(--x-fg3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* the one colour for "just happened" */
-.last-step::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--x-wait); margin-right: 8px; vertical-align: 1px; }
 .diagram { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 230px); justify-content: start; gap: 24px 128px; align-items: start; padding: 8px 0 8px 16px; }
 .rank { display: flex; flex-direction: column; gap: 16px; }
 .edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }

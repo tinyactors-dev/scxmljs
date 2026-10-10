@@ -170,7 +170,7 @@ Parts, with their modifiers (added while they apply):
 | Panels | `panel` (the tree, and in one-panel layouts the inspector), `side-panel` (the inspector, wide layouts), `top` (the panel's head), `levels`, `crumbs`, `crumb` (`current`), `to-inspector`, `back`, `sheet-handle` |
 | Corners | `playback`, `play`, `step`, `speeds` (a `<select>`), `clock` (bottom left), `follow` (bottom right) |
 | Tree | `tree-pane`, `tree-search`, `tree`, `tree-row` (`path` `active` `match`) |
-| Focus | `focus-pane`, `title`, `last-step`, `diagram`, `card` (`path` `active` `waiting` `final` `selected` `visited`), `edges`, `edge-label` (`live` `fired` `collapsed`), `list`, `list-row` (`path` `active` `visited` `open`), `visited`, `row-actions`, `row-exits`, `row-event` (`fired`), `row-detail`, `open-detail`, `lanes`, `lane` (`path`), `lane-row` (`active` `visited`), `doors`, `door` (`exit` or `entry`, `live`) |
+| Focus | `focus-pane`, `title`, `diagram`, `card` (`path` `active` `waiting` `final` `selected` `visited`), `edges`, `edge-label` (`live` `fired` `collapsed`), `list`, `list-row` (`path` `active` `visited` `open`), `visited`, `row-actions`, `row-exits`, `row-event` (`fired`), `row-detail`, `open-detail`, `lanes`, `lane` (`path`), `lane-row` (`active` `visited`), `doors`, `door` (`exit` or `entry`, `live`) |
 | Accepted events | `inspector`, `event-search`, `scopes`, `event-data` (a `<details>`), `events`, `event-group`, `event-row` (`here`, `inherited` or `elsewhere`), `send` (the event's name) |
 | Details | `detail`, `warning` |
 | System level | `system`, `machine` (`running` `done` `hot`), `service` (`selected` `hot`) |

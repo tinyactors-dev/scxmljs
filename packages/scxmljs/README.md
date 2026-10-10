@@ -6,9 +6,9 @@ automatic mandatory W3C conformance tests. Two custom elements draw running char
 shows a whole chart and needs no JavaScript, and `<scxml-explorer>` explores large, multi-machine
 systems one level at a time. They are plain custom elements, so they work with any framework.
 
-[![<scxml-explorer> following a running order-fulfilment system: the order machine's tree, the focus on its current state, the events it accepts, and the System level with the payment and shipment machines](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-43551975.webp)](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-43551975.webm)
+[![<scxml-explorer> following a running order-fulfilment system: the order machine's tree, the focus on its current state, the events it accepts, and the System level with the payment and shipment machines](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-b91fad8a.webp)](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-b91fad8a.webm)
 
-<sub>[Full-resolution video](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-43551975.webm) (WebM, 2880×1800) · [High-resolution screenshot](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-43551975.png) (PNG) · the explorer with the optional Tinyactors theme</sub>
+<sub>[Full-resolution video](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-b91fad8a.webm) (WebM, 2880×1800) · [High-resolution screenshot](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/explorer-tour-b91fad8a.png) (PNG) · the explorer with the optional Tinyactors theme</sub>
 
 **Docs & demos: <https://scxmljs.tinyactors.dev>**: guides, live demos and the API reference.
 
@@ -69,7 +69,7 @@ bundler, or an [import map](https://github.com/tinyactors-dev/scxmljs/blob/main/
 The element loads, validates, runs and draws the chart. Active states are highlighted, and each
 transition label is a button that sends its event.
 
-![A media player chart drawn by <scxml-view>: the "playing" and "audible" states are active](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-light-0ce739b3.webp)
+![A media player chart drawn by <scxml-view>: the "playing" and "audible" states are active](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-light-b74e654c.webp)
 
 **Explore a running system** with `<scxml-explorer>`: a tree of states, a focus on one level of
 the chart (each state with what it does, how it leaves, and buttons to send its events while

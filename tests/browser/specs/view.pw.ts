@@ -34,6 +34,42 @@ test.describe("<scxml-view>", () => {
     await expect(stateBox(page, "#host", "green")).toHaveAttribute("part", /active/);
   });
 
+  test("controls sit on the diagram's bottom edge: playback left, zoom right, one line, inset alike", async ({ page }) => {
+    await page.clock.install();
+    await page.goto("/fixtures/view.html");
+    await ready(page);
+    const host = page.locator("#host");
+    const canvas = (await host.locator("[part~=canvas]").boundingBox())!;
+    const controls = host.locator("[part~=controls]");
+    const fit = host.locator("[part~=fit]");
+    await expect(controls).toBeVisible();
+    await expect(fit).toBeHidden();
+    // zoom in: Fit appears in the corner
+    await host.locator("[part~=canvas]").hover();
+    await host.locator("[part~=zoom-in]").click();
+    await expect(fit).toBeVisible();
+    const [c, f] = [(await controls.boundingBox())!, (await fit.boundingBox())!];
+    // the same line, the same height, the same inset from their sides
+    expect(Math.abs(c.y + c.height - (f.y + f.height))).toBeLessThan(1);
+    expect(Math.abs(c.height - f.height)).toBeLessThan(1);
+    expect(Math.abs(c.x - canvas.x - (canvas.x + canvas.width - (f.x + f.width)))).toBeLessThan(2);
+    // the pointer leaves: −/level/+ go, Fit stays where it was
+    await page.mouse.move(0, 0);
+    await expect(host.locator("[part~=zoom-in]")).toBeHidden();
+    expect((await fit.boundingBox())!.x).toBeCloseTo(f.x, 0);
+    // playing untouched: the controls shrink to the play button; movement brings them back
+    await host.locator("[part~=play]").click();
+    await expect(host.locator("[part~=step]")).toBeHidden();
+    await page.mouse.move(0, 0);
+    await page.clock.runFor(4000);
+    await expect(controls).toHaveClass(/idle/);
+    await expect(host.locator("[part~=speeds]")).toBeHidden();
+    await host.locator("[part~=canvas]").hover();
+    await expect(controls).not.toHaveClass(/idle/);
+    await host.locator("[part~=play]").click();
+    await expect(host.locator("[part~=step]")).toBeVisible();
+  });
+
   test("a page that doesn't declare color-scheme keeps the light theme, even for dark-mode users", async ({ page }) => {
     const bg = () => page.evaluate(() => getComputedStyle(document.getElementById("src")!).backgroundColor);
     await page.emulateMedia({ colorScheme: "light" });
@@ -168,6 +204,40 @@ test.describe("<scxml-view> layout", () => {
       canvas.dispatchEvent(new TouchEvent("touchend", { touches: [], bubbles: true }));
     });
     expect(await zoom()).toBeCloseTo(before * 2, 1);
+
+    // double tap: zoomed in → back to fit; again → zoom in on that spot
+    const doubleTap = () =>
+      view.evaluate((v) => {
+        const canvas = v.shadowRoot!.querySelector(".canvas")!;
+        const r = canvas.getBoundingClientRect();
+        const t = () => [new Touch({ identifier: 7, target: canvas, clientX: r.left + 30, clientY: r.top + 30 })];
+        for (let i = 0; i < 2; i++) {
+          const touches = t();
+          canvas.dispatchEvent(
+            new TouchEvent("touchstart", { touches, targetTouches: touches, changedTouches: touches, bubbles: true, composed: true }),
+          );
+          canvas.dispatchEvent(
+            new TouchEvent("touchend", { touches: [], changedTouches: touches, bubbles: true, composed: true, cancelable: true }),
+          );
+        }
+      });
+    await doubleTap();
+    expect(await zoom()).toBeCloseTo(before, 2);
+    await doubleTap();
+    expect(await zoom()).toBeGreaterThanOrEqual(Math.max(1, before * 2) - 0.01);
+  });
+
+  test("an inline-block element sizes to its diagram (nothing in it zeroes its intrinsic width)", async ({ page }) => {
+    await page.goto("/fixtures/layout.html?chart=traffic-light.scxml");
+    await page.waitForSelector("body[data-ready]");
+    const { host, diagram } = await page.evaluate(() => {
+      const v = document.querySelector("scxml-view")!;
+      v.style.display = "inline-block";
+      v.style.width = "";
+      return { host: v.getBoundingClientRect().width, diagram: v.shadowRoot!.querySelector(".diagram")!.getBoundingClientRect().width };
+    });
+    expect(diagram).toBeGreaterThan(100);
+    expect(host).toBeGreaterThanOrEqual(diagram);
   });
 
   test("right-to-left pages: the diagram stays anchored at the start of its canvas", async ({ page }) => {

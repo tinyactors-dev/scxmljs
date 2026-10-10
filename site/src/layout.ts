@@ -44,6 +44,12 @@ const NAV: [Section, string, string][] = [
 // runs before first paint: no flash of the wrong theme
 const THEME_BOOT = `(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();`;
 
+// Lucide icons (https://lucide.dev, ISC): centred in their buttons, unlike text glyphs
+const svgIcon = (body: string) =>
+  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
+const ICON_CONTRAST = svgIcon('<circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z" fill="currentColor"/>');
+const ICON_MENU = svgIcon('<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>');
+
 export function page(o: PageOptions): string {
   const title = o.section === "home" ? o.title : `${o.title} · scxmljs`;
   const canonical = `${SITE}${o.path.replace(/index\.html$/, "")}`;
@@ -90,8 +96,8 @@ ${NAV.map(([sec, label, href]) => `      <a href="${href}"${sec === o.section ? 
         <label class="visually-hidden" for="site-search">Search the docs</label>
         <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
       </form>
-      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">◐</button>
-      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">☰</button>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark">${ICON_CONTRAST}</button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu">${ICON_MENU}</button>
     </div>
   </div>
 </header>

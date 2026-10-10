@@ -49,8 +49,10 @@ export interface ViewStrings {
   zoomReset: string;
   /** The zoom level readout, e.g. "80%"; it's a button that sets 100%. */
   zoomLevel: (percent: number) => string;
-  /** Tooltip of the zoom readout. */
+  /** Tooltip and accessible name of the zoom level button. */
   zoomActual: string;
+  /** The text of the button that goes back to the automatic view (shown once you've zoomed or scrolled away). */
+  fit: string;
   /** Accessible name of the zoom toolbar (mentions the shortcuts). */
   zoomToolbar: string;
   /** Notice when a large chart was folded to fit `max-states`. */
@@ -70,18 +72,20 @@ export interface ViewStrings {
   /** Tooltip of a warning that focuses its state when clicked. */
   showWarningState: string;
   // playback (with a PlaybackClock)
-  /** Play button (while paused). */
+  /** Accessible name of the playback controls. */
+  playbackLabel: string;
+  /** Play button's accessible name (while paused). */
   play: string;
-  /** Pause button (while playing). */
+  /** Pause button's accessible name (while playing). */
   pause: string;
-  /** Tooltip of the play/pause button (mentions the Space shortcut). */
-  playHint: string;
-  /** Step button. */
-  step: string;
-  /** Tooltip of the step button (mentions the `.` shortcut). */
+  /** The play/pause shortcut, shown in its tooltip. */
+  playKey: string;
+  /** Step button's accessible name and tooltip (mentions the `.` shortcut). */
   stepHint: string;
-  /** Accessible name of the speed buttons. */
+  /** Tooltip of the speed button (it cycles through the speeds). */
   speedLabel: string;
+  /** Accessible name of the speed button, with the current speed. */
+  speedButton: (speed: string) => string;
   /** The virtual time readout. */
   clockTime: (time: string) => string;
   // live region
@@ -122,8 +126,9 @@ export const defaultViewStrings: ViewStrings = {
   zoomOut: "Zoom out (−)",
   zoomReset: "Fit to width (0)",
   zoomLevel: (p) => `${p}%`,
-  zoomActual: "Actual size",
-  zoomToolbar: "Zoom: Ctrl or ⌘ + scroll wheel, pinch, or + and −; drag to pan",
+  fit: "Fit",
+  zoomActual: "Actual size (100%)",
+  zoomToolbar: "Zoom (also Ctrl or ⌘ + scroll wheel, pinch, double tap, or + and −; drag to pan)",
   foldedNotice: (hidden, groups) =>
     `Large chart: ${hidden} ${plural.select(hidden) === "one" ? "state is" : "states are"} folded into ${groups} ${plural.select(groups) === "one" ? "group" : "groups"}. Expand a group to see inside, or explore the chart level by level with <scxml-explorer>.`,
   expandAll: "Expand all",
@@ -133,12 +138,13 @@ export const defaultViewStrings: ViewStrings = {
   terminated: "The machine has terminated.",
   warningsSummary: (n) => `⚠ ${n} ${plural.select(n) === "one" ? "warning" : "warnings"} about this chart`,
   showWarningState: "Show the state",
-  play: "▶ Play",
-  pause: "⏸ Pause",
-  playHint: "Play / pause (Space)",
-  step: "Step ⏭",
-  stepHint: "Run until the next step (.)",
-  speedLabel: "Speed",
+  playbackLabel: "Playback",
+  play: "Play",
+  pause: "Pause",
+  playKey: "Space",
+  stepHint: "Step: run until the next step (.)",
+  speedLabel: "Speed: click for the next one",
+  speedButton: (speed) => `Speed ${speed}`,
   clockTime: (t) => `t = ${t}`,
   announceStep: (event, entered) => `${event ?? "Started"}: ${entered.length ? `now in ${entered.join(", ")}` : "no change"}`,
   announceSent: (name) => `Sent ${name}`,

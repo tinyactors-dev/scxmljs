@@ -78,6 +78,7 @@ background doesn't fast-forward through minutes of timers when it comes back.
 Both elements show playback controls when the session's clock is a `PlaybackClock`: play/pause,
 step, speeds from ¼× to 4×, and the virtual time. Their Step button does exactly what the example
 above does: it runs until the next macrostep. Space plays and pauses, and `.` steps.
+`<scxml-view>` puts them at the bottom left of the diagram.
 
 - `<scxml-view>`: set its `clock` property; the element creates the session with it.
 - `<scxml-explorer>`: create the session with the clock and pass both to `attach()`.

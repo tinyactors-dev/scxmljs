@@ -50,7 +50,7 @@ The defaults are light / dark.
 | `--scxml-running`, `--scxml-running-bg` | `#26733a` on `#e5f3e9` / `#6fd48a` on `#1a3123` | active states |
 | `--scxml-waiting`, `--scxml-waiting-bg` | `#a8560a` on `#fdf0e1` / `#ffb46b` on `#382815` | waiting states, conditions, warnings |
 | `--scxml-done`, `--scxml-done-bg` | `#48566b` on `#e9edf3` / `#a7b5c9` on `#242b35` | final states, finished machines |
-| `--scxml-error` | `#c2332f` / `#ff8a84` | errors |
+| `--scxml-error`, `--scxml-error-bg` | `#c2332f` on `#fbeceb` / `#ff8a84` on `#3a1c1b` | errors, and error events (`error.*`, `*.error`) |
 | `--scxml-font-sans` | `system-ui, …` | text |
 | `--scxml-font-mono` | `ui-monospace, …` | ids, events, code |
 | `--scxml-font-display` | `--scxml-font-sans` | titles |
@@ -77,8 +77,8 @@ text needs 4.5:1, graphics 3:1:
 | `--scxml-on-accent` | `--scxml-accent` | 4.5 |
 | `--scxml-running` | `--scxml-bg`, `--scxml-surface`, `--scxml-running-bg` | 4.5 |
 | `--scxml-waiting` | `--scxml-surface`, `--scxml-waiting-bg` | 4.5 |
-| `--scxml-done` | `--scxml-done-bg` | 4.5 |
-| `--scxml-error` | `--scxml-surface` | 4.5 |
+| `--scxml-done` | `--scxml-done-bg`, `--scxml-bg`, `--scxml-surface` | 4.5 |
+| `--scxml-error` | `--scxml-surface`, `--scxml-bg`, `--scxml-error-bg` | 4.5 |
 | `--scxml-fg-faint` | `--scxml-surface`, `--scxml-surface-2` | 3 |
 | `--scxml-border-strong` | `--scxml-surface` | 3 |
 

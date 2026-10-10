@@ -35,6 +35,7 @@ scxml-view {
   --scxml-done: var(--state-done);
   --scxml-done-bg: var(--state-done-bg);
   --scxml-error: var(--state-error);
+  --scxml-error-bg: var(--state-error-bg);
   --scxml-font-sans: var(--font-sans);
   --scxml-font-mono: var(--font-mono);
   --scxml-font-display: var(--font-serif);

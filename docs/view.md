@@ -140,18 +140,44 @@ own controls (see [driving charts](driving-charts.md)).
 
 ## Zoom, pan and folding
 
-- **Zoom** with the toolbar in the corner (zoom out, the current level, which resets to 100%,
-  zoom in, fit to width), with Ctrl or ⌘ and the scroll wheel, with a trackpad pinch, or with
-  `+`, `-` and `0` (fit to width) while the diagram has focus. Zooming keeps the point under the
-  pointer in place, and fixes the canvas at the height it had, so the page doesn't jump.
+The controls float over the diagram's bottom edge, on one line and inset like the diagram:
+playback at the bottom left (with a `PlaybackClock`), zoom at the bottom right. They show only
+what's useful at the moment.
+
+```text
+[▶] [⏭] [1×]  t = 26.2 s ·············· [−] [65%] [+] [Fit]
+```
+
+- **Zoom** with Ctrl or ⌘ and the scroll wheel, a trackpad pinch, or `+`, `-` and `0` (fit to
+  width) while the diagram has focus. −, the level (a button that sets 100%) and + appear while
+  the pointer is over the diagram, keyboard focus is in it, or you're zooming. Zooming keeps the
+  point under the pointer in place, and fixes the canvas at the height it had, so the page
+  doesn't jump.
+- **Fit** sits in the corner once you've zoomed or scrolled away, and takes you back to the
+  automatic view.
 - **Pan** by dragging the diagram's background, or by scrolling.
-- **Touch:** one finger scrolls the diagram, two fingers pinch-zoom it (not the page). Icon buttons
-  get a larger hit area on touch screens.
+- **Touch:** one finger scrolls the diagram, two fingers pinch-zoom it (not the page). A double
+  tap zooms in on that spot, and when you're zoomed in, back to fit. Buttons are larger, and − and
+  + give way to the gestures.
+- **Playback** (with a `PlaybackClock`): play or pause, Step (only while paused), the speed (one
+  button that cycles through ¼× to 4×) and the virtual time. While the chart plays and nobody
+  touches it, the controls shrink to the play button after three seconds; moving the pointer over
+  the diagram, a tap or keyboard focus brings them back.
 - **Following:** when the chart doesn't fit, the element scrolls to the active states, and keeps
   them in view as the machine moves. It stops as soon as you scroll, drag or zoom; fit to width
   (`0`) turns it back on.
+- **Narrow elements:** parallel regions that wouldn't fit side by side at 65% stack instead, and
+  the element lays the chart out again when its width changes a lot.
 - **Fold** any compound or parallel state with the chevron before its name: it becomes a single
   box that says how many states it holds. The chevron of a folded box unfolds it.
+
+### Transitions listed in a box
+
+Two kinds of transition aren't drawn as arrows, because they would run long lines across the
+chart: a compound state's transitions into its own states ("from anywhere in here", like a global
+`cancel`), and transitions that cross three or more container borders. The source state's box
+lists them as chips that name their target, like `customer.cancel → cancelling`. Hovering or
+focusing a chip outlines the target, and clicking it sends the event like any label.
 
 ## Describing states
 
@@ -230,13 +256,14 @@ The element uses the shared `--scxml-*` tokens and exposes these parts:
 | `initial` | | the initial-state marker |
 | `expand`, `collapse` | | the fold toggle of a folded / an expanded container |
 | `help`, `help-popover` | | a state's help button, and the popover it opens |
-| `zoom` | | the zoom toolbar |
+| `portal`, `target` | `live` `fired` | a transition listed in its source's box (with `transition`), and the target it names |
 | `empty` | | the hint shown while there's nothing to show |
 | `notice` | | the "large chart" notice |
 | `send-status` | | what became of an event sent by clicking a label, when it changed nothing or raised an error |
 | `error` | | the error panel |
 | `warnings`, `warning` | | the authoring-warnings list and each item |
-| `controls`, `play`, `step`, `speeds`, `clock` | | the playback bar (with a `PlaybackClock`) |
+| `controls`, `play`, `step`, `speeds`, `clock` | | the playback controls at the bottom left (with a `PlaybackClock`); `speeds` is one button that cycles |
+| `zoom`, `zoom-out`, `zoom-level`, `zoom-in`, `fit` | | the zoom controls at the bottom right: −, the level (sets 100%), +, and back to the automatic view |
 
 `live` marks transitions whose source state is active, `fired` those that fired within the last
 second. `--scxml-height` caps the element's height (default: none). Details and examples are in

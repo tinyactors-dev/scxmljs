@@ -55,10 +55,12 @@ import { compile, isCompound, type Model, type StateNode, type TransitionNode } 
 import { parseSCXML, SCXMLSession, type SessionOptions } from "../session.ts";
 import type { MicrostepEvent } from "../session-events.ts";
 import { Announcer } from "../ui/announcer.ts";
+import * as icons from "../ui/icons.ts";
+import { eventName, NOTATION_CSS } from "../ui/notation.ts";
 import { arrowMarker, icon } from "../ui/svg.ts";
 import { lazySheet, NARROW_WIDTH, themeSheet } from "../ui/theme.ts";
 import { sourceDescription } from "./describe.ts";
-import { autoCollapse, type ChartLayout, type Direction, layoutChart, type Size } from "./layout.ts";
+import { autoCollapse, type ChartLayout, type Direction, layoutChart, portalTransitions, type Size } from "./layout.ts";
 import { defaultViewStrings, type ViewStateKind, type ViewStrings } from "./strings.ts";
 import { VIEW_CSS } from "./styles.ts";
 
@@ -115,6 +117,13 @@ const ZOOM_STEP = 1.25;
 /** The diagram's margin inside the canvas, px (see `.diagram` in styles.ts). */
 const MARGIN = 12;
 const FIRED_MS = 900;
+/** How long the playback controls stay in full while playing and untouched. */
+const IDLE_MS = 3000;
+/** How long the zoom level stays up after zooming. */
+const ZOOM_LEVEL_MS = 900;
+/** Two taps within this long (ms) are a double tap. */
+const DOUBLE_TAP_MS = 300;
+
 const DEFAULT_MAX_STATES = 150;
 const MAX_INTERNAL_SHOWN = 3;
 const SPEEDS: [number, string][] = [
@@ -128,7 +137,7 @@ const SPEEDS: [number, string][] = [
 // importing this module where there is no DOM (server-side rendering, Node) must work
 const ElementBase: typeof HTMLElement = typeof HTMLElement === "undefined" ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
 
-const sheet = lazySheet(VIEW_CSS);
+const sheet = lazySheet(VIEW_CSS + NOTATION_CSS);
 
 /** Load a data model engine on demand (dynamic import: never in the element's own bundle). */
 async function engine(trusted: boolean): Promise<DataModelFactory> {
@@ -158,7 +167,7 @@ export class ScxmlView extends ElementBase {
     controls: HTMLElement;
     play: HTMLButtonElement;
     step: HTMLButtonElement;
-    speeds: HTMLElement;
+    speeds: HTMLButtonElement;
     clock: HTMLElement;
     notice: HTMLElement;
     sendStatus: HTMLElement;
@@ -167,6 +176,9 @@ export class ScxmlView extends ElementBase {
     canvas: HTMLElement;
     diagram: HTMLElement;
     live: HTMLElement;
+    viewport: HTMLElement;
+    nav: HTMLElement;
+    fit: HTMLButtonElement;
     zoom: HTMLElement;
     zoomLevel: HTMLButtonElement;
     help: HTMLElement;
@@ -196,6 +208,9 @@ export class ScxmlView extends ElementBase {
   #labels = new Map<TransitionNode, HTMLElement[]>();
   #paths = new Map<TransitionNode, SVGPathElement[]>();
   #chips = new Map<TransitionNode, HTMLElement>();
+  /** Transitions listed in their source's box with their target instead of drawn, per box. */
+  #portals = new Map<StateNode, TransitionNode[]>();
+  #portalChips = new Map<TransitionNode, HTMLElement>();
 
   // live state
   #fired = new Map<TransitionNode, number>();
@@ -209,6 +224,8 @@ export class ScxmlView extends ElementBase {
   #raf = 0;
   #decayRaf = 0;
   #width = 0;
+  /** The width the last layout tried to stay within (px; 0: none). */
+  #budget = 0;
 
   // navigation: an explicit zoom (null = automatic, see #applyFit) and the open help popover
   #zoom: number | null = null;
@@ -664,13 +681,35 @@ export class ScxmlView extends ElementBase {
 
   #buildShell() {
     const t = this.#strings;
-    const play = h("button", { class: "play", type: "button", part: "play", title: t.playHint }) as HTMLButtonElement;
-    const step = h("button", { class: "step", type: "button", part: "step", title: t.stepHint }, t.step) as HTMLButtonElement;
-    const speeds = h("div", { class: "speeds", role: "group", part: "speeds", "aria-label": t.speedLabel });
+    const iconButton = (cls: string, part: string, label: string, glyph: Node, onClick: () => void) => {
+      const b = h("button", { class: cls, type: "button", part, title: label, "aria-label": label }, glyph) as HTMLButtonElement;
+      b.addEventListener("click", onClick);
+      return b;
+    };
+    // controls float over the diagram's bottom edge, both clusters on one line, inset like the diagram:
+    //   [play] [step] [speed] t = …  ·········  [−] [level] [+] [fit]
+    // playback (a PlaybackClock) on the left: Step only while paused; while playing untouched it
+    // shrinks to the play button (#wake). Zoom on the right: fit, in the corner, once the view has
+    // left the automatic one; −/level/+ beside it on hover, keyboard focus, or while zooming
+    // (−/+ give way to pinch and double tap on touch screens)
+    const play = iconButton("play", "play", t.play, icon(icons.play, 16), () => this.#playback()?.toggle());
+    const step = iconButton("step", "step", t.stepHint, icon(icons.stepForward, 16), () => this.#step());
+    const speeds = h("button", { class: "speeds", type: "button", part: "speeds", title: t.speedLabel }) as HTMLButtonElement;
+    speeds.addEventListener("click", () => {
+      const clock = this.#playback();
+      if (!clock) return;
+      const i = SPEEDS.findIndex(([v]) => v === clock.speed);
+      clock.speed = SPEEDS[(i + 1) % SPEEDS.length]![0];
+    });
     const clock = h("span", { class: "clock", part: "clock" });
-    play.addEventListener("click", () => this.#playback()?.toggle());
-    step.addEventListener("click", () => this.#step());
-    const controls = h("div", { class: "controls", part: "controls", hidden: "" }, play, step, speeds, clock);
+    const controls = h(
+      "div",
+      { class: "controls", part: "controls", role: "group", "aria-label": t.playbackLabel, hidden: "" },
+      play,
+      step,
+      speeds,
+      clock,
+    );
     const notice = h("div", { class: "notice", part: "notice", hidden: "" });
     // what became of an event sent by clicking a label, when it wasn't the obvious (a transition fired)
     const sendStatus = h("div", { class: "notice send-status", part: "send-status", hidden: "" });
@@ -679,24 +718,21 @@ export class ScxmlView extends ElementBase {
     const diagram = h("div", { class: "diagram", role: "group" });
     // focusable: a scroll container must be keyboard-scrollable, and it takes the playback and zoom shortcuts
     const canvas = h("div", { class: "canvas", part: "canvas", tabindex: "0" }, diagram);
-    const zoomButton = (cls: string, title: string, glyph: Node | string, onClick: () => void) => {
-      const b = h("button", { class: cls, type: "button", title, "aria-label": title }, glyph) as HTMLButtonElement;
-      b.addEventListener("click", onClick);
-      return b;
-    };
-    const zoomLevel = zoomButton("zoom-level", t.zoomActual, "100%", () => this.#zoomTo(1));
+    const fit = iconButton("zoom-reset", "fit", t.zoomReset, icon(icons.scan, 16), () => this.#zoomTo(null));
+    fit.append(h("span", {}, t.fit));
+    const zoomLevel = iconButton("zoom-level", "zoom-level", t.zoomActual, document.createTextNode("100%"), () => this.#zoomTo(1));
     const zoom = h(
       "div",
-      { class: "zoom", part: "zoom", role: "toolbar", "aria-label": t.zoomToolbar, hidden: "" },
-      zoomButton("zoom-out", t.zoomOut, icon("zoom-out"), () => this.#zoomBy(1 / ZOOM_STEP)),
+      { class: "zoom", part: "zoom", role: "group", "aria-label": t.zoomToolbar },
+      iconButton("zoom-out", "zoom-out", t.zoomOut, icon(icons.minus, 16), () => this.#zoomBy(1 / ZOOM_STEP)),
       zoomLevel,
-      zoomButton("zoom-in", t.zoomIn, icon("zoom-in"), () => this.#zoomBy(ZOOM_STEP)),
-      zoomButton("zoom-reset", t.zoomReset, icon("scan"), () => this.#zoomTo(null)),
+      iconButton("zoom-in", "zoom-in", t.zoomIn, icon(icons.plus, 16), () => this.#zoomBy(ZOOM_STEP)),
     );
+    const nav = h("div", { class: "nav", hidden: "" }, zoom, fit);
     const help = h("div", { class: "help-popover", part: "help-popover", role: "dialog", tabindex: "-1", id: "help-popover", hidden: "" });
-    const viewport = h("div", { class: "viewport" }, canvas, zoom, help);
+    const viewport = h("div", { class: "viewport" }, canvas, controls, nav, help);
     const live = h("div", { class: "sr-only", role: "status", "aria-live": "polite", "aria-atomic": "true" });
-    const frame = h("div", { class: "frame", part: "frame" }, controls, notice, sendStatus, warnings, error, viewport, live);
+    const frame = h("div", { class: "frame", part: "frame" }, notice, sendStatus, warnings, error, viewport, live);
     this.#shadow.append(frame);
     this.#el = {
       frame,
@@ -712,10 +748,15 @@ export class ScxmlView extends ElementBase {
       canvas,
       diagram,
       live,
+      viewport,
+      nav,
+      fit,
       zoom,
       zoomLevel,
       help,
     };
+    for (const type of ["pointermove", "pointerdown", "keydown", "focusin", "wheel", "touchstart"])
+      viewport.addEventListener(type, () => this.#wake(), { passive: true });
     this.#wireNavigation();
     this.addEventListener("keydown", (e) => {
       const clockNow = this.#playback();
@@ -739,7 +780,7 @@ export class ScxmlView extends ElementBase {
     canvas.addEventListener(
       "wheel",
       (e) => {
-        this.#follow = false;
+        this.#takeOver();
         // pinch-zoom on a trackpad arrives as a wheel event with ctrlKey
         if (!(e.ctrlKey || e.metaKey) || !this.#layout) return;
         e.preventDefault();
@@ -755,7 +796,7 @@ export class ScxmlView extends ElementBase {
       else if (e.key === "-" || e.key === "_") this.#zoomBy(1 / ZOOM_STEP);
       else if (e.key === "0") this.#zoomTo(null);
       else {
-        if (/^(Arrow|Page|Home$|End$)/.test(e.key) || e.key === " ") this.#follow = false;
+        if (/^(Arrow|Page|Home$|End$)/.test(e.key) || e.key === " ") this.#takeOver();
         return;
       }
       e.preventDefault();
@@ -776,7 +817,7 @@ export class ScxmlView extends ElementBase {
       if (!drag.moved) {
         if (Math.abs(dx) + Math.abs(dy) < 4) return;
         drag.moved = true;
-        this.#follow = false;
+        this.#takeOver();
         canvas.setPointerCapture?.(e.pointerId);
         canvas.classList.add("panning");
       }
@@ -808,23 +849,38 @@ export class ScxmlView extends ElementBase {
   /**
    * Touch: one finger scrolls (natively), two pinch-zoom the diagram around their midpoint
    * instead of the page (`touch-action: pan-x pan-y` on the canvas keeps the browser out of it).
+   * A double tap zooms in on that spot, or, when already zoomed in, back to fit (like Photos).
    */
   #wirePinch() {
     const canvas = this.#el.canvas;
     let pinch: { dist: number; scale: number } | undefined;
+    /** the last single-finger tap (no movement): where and when */
+    let tap: { x: number; y: number; at: number } | undefined;
+    let start: { x: number; y: number; moved: boolean } | undefined;
     const dist = (t: TouchList) => Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY);
     const mid = (t: TouchList) => ({ x: (t[0]!.clientX + t[1]!.clientX) / 2, y: (t[0]!.clientY + t[1]!.clientY) / 2 });
     canvas.addEventListener(
       "touchstart",
       (e) => {
-        this.#follow = false;
-        if (e.touches.length === 2 && this.#layout) pinch = { dist: dist(e.touches), scale: this.#scale };
+        if (e.touches.length === 2 && this.#layout) {
+          this.#takeOver();
+          pinch = { dist: dist(e.touches), scale: this.#scale };
+          start = undefined;
+          tap = undefined;
+        } else if (e.touches.length === 1) start = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY, moved: false };
       },
       { passive: true },
     );
     canvas.addEventListener(
       "touchmove",
       (e) => {
+        if (start && e.touches.length === 1) {
+          const t = e.touches[0]!;
+          if (!start.moved && Math.abs(t.clientX - start.x) + Math.abs(t.clientY - start.y) > 8) {
+            start.moved = true;
+            this.#takeOver(); // scrolling by hand
+          }
+        }
         if (!pinch || e.touches.length !== 2) return;
         e.preventDefault();
         const d = dist(e.touches);
@@ -834,11 +890,37 @@ export class ScxmlView extends ElementBase {
     );
     const end = (e: TouchEvent) => {
       if (e.touches.length < 2) pinch = undefined;
+      if (e.type !== "touchend" || e.touches.length || !start || start.moved) {
+        start = undefined;
+        return;
+      }
+      // a tap on a control is that control's
+      const target = e.composedPath()[0] as Element;
+      const s0 = start;
+      start = undefined;
+      if (target?.closest?.("button, a, input, select, textarea, summary") || !this.#layout) return;
+      const now = e.timeStamp;
+      if (tap && now - tap.at < DOUBLE_TAP_MS && Math.hypot(s0.x - tap.x, s0.y - tap.y) < 30) {
+        tap = undefined;
+        e.preventDefault();
+        const anchor = { x: s0.x, y: s0.y };
+        if (this.#zoom != null && this.#zoom > this.#fitScale() + 0.01) this.#zoomTo(null);
+        else this.#zoomTo(Math.max(1, this.#scale * 2), anchor);
+      } else tap = { x: s0.x, y: s0.y, at: now };
     };
-    canvas.addEventListener("touchend", end);
+    canvas.addEventListener("touchend", end, { passive: false });
     canvas.addEventListener("touchcancel", end);
     // WebKit's own pinch gesture on the page
     canvas.addEventListener("gesturestart", (e) => e.preventDefault());
+  }
+
+  /** The automatic scale (what "fit" goes back to). */
+  #fitScale(): number {
+    const layout = this.#layout;
+    const available = this.#el.canvas.clientWidth - 2 * MARGIN;
+    if (!layout || !(available > 0) || available >= layout.width) return 1;
+    const floor = this.fit ? 0 : this.#minScale();
+    return Math.min(1, Math.max(floor, available / layout.width));
   }
 
   /**
@@ -883,6 +965,28 @@ export class ScxmlView extends ElementBase {
     }
   }
 
+  /** "Fit" shows once the view has left the default: zoomed by hand, or no longer following. */
+  #syncFit() {
+    this.#el.fit.hidden = this.#zoom == null && this.#follow;
+  }
+
+  #zoomLevelTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** Show the zoom level for a moment after zooming (on touch screens, where nothing hovers). */
+  #flashZoomLevel() {
+    const v = this.#el.viewport;
+    v.dataset.zooming = "";
+    clearTimeout(this.#zoomLevelTimer);
+    this.#zoomLevelTimer = setTimeout(() => delete v.dataset.zooming, ZOOM_LEVEL_MS);
+  }
+
+  /** Stop following the active states: the user has taken over the view. */
+  #takeOver() {
+    if (!this.#follow) return;
+    this.#follow = false;
+    this.#syncFit();
+  }
+
   #zoomBy(factor: number) {
     this.#zoomTo(this.#scale * factor);
   }
@@ -911,6 +1015,7 @@ export class ScxmlView extends ElementBase {
     this.#zoom = next;
     this.#follow = next == null;
     this.#revealed = "";
+    if (next != null) this.#flashZoomLevel();
     this.#applyFit();
     if (next == null) {
       this.#revealActive(true);
@@ -1010,8 +1115,17 @@ export class ScxmlView extends ElementBase {
     this.#width = w;
     if (!this.#layout) return;
     const crossed = was === 0 || was <= NARROW_WIDTH !== w <= NARROW_WIDTH;
-    if (this.direction === "auto" && crossed) this.#relayout();
+    // the layout wraps parallel regions to the width: lay out again when it changed noticeably
+    const budget = (this.#el.canvas.clientWidth - 2 * MARGIN) / this.#minScale();
+    const moved = !this.#budget || Math.abs(budget - this.#budget) / this.#budget > 0.15;
+    if ((this.direction === "auto" && crossed) || moved) this.#relayout();
     else this.#applyFit();
+  }
+
+  /** The automatic scale's floor: `--scxml-min-scale` (default 0.65); `fit` scales further, but wraps the same. */
+  #minScale(): number {
+    const raw = Number.parseFloat(getComputedStyle(this).getPropertyValue("--scxml-min-scale"));
+    return Number.isFinite(raw) ? Math.min(1, Math.max(0.1, raw)) : DEFAULT_MIN_SCALE;
   }
 
   // ──────────────────────────────── rendering ────────────────────────────────
@@ -1049,6 +1163,15 @@ export class ScxmlView extends ElementBase {
     this.#labels.clear();
     this.#paths.clear();
     this.#chips.clear();
+    this.#portalChips.clear();
+    // long-distance transitions: chips in their (drawn) source's box, not edges
+    const portals = portalTransitions(model.root, this.#collapsed);
+    this.#portals.clear();
+    for (const tr of portals) {
+      let box = tr.source;
+      for (let n = box.parent; n; n = n.parent) if (this.#collapsed.has(n)) box = n;
+      (this.#portals.get(box) ?? this.#portals.set(box, []).get(box)!).push(tr);
+    }
     e.diagram.replaceChildren();
     e.diagram.setAttribute("aria-label", t.diagramLabel(model.name || "statechart"));
 
@@ -1073,7 +1196,7 @@ export class ScxmlView extends ElementBase {
     e.diagram.append(measureHost);
     for (const s of visible) {
       for (const tr of s.transitions) {
-        if (!tr.targets.length || !labelText(tr)) continue;
+        if (!tr.targets.length || !labelText(tr) || portals.has(tr)) continue;
         const el = this.#label(tr);
         measureHost.append(el);
         labelSizes.set(tr, measured(el, estimateLabel(tr)));
@@ -1082,9 +1205,14 @@ export class ScxmlView extends ElementBase {
     measureHost.remove();
 
     // 3. layout
+    // the width that fits at the smallest automatic scale: parallel regions wrap to stay within it
+    const available = e.canvas.clientWidth - 2 * MARGIN;
+    this.#budget = available > 0 ? available / this.#minScale() : 0;
     const layout = layoutChart(model.root, {
       direction: this.#direction,
+      maxWidth: this.#budget || undefined,
       collapsed: this.#collapsed,
+      portals,
       labelSize: (tr) => labelSizes.get(tr) ?? { w: 0, h: 0 },
       measure: (s, collapsed) => this.#measure(s, collapsed),
     });
@@ -1140,6 +1268,10 @@ export class ScxmlView extends ElementBase {
     this.#renderNotice();
     this.#renderWarnings();
     this.#applyFit();
+    // the width the element has NOW: when its width follows its content (inline-block, a flex
+    // item…), drawing just changed it, and that resize mustn't count as a reason to lay out again
+    const after = e.canvas.clientWidth - 2 * MARGIN;
+    if (this.#budget && after > 0) this.#budget = after / this.#minScale();
     this.#revealed = "";
     this.#renderState();
   }
@@ -1202,7 +1334,7 @@ export class ScxmlView extends ElementBase {
           "aria-label": `${collapsed ? t.expand : t.collapse} ${display}`,
           title: collapsed ? t.expand : t.collapse,
         },
-        icon(collapsed ? "chevron-right" : "chevron-down"),
+        icon(collapsed ? icons.chevronRight : icons.chevronDown),
       );
       fold.addEventListener("click", () => this.#toggleFold(s));
       row.append(fold);
@@ -1219,7 +1351,7 @@ export class ScxmlView extends ElementBase {
         "aria-controls": "help-popover",
         title: t.helpLabel(display),
       },
-      icon("circle-help"),
+      icon(icons.circleHelp),
     );
     help.addEventListener("click", () => {
       if (this.#helpFor?.button === help) this.#closeHelp(false);
@@ -1247,11 +1379,31 @@ export class ScxmlView extends ElementBase {
     (box?.querySelector(".toggle") as HTMLElement | null)?.focus({ preventScroll: true });
   }
 
-  /** Targetless transitions of a state, as chips inside its box. */
+  /**
+   * Chips inside a state's box: its long-distance transitions ("event → target", all of them;
+   * hovering one marks its target), then its targetless ones (the first few).
+   */
   #internal(s: StateNode): HTMLElement | undefined {
     const list = s.transitions.filter((tr) => !tr.targets.length);
-    if (!list.length) return undefined;
+    const far = this.#portals.get(s) ?? [];
+    if (!list.length && !far.length) return undefined;
     const wrap = h("div", { class: "internal", part: "internal" });
+    for (const tr of far) {
+      const chip = this.#label(tr, true, true);
+      const mark = (on: boolean) => {
+        for (const target of tr.targets) {
+          let box = target;
+          for (let n = box.parent; n; n = n.parent) if (this.#collapsed.has(n)) box = n;
+          this.#boxes.get(box)?.classList.toggle("portal-target", on);
+        }
+      };
+      chip.addEventListener("pointerenter", () => mark(true));
+      chip.addEventListener("pointerleave", () => mark(false));
+      chip.addEventListener("focus", () => mark(true));
+      chip.addEventListener("blur", () => mark(false));
+      wrap.append(chip);
+      this.#portalChips.set(tr, chip);
+    }
     for (const tr of list.slice(0, MAX_INTERNAL_SHOWN)) {
       const chip = this.#label(tr, true);
       wrap.append(chip);
@@ -1263,22 +1415,27 @@ export class ScxmlView extends ElementBase {
   }
 
   /** A transition's label: a button that sends its event (or a plain label). */
-  #label(tr: TransitionNode, chip = false): HTMLElement {
+  #label(tr: TransitionNode, chip = false, withTarget = false): HTMLElement {
     const t = this.#strings;
     const name = tr.events.map(sendableName).find((n): n is string => !!n);
     const interactive = this.interactive && !!name;
     const el = h(interactive ? "button" : "span", {
-      class: chip ? "chip" : "label",
+      class: `${chip ? "chip" : "label"} ev-chip`,
       part: parts("transition", "edge-label"),
       ...(interactive ? { type: "button" } : {}),
     });
     const events = tr.events.length ? tr.events : [t.eventless];
     events.forEach((ev, i) => {
       if (i) el.append(" ");
-      el.append(h("span", { part: "event" }, ev));
+      // the event's name as written: the namespace quieter, its kind in the state colours
+      el.append(h("span", { part: "event" }, tr.events.length ? eventName(ev) : ev));
     });
     if (tr.cond) el.append(h("span", { class: "cond", part: "cond" }, `[${truncate(tr.cond, 22)}]`));
     const targets = tr.targets.map((s) => s.id).join(", ");
+    if (withTarget) {
+      el.classList.add("portal");
+      el.append(h("span", { class: "to", part: "target" }, `→ ${targets}`));
+    }
     el.setAttribute("aria-label", t.transitionLabel(tr.events.join(" ") || t.eventless, targets));
     el.title = [tr.events.join(" ") || t.eventless, tr.cond && `[${tr.cond}]`, targets && `→ ${targets}`].filter(Boolean).join(" ");
     if (interactive)
@@ -1299,14 +1456,19 @@ export class ScxmlView extends ElementBase {
     const kind = this.#kind(s);
     if (s.kind === "scxml") return { w: 0, h: 0 };
     if (kind === "history") return { w: 26, h: 26 };
-    if (!el) return estimateBox(s, collapsed);
+    if (!el) return estimateBox(s, collapsed, this.#portals.get(s));
     const container = !collapsed && (kind === "compound" || kind === "parallel");
     if (container) {
       const head = el.querySelector(".head") as HTMLElement | null;
-      return head ? measured(head, estimateBox(s, false)) : estimateBox(s, false);
+      if (!head) return estimateBox(s, false, this.#portals.get(s));
+      // the box has no width yet: measure the header at its own width (its chips wrap at their max-width)
+      head.style.width = "max-content";
+      const size = measured(head, estimateBox(s, false, this.#portals.get(s)));
+      head.style.width = "";
+      return size;
     }
     el.style.width = "max-content";
-    const size = measured(el, estimateBox(s, collapsed));
+    const size = measured(el, estimateBox(s, collapsed, this.#portals.get(s)));
     el.style.width = "";
     // + the active dot, hidden while measuring (7px and a 6px gap), so an active box doesn't truncate its name
     return { w: Math.max(size.w + 13, 64), h: Math.max(size.h, 34) };
@@ -1378,8 +1540,13 @@ export class ScxmlView extends ElementBase {
     }
     this.#scale = scale;
     this.#el.canvas.classList.toggle("zoomed", this.#zoom != null);
-    this.#el.zoom.hidden = !layout;
-    this.#el.zoomLevel.textContent = this.#strings.zoomLevel(Math.round(scale * 100));
+    const level = this.#strings.zoomLevel(Math.round(scale * 100));
+    this.#el.zoomLevel.textContent = level;
+    this.#el.zoomLevel.setAttribute("aria-label", `${level}: ${this.#strings.zoomActual}`);
+    this.#syncFit();
+    this.#el.nav.hidden = !layout;
+    // narrow: Fit is its icon, so both clusters share the bottom edge
+    this.#el.viewport.toggleAttribute("data-narrow", this.#el.canvas.clientWidth > 0 && this.#el.canvas.clientWidth < 420);
     // transform, not `zoom`: WebKit's zoom shrinks the boxes but not their text. A transform
     // doesn't change the layout box, so margins give the scroll area the scaled size.
     d.dataset.scale = String(scale);
@@ -1403,6 +1570,7 @@ export class ScxmlView extends ElementBase {
     const e = this.#el;
     const clock = this.#playback();
     e.controls.hidden = !clock;
+    e.viewport.classList.toggle("has-controls", !!clock);
     if (clock) this.#renderControls(clock);
     if (!session || !this.#layout) return;
     const running = session.status === "running";
@@ -1447,6 +1615,7 @@ export class ScxmlView extends ElementBase {
     };
     for (const [tr, list] of this.#labels) for (const el of list) paint(tr, el, ["transition", "edge-label"]);
     for (const [tr, el] of this.#chips) paint(tr, el, ["transition", "edge-label", "internal"]);
+    for (const [tr, el] of this.#portalChips) paint(tr, el, ["transition", "edge-label", "portal"]);
     for (const [tr, list] of this.#paths) for (const p of list) paint(tr, p, ["edge"]);
 
     // fired highlights fade on the session's clock: a real-time clock needs frames to see time pass
@@ -1471,22 +1640,44 @@ export class ScxmlView extends ElementBase {
   #renderControls(clock: PlaybackClock) {
     const e = this.#el;
     const t = this.#strings;
-    e.play.textContent = clock.playing ? t.pause : t.play;
-    e.play.setAttribute("aria-pressed", String(!clock.playing));
-    e.step.textContent = t.step;
+    const playing = clock.playing;
+    if (e.play.dataset.playing !== String(playing)) {
+      e.play.dataset.playing = String(playing);
+      e.play.replaceChildren(icon(playing ? icons.pause : icons.play, 16));
+      const label = playing ? t.pause : t.play;
+      e.play.setAttribute("aria-label", label);
+      e.play.title = `${label} (${t.playKey})`;
+      this.#wake();
+    }
+    e.play.setAttribute("aria-pressed", String(!playing));
+    // stepping only means something while paused
+    e.step.hidden = playing;
     e.step.disabled = clock.pending === 0;
-    if (e.speeds.childElementCount !== SPEEDS.length)
-      e.speeds.replaceChildren(
-        ...SPEEDS.map(([v, text]) => {
-          const b = h("button", { type: "button", "data-speed": String(v) }, text);
-          b.addEventListener("click", () => {
-            clock.speed = v;
-          });
-          return b;
-        }),
-      );
-    for (const b of e.speeds.children) b.setAttribute("aria-pressed", String(Number((b as HTMLElement).dataset.speed) === clock.speed));
+    const speed = SPEEDS.find(([v]) => v === clock.speed)?.[1] ?? `${clock.speed}×`;
+    e.speeds.textContent = speed;
+    e.speeds.setAttribute("aria-label", t.speedButton(speed));
     e.clock.textContent = t.clockTime(`${(clock.now() / 1000).toFixed(1)} s`);
+  }
+
+  #idleTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * Show the playback controls in full; while the clock plays, shrink them to the play button
+   * again after a few seconds untouched. Never while the pointer is on them or keyboard focus is
+   * in them (a mouse click leaves focus behind; that doesn't count). Real time: this is about the
+   * person, not the chart.
+   */
+  #wake() {
+    const controls = this.#el.controls;
+    controls.classList.remove("idle");
+    clearTimeout(this.#idleTimer);
+    if (!this.#playback()?.playing) return;
+    const settle = () => {
+      if (!this.#playback()?.playing) return;
+      if (controls.matches(":hover") || controls.querySelector(":focus-visible")) this.#idleTimer = setTimeout(settle, IDLE_MS);
+      else controls.classList.add("idle");
+    };
+    this.#idleTimer = setTimeout(settle, IDLE_MS);
   }
 }
 
@@ -1536,10 +1727,12 @@ function estimateLabel(tr: TransitionNode): Size {
   return text ? { w: Math.ceil(text.length * 6.8 + 18), h: 20 } : { w: 0, h: 0 };
 }
 
-function estimateBox(s: StateNode, collapsed: boolean): Size {
+/** `portals`: the state's long-distance transitions, listed as chips with their target. */
+function estimateBox(s: StateNode, collapsed: boolean, portals: TransitionNode[] = []): Size {
   const name = s.generatedId ? s.kind : s.id;
-  const internal = s.transitions.filter((t) => !t.targets.length);
-  const chipsW = internal.slice(0, MAX_INTERNAL_SHOWN).reduce((w, t) => w + estimateLabel(t).w + 4, 0);
+  const internal = [...portals, ...s.transitions.filter((t) => !t.targets.length).slice(0, MAX_INTERNAL_SHOWN)];
+  const targetW = (t: TransitionNode) => (portals.includes(t) ? t.targets.map((x) => x.id).join(", ").length * 6.8 + 16 : 0);
+  const chipsW = internal.reduce((w, t) => w + estimateLabel(t).w + targetW(t) + 4, 0);
   const isContainer = !collapsed && (s.kind === "parallel" || s.children.length > 0);
   // the help button, and the fold toggle of containers
   const icons = 22 + (isContainer || collapsed ? 18 : 0);

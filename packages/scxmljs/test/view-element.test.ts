@@ -5,7 +5,7 @@
  * engine, so boxes are sized from the element's estimates; the layout itself
  * is tested in view-layout.test.ts.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, jest, test } from "bun:test";
 import { Window } from "happy-dom";
 import { PlaybackClock, VirtualClock } from "../src/index.ts";
 import { createSession } from "../src/trusted.ts";
@@ -313,19 +313,36 @@ describe("<scxml-view>", () => {
       v.clock = clock;
     });
     const controls = root.querySelector<HTMLElement>(".controls")!;
+    const play = root.querySelector<HTMLButtonElement>(".play")!;
+    const step = root.querySelector<HTMLButtonElement>(".step")!;
+    const speed = root.querySelector<HTMLButtonElement>(".speeds")!;
     expect(controls.hidden).toBe(false);
-    expect(root.querySelector(".play")?.textContent).toBe("▶ Play");
-    expect(root.querySelectorAll(".speeds button").length).toBe(5);
+    expect(play.getAttribute("aria-label")).toBe("Play");
+    expect(step.hidden).toBe(false);
+    expect(speed.textContent).toBe("1×");
     expect(el.session!.isActive("a")).toBe(true);
-    root.querySelector<HTMLButtonElement>(".step")!.click();
+    step.click();
     await frame();
     expect(el.session!.isActive("b")).toBe(true);
     expect(root.querySelector(".clock")?.textContent).toBe("t = 1.0 s");
     el.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
     expect(clock.playing).toBe(true);
+    await frame();
+    // while playing: pause, and no Step
+    expect(play.getAttribute("aria-label")).toBe("Pause");
+    expect(step.hidden).toBe(true);
     clock.pause();
-    root.querySelector<HTMLButtonElement>('.speeds [data-speed="2"]')!.click();
+    await frame();
+    expect(step.hidden).toBe(false);
+    // one speed button, cycling
+    speed.click();
     expect(clock.speed).toBe(2);
+    await frame();
+    expect(speed.textContent).toBe("2×");
+    expect(speed.getAttribute("aria-label")).toBe("Speed 2×");
+    speed.click();
+    speed.click();
+    expect(clock.speed).toBe(0.25);
     el.remove();
   });
 
@@ -462,15 +479,43 @@ describe("<scxml-view>", () => {
     el.remove();
   });
 
+  test("far transitions are chips in their source's box that name their target, and mark it on hover", async () => {
+    const FAR = `<scxml ${NS} initial="top"><state id="top" initial="idle">
+        <transition event="reset" target="idle"/>
+        <state id="idle"><transition event="go" target="busy"/></state>
+        <state id="busy"/>
+      </state></scxml>`;
+    const { el, root } = await mount({ trusted: "" }, FAR);
+    const chip = box(root, "top").querySelector<HTMLButtonElement>(".chip.portal")!;
+    expect(chip.textContent).toBe("reset→ idle");
+    expect(chip.getAttribute("part")).toContain("portal");
+    expect(
+      labels(root)
+        .filter((l) => l.classList.contains("label"))
+        .map((l) => l.textContent),
+    ).toEqual(["go"]);
+    chip.dispatchEvent(new window.Event("pointerenter") as unknown as Event);
+    expect(box(root, "idle").classList.contains("portal-target")).toBe(true);
+    chip.dispatchEvent(new window.Event("pointerleave") as unknown as Event);
+    expect(box(root, "idle").classList.contains("portal-target")).toBe(false);
+    chip.click();
+    expect(el.session!.isActive("idle")).toBe(true);
+    el.remove();
+  });
+
   test("zoom: toolbar, keys, and back to automatic", async () => {
     const { el, root } = await mount({ trusted: "" }, LIGHT);
     const diagram = root.querySelector<HTMLElement>(".diagram")!;
-    expect(root.querySelector<HTMLElement>(".zoom")!.hidden).toBe(false);
+    const fit = root.querySelector<HTMLButtonElement>(".zoom-reset")!;
+    // "fit" only once the view has left fit-to-width
+    expect(fit.hidden).toBe(true);
     expect(el.zoom).toBe(1);
     root.querySelector<HTMLButtonElement>(".zoom-in")!.click();
     expect(el.zoom).toBe(1.25);
     expect(diagram.style.transform).toBe("scale(1.25)");
     expect(root.querySelector(".zoom-level")?.textContent).toBe("125%");
+    expect(fit.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>(".viewport")!.hasAttribute("data-zooming")).toBe(true);
     const canvas = root.querySelector<HTMLElement>(".canvas")!;
     canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "-", bubbles: true }));
     canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "-", bubbles: true }));
@@ -480,6 +525,89 @@ describe("<scxml-view>", () => {
     canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "0", bubbles: true }));
     expect(el.zoom).toBe(1);
     expect(diagram.style.transform).toBe("");
+    expect(fit.hidden).toBe(true);
+    el.remove();
+  });
+
+  test("input: wheel and drag take over the view; touch scrolls, pinches and double-taps", async () => {
+    const { el, root } = await mount({ trusted: "" }, LIGHT);
+    const w = window as unknown as Record<string, new (type: string, init?: object) => Event>;
+    const canvas = root.querySelector<HTMLElement>(".canvas")!;
+    const fit = root.querySelector<HTMLButtonElement>(".zoom-reset")!;
+    const fire = (type: keyof typeof w, name: string, init: Record<string, unknown>) => {
+      const e = new w[type]!(name, { bubbles: true, cancelable: true, composed: true, ...init });
+      // happy-dom's WheelEvent drops some init fields (ctrlKey, clientX…): set what it didn't take
+      for (const [k, v] of Object.entries(init))
+        if ((e as unknown as Record<string, unknown>)[k] !== v) Object.defineProperty(e, k, { value: v });
+      return canvas.dispatchEvent(e);
+    };
+    // a plain wheel scrolls: the view is the user's now ("fit" offers the way back)
+    fire("WheelEvent", "wheel", { deltaY: 40 });
+    expect(fit.hidden).toBe(false);
+    // Ctrl + wheel zooms
+    fire("WheelEvent", "wheel", { deltaY: -100, ctrlKey: true, clientX: 5, clientY: 5 });
+    expect(el.zoom).toBeGreaterThan(1.1);
+    fit.click();
+    expect(el.zoom).toBe(1);
+    expect(fit.hidden).toBe(true);
+    // dragging the background pans
+    fire("PointerEvent", "pointerdown", { button: 0, pointerType: "mouse", pointerId: 1, clientX: 10, clientY: 10 });
+    fire("PointerEvent", "pointermove", { pointerId: 1, clientX: 60, clientY: 40 });
+    expect(canvas.classList.contains("panning")).toBe(true);
+    expect(fit.hidden).toBe(false);
+    fire("PointerEvent", "pointerup", { pointerId: 1 });
+    expect(canvas.classList.contains("panning")).toBe(false);
+    fit.click();
+    // touch: a double tap zooms in on the spot, another goes back to fit
+    const touch = (x: number, y: number, id = 0) => ({ identifier: id, clientX: x, clientY: y, target: canvas });
+    const tap = () => {
+      fire("TouchEvent", "touchstart", { touches: [touch(20, 20)] });
+      fire("TouchEvent", "touchend", { touches: [], changedTouches: [touch(20, 20)] });
+    };
+    tap();
+    tap();
+    expect(el.zoom).toBe(2);
+    tap();
+    tap();
+    expect(el.zoom).toBe(1);
+    // one finger moving scrolls by hand
+    fire("TouchEvent", "touchstart", { touches: [touch(20, 20)] });
+    fire("TouchEvent", "touchmove", { touches: [touch(20, 60)] });
+    fire("TouchEvent", "touchend", { touches: [], changedTouches: [touch(20, 60)] });
+    expect(fit.hidden).toBe(false);
+    fit.click();
+    // two fingers pinch
+    fire("TouchEvent", "touchstart", { touches: [touch(10, 10, 1), touch(50, 10, 2)] });
+    fire("TouchEvent", "touchmove", { touches: [touch(0, 10, 1), touch(80, 10, 2)] });
+    fire("TouchEvent", "touchend", { touches: [] });
+    expect(el.zoom).toBe(2);
+    el.remove();
+  });
+
+  test("while playing untouched, the playback controls shrink to the play button; movement brings them back", async () => {
+    const clock = new PlaybackClock({ playing: true });
+    const { el, root } = await mount({ trusted: "" }, LIGHT, (v) => {
+      v.clock = clock;
+    });
+    const controls = root.querySelector<HTMLElement>(".controls")!;
+    const viewport = root.querySelector<HTMLElement>(".viewport")!;
+    const move = () => viewport.dispatchEvent(new window.Event("pointermove", { bubbles: true }) as unknown as Event);
+    jest.useFakeTimers();
+    try {
+      move();
+      expect(controls.classList.contains("idle")).toBe(false);
+      jest.advanceTimersByTime(3100);
+      expect(controls.classList.contains("idle")).toBe(true);
+      move();
+      expect(controls.classList.contains("idle")).toBe(false);
+      // paused: they stay
+      clock.pause();
+      move();
+      jest.advanceTimersByTime(5000);
+      expect(controls.classList.contains("idle")).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
     el.remove();
   });
 

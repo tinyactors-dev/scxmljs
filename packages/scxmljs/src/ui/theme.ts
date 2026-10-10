@@ -45,6 +45,7 @@ export const THEME_CSS = /* css */ `
   --x-done: var(--scxml-done, light-dark(#48566b, #a7b5c9));
   --x-done-bg: var(--scxml-done-bg, light-dark(#e9edf3, #242b35));
   --x-err: var(--scxml-error, light-dark(#c2332f, #ff8a84));
+  --x-err-bg: var(--scxml-error-bg, light-dark(#fbeceb, #3a1c1b));
   /* type */
   --x-sans: var(--scxml-font-sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
   --x-mono: var(--scxml-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
@@ -140,7 +141,12 @@ export const CONTRAST_PAIRS: readonly [string, string, number][] = [
   ["--scxml-waiting", "--scxml-surface", 4.5],
   ["--scxml-waiting", "--scxml-waiting-bg", 4.5],
   ["--scxml-done", "--scxml-done-bg", 4.5],
+  // event names: a completion or an error in plain text, or on its tinted chip
+  ["--scxml-done", "--scxml-bg", 4.5],
+  ["--scxml-done", "--scxml-surface", 4.5],
   ["--scxml-error", "--scxml-surface", 4.5],
+  ["--scxml-error", "--scxml-bg", 4.5],
+  ["--scxml-error", "--scxml-error-bg", 4.5],
   ["--scxml-fg-faint", "--scxml-surface", 3],
   ["--scxml-fg-faint", "--scxml-surface-2", 3],
   ["--scxml-border-strong", "--scxml-surface", 3],

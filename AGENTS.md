@@ -66,6 +66,9 @@ Layout:
 - Inside the repo, `@tinyactors/scxmljs[/*]` resolves to `packages/scxmljs/src` through the root
   `tsconfig.json` `paths` (Bun and tsc honour it), so no build is needed to develop. The published
   package resolves to `dist/` through `exports`.
+- UI changes to the elements follow `docs/design-principles.md`: notation over narration (text for
+  names and values; shape, glyph, position and colour for the rest), and its glyph table is the only
+  list of icons.
 - Don't commit, publish or trigger CI unless asked.
 
 ## Commands
@@ -75,6 +78,7 @@ Layout:
 - Releasing: bump `packages/scxmljs/package.json`, add the dated CHANGELOG entry, commit, then `git tag vX.Y.Z && git push origin main vX.Y.Z`. The tag runs `.github/workflows/release.yml` → `scripts/publish` (refuses to run outside Actions; skips versions already on npm; runs `scripts/release`, then `npm stage publish` via npm trusted publishing/OIDC with provenance). The trusted publisher only allows staging: a maintainer approves each version with 2FA (npmjs.com → Staged Packages, or `npm stage approve <id>`) before it's public. No npm tokens exist. Prereleases (`X.Y.Z-dev.N`, `-beta.N`, `-rc.N`) publish under that dist-tag (`dev`, `beta`, `rc`), never `latest`, and need no CHANGELOG entry
 - `mise run lint` / `mise run format`: Biome check (errors only) / fix formatting, safe lint fixes and import order
 - `mise run test:coverage`: unit tests plus the library coverage gate (`scripts/coverage.ts`)
+- `mise run layout:metrics`: how the `<scxml-view>` layout uses space over every chart; save a run with `-- --json a.json` before a layout change and `-- --compare a.json b.json` after. `tests/browser/fixtures/layout.html?chart=…&width=…` draws one chart whole, for screenshots
 - `mise run pack:check` / `mise run size`: what `npm pack` would ship; bundle sizes against `size-budgets.json`
 - `mise run build`: build the library into `packages/scxmljs/dist` (ESM, `.d.ts`, source maps)
 - `mise run smoke:node`: run the built library in Node, both entry points

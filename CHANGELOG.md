@@ -34,9 +34,46 @@ private `--x-*` properties are not public API and can change in any release.
   `justTaken`, `lastVisited`, `openDetail`, `lastStep`.
 - `<scxml-view>` zooms and pans: a zoom toolbar, Ctrl/⌘ + wheel, pinch, `+` `-` `0`, and dragging
   the background. The `zoom` property reads or sets the scale (`null`: automatic). New part `zoom`.
-- `<scxml-view>` on phones: two fingers pinch-zoom the diagram, icon buttons get finger-sized
-  hit areas, and the playback bar stays on one line. A chart that doesn't fit scrolls to its
+- `<scxml-view>` on phones: two fingers pinch-zoom the diagram, and icon buttons get finger-sized
+  hit areas. A chart that doesn't fit scrolls to its
   active states and keeps them in view as it runs, until you scroll or zoom yourself.
+- `<scxml-view>` lays charts out more compactly, especially top to bottom: boxes start at the top
+  of their layer, labels that don't fit side by side stack below their box instead of widening it,
+  ports are spaced by their labels' widths, labels stay near their source, and nothing is drawn
+  outside the diagram (labels used to be cut off at its left edge). Charts from the examples are
+  up to 45% smaller.
+- `<scxml-view>`: a compound state's transitions into its own states, and transitions that cross
+  three or more container borders, are chips in their source's box ("cancel → cancelling")
+  instead of long arrows; hovering one outlines its target. New parts `portal` and `target`.
+  `portalTransitions()` (exported from `/view`) picks them; `layoutChart` takes them as `portals`.
+- `<scxml-view>` on narrow elements: parallel regions stack instead of sitting side by side
+  (`layoutChart`'s new `maxWidth`), and the chart is laid out again when the width changes a lot.
+- `<scxml-view>`'s controls float over the diagram's bottom edge, showing only what's useful:
+  playback at the bottom left (Step only while paused, one speed button that cycles, shrinking to
+  the play button while playing untouched), zoom at the bottom right (Fit once you've left the
+  automatic view; −, the level and + on hover, keyboard focus or while zooming). A double tap
+  zooms in on a spot, or back to fit. New parts `zoom-in`, `zoom-out`, `fit`, `zoom-level`; new
+  `strings`: `playbackLabel`, `playKey`, `speedButton`, `fit`.
+- `<scxml-explorer>` works on any width: the focus fills it and the other panels float over it.
+  Wide: the tree on the left, the inspector on the right. Medium: one panel, with the inspector as
+  its second page ("Accepts n ›", "‹ States"). Narrow: a bottom sheet you drag or tap between
+  three heights, whose lowest shows the accepted events. Playback sits in the bottom-left corner,
+  Follow in the bottom-right. New parts `panel`, `side-panel`, `to-inspector`, `back`,
+  `sheet-handle`; new `strings`: `backToStates`, `backToStatesLabel`, `panelLabel`,
+  `inspectorLabel`, `sheetExpand`, `sheetCollapse`.
+- Both elements follow one visual language, written down in
+  [docs/design-principles.md](docs/design-principles.md): notation over narration.
+  - Event names are shown as written, in monospace, the namespace quieter and cut from the left
+    when there's no room; a clickable event sits in the event chip; completion events
+    (`done.*`, `*.done`) take the done colours and error events (`error.*`, `*.error`) the error
+    colours. New token `--scxml-error-bg` (mapped to `--state-error-bg` by the Tinyactors theme).
+  - `<scxml-explorer>`: what a state does is glyphs (on entry, on exit, sends, logs, invokes),
+    named in their tooltips; a condition is a diamond; a container shows the layers glyph and its
+    number of states; exits and entries are a door glyph, the target and the first event; the
+    breadcrumb is the title's first line (with "System", the way to the System level); list and
+    diagram are icon toggles, "only active states" a funnel, playback icons. The last-step line
+    is gone from the screen (the live region still announces it).
+  - New `strings` (explorer): `onExit`, `invokesGlyph`, `sendsGlyph`, `logsGlyph`.
 - `<scxml-view>`: every compound and parallel state folds and unfolds with a chevron before its
   name (before, only the containers folded for `max-states` could be unfolded and folded again).
 - `<scxml-view>`: every state has a help button that opens a popover with its kind, description
@@ -50,6 +87,21 @@ private `--x-*` properties are not public API and can change in any release.
 
 - `<scxml-view>` lays charts out top to bottom by default (`direction="down"`). `direction="right"`
   keeps the old left-to-right layout; `direction="auto"` still switches at 760 px.
+- `<scxml-explorer>`: the header bar and the narrow layout's tabs are gone (the levels and the
+  breadcrumb moved into the panel's head, playback and Follow into the corners). Removed parts
+  `tabs` and `tab`; removed `strings` `tabSystem`, `tabStates`, `tabFocus`, `tabEvents`,
+  `tabDetail`. The breadcrumb always shortens to "…" and the last two places.
+- `<scxml-explorer>`: the System/Machine switch (`levels` part) is gone: the breadcrumb's first
+  place goes to the System level. `play`, `pause`, `step` and `clockTime` are plain names now
+  ("Play", "Pause", "Step", "0.7 s"); `activeOnly` names the funnel ("Only active states").
+- `<scxml-explorer>`: the Follow toggle is a map's locate crosshair (its centre filled while
+  following) instead of a dot. The focus list keeps its order (the active path, then the states
+  one step from it, then the rest) but only the active path has a heading; removed `strings`
+  `groupOneStep`, `groupElse` and `groupCount`.
+- `<scxml-view>`: the playback controls moved from above the diagram onto its bottom edge;
+  `speeds` is one button that cycles (it was a group of five), and `play` and `step` are icon
+  buttons. The `play`, `pause` and `stepHint` strings are plain labels now ("Play", "Pause");
+  `playHint` and `step` are gone.
 - `<scxml-view>`: the `expand` and `collapse` parts are now icon buttons (a chevron before the
   state's name) instead of text buttons; their accessible names still say "Expand" / "Collapse".
 - `<scxml-explorer>` is quieter: one header bar (the playback controls moved into it), no

@@ -8,6 +8,8 @@ The elements can be adapted at four levels, from small to large:
 4. Keep the engine and build your own UI: [draw charts yourself](#draw-it-yourself) with the
    exported layout, or [build your own explorer](#build-your-own-explorer) on its view-model.
 
+The elements' own UI follows the [design principles](design-principles.md).
+
 ## Translations
 
 Every user-visible string of both elements comes from their `strings` property. Set a partial
@@ -119,6 +121,12 @@ on→off red→green green→yellow yellow→red
 - `direction: "down"` lays layers out top to bottom; `collapsed` is a set of containers to draw as
   single boxes, and `autoCollapse(model.root, maxBoxes)` picks one for big charts; `spacing`
   overrides gaps.
+- `portals` is a set of transitions not to route: `portalTransitions(model.root, collapsed)` picks
+  the ones `<scxml-view>` lists in their source's box as "event → target" chips instead (a
+  container's transitions into its own states, and transitions crossing three or more container
+  borders). List them yourself, and include them in `measure`.
+- `maxWidth`: with `direction: "down"`, parallel regions that would sit side by side wrap into
+  fewer columns to stay within it.
 
 The result has `boxes` (parents before children, so draw them in order), `edges` with orthogonal
 `points` and a `label` rectangle, `initials` (initial-state markers), and `inside`: per box, the

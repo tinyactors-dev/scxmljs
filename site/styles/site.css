@@ -402,6 +402,16 @@ h3 {
   color: var(--accent-fg);
   margin-bottom: var(--space-2);
 }
+.feature .stat-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  height: 1.1em;
+}
+.feature .stat-icons svg {
+  width: 0.9em;
+  height: 0.9em;
+}
 .feature h3 {
   font: var(--type-h3);
   margin: 0 0 var(--space-2);

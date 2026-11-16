@@ -2,8 +2,17 @@
 import { CITATIONS, EXTERNAL_SVG, PI_LOGO_SVG, POST_URL, quoteLink } from "../../examples/pi-durable/src/post.ts";
 import { CHAPTERS } from "../../examples/pi-durable/src/tour.ts";
 import { REPO } from "../../scripts/docs/config.ts";
-import { esc } from "./layout.ts";
+import { esc, svgIcon } from "./layout.ts";
 import { EXAMPLES } from "./playground-examples.ts";
+
+// Lucide play, pause, skip-forward (lucide-static 1.73.0, ISC)
+const PLAYBACK_ICONS = [
+  '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
+  '<rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/>',
+  '<path d="M21 4v16"/><path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z"/>',
+]
+  .map(svgIcon)
+  .join("");
 
 export interface Media {
   webp: string;
@@ -68,16 +77,16 @@ ${
   </figure>`
     : ""
 }
-  <h2 class="section-title">Why scxmljs</h2>
+  <h2 class="section-title">Features</h2>
   <div class="features">
     <div class="card feature"><span class="stat">160 / 160</span><h3>Conformant</h3><p>Every mandatory W3C SCXML test passes, in both data models. The algorithm follows the spec's Appendix D procedure by procedure.</p></div>
     <div class="card feature"><span class="stat">Sandboxed</span><h3>Safe for user charts</h3><p>Each session gets its own QuickJS context: no access to the page, other sessions, or the network, and runaway scripts are stopped.</p></div>
     <div class="card feature"><span class="stat">16 KB</span><h3>Or trusted and tiny</h3><p>For your own charts, the trusted entry runs on the page's engine with the same semantics and no WebAssembly download.</p></div>
-    <div class="card feature"><span class="stat">▶ ⏸ ⏭</span><h3>Playback built in</h3><p>A <code>PlaybackClock</code> pauses, steps and speeds up whole systems: machines, delayed events and simulated services together.</p></div>
+    <div class="card feature"><span class="stat stat-icons" role="img" aria-label="Play, pause, step">${PLAYBACK_ICONS}</span><h3>Playback built in</h3><p>A <code>PlaybackClock</code> pauses, steps and speeds up whole systems: machines, delayed events and simulated services together.</p></div>
     <div class="card feature"><span class="stat">Any framework</span><h3>Custom elements</h3><p>Plain web components with properties, events, slots and <code>::part()</code>. Tested with React, Vue, Svelte and Angular.</p></div>
     <div class="card feature"><span class="stat">Accessible</span><h3>Keyboard and screen readers</h3><p>Tree navigation, live announcements, WCAG AA contrast in both themes, and zero axe violations in three browser engines.</p></div>
   </div>
-  <h2 class="section-title">Two elements, two jobs</h2>
+  <h2 class="section-title">Ready to use components</h2>
   <div class="two-up">
     <div class="card"><h3>&lt;scxml-view&gt;</h3><p>Drop-in and zero-JavaScript: point it at a chart and it loads, validates, runs and draws the whole thing. Transition labels are buttons that send their event.</p><a href="/docs/view/">Reference</a> · <a href="/demos/gallery/">Gallery</a></div>
     <div class="card"><h3>&lt;scxml-explorer&gt;</h3><p>For systems too big to draw at once: a tree of states, a focus on one level, the events accepted right now, and a system view of machines and services.</p><a href="/docs/explorer/">Reference</a> · <a href="/demos/explorer/">Demo</a></div>

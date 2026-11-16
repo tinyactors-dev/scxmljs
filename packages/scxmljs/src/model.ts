@@ -130,7 +130,8 @@ export class SCXMLValidationError extends Error {
 /** SCXML text couldn't be parsed (or there is no `DOMParser` to parse it with). */
 export class SCXMLParseError extends Error {
   /**
-   * @param code `SCXML_PARSE`: the text isn't well-formed XML (or has no `<scxml>` root);
+   * @param code `SCXML_PARSE`: the text isn't well-formed XML (or has no `<scxml>` root), or the
+   *   `DOMParser` doesn't implement XML namespaces;
    *   `SCXML_NO_DOMPARSER`: there is no `DOMParser` (outside browsers: pass `domParser`).
    */
   constructor(

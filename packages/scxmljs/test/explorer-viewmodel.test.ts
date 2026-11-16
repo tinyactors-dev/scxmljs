@@ -45,7 +45,7 @@ async function shop() {
   s.start();
   clock.run();
   const $ = (id: string) => s.model.byId.get(id)!;
-  const isActive = (n: { id: string }) => s.isActive(n.id);
+  const isActive = (n: Parameters<typeof s.isActiveNode>[0]) => s.isActiveNode(n);
   return { s, clock, $, isActive };
 }
 

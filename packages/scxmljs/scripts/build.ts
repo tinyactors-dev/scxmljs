@@ -22,7 +22,10 @@ for (const name of await readdir(`${root}dist`, { recursive: true })) {
   if (!name.endsWith(".d.ts")) continue;
   const file = Bun.file(`${root}dist/${name}`);
   const text = await file.text();
-  const fixed = text.replace(/(from\s+["']\.{1,2}\/[^"']+)\.ts(["'])/g, (_, a, b) => {
+  // the types use DOM types (Element, EventTarget…): bring in TypeScript's dom lib, so
+  // Node-only projects type-check without "lib": ["dom"] or skipLibCheck
+  const entry = ["index.d.ts", "trusted.d.ts", "explorer.d.ts", "view.d.ts"].includes(name);
+  const fixed = (entry ? `/// <reference lib="dom" />\n${text}` : text).replace(/(from\s+["']\.{1,2}\/[^"']+)\.ts(["'])/g, (_, a, b) => {
     rewritten++;
     return `${a}.js${b}`;
   });

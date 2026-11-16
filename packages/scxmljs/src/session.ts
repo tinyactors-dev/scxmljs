@@ -123,9 +123,10 @@ export type Invoker = (ctx: InvokeContext) => InvokedService | Promise<InvokedSe
 
 /**
  * A `DOMParser`: the browser's, or one from a DOM implementation such as
- * happy-dom or linkedom. Only `parseFromString` is used, and its result only
- * needs to behave like a standard XML `Document`; the return type is `unknown`
- * so any implementation's own `Document` type is accepted without a cast.
+ * happy-dom. Only `parseFromString` is used, and its result only needs to
+ * behave like a standard XML `Document`, XML namespaces included (linkedom's
+ * doesn't); the return type is `unknown` so any implementation's own
+ * `Document` type is accepted without a cast.
  */
 export interface DOMParserLike {
   /** Parse `source` as the given MIME type (the session asks for `application/xml`). */
@@ -241,10 +242,12 @@ export function resolveModel(source: string | Element | Model, opts: SessionOpti
  * Parse SCXML text into its `<scxml>` element.
  *
  * Browsers have a `DOMParser`; Node, Bun and Deno don't, so pass one there
- * (any standards-compliant implementation, e.g. happy-dom's or linkedom's).
+ * (any standards-compliant XML implementation, e.g. happy-dom's; linkedom's
+ * ignores XML namespaces, so it can't read SCXML).
  *
  * @throws {SCXMLParseError} `code: "SCXML_NO_DOMPARSER"` when no parser is
- *   available, `code: "SCXML_PARSE"` when the text isn't well-formed XML.
+ *   available, `code: "SCXML_PARSE"` when the text isn't well-formed XML or
+ *   the parser doesn't implement XML namespaces.
  */
 export function parseSCXML(source: string, domParser?: DOMParserLike): Element {
   const parser = domParser ?? (typeof DOMParser !== "undefined" ? new DOMParser() : undefined);
@@ -263,8 +266,18 @@ export function parseSCXML(source: string, domParser?: DOMParserLike): Element {
     );
   const doc = parser.parseFromString(source, "application/xml") as Document;
   const err = doc.getElementsByTagName("parsererror")[0];
-  if (err) throw new SCXMLParseError("SCXML_PARSE", `SCXML is not well-formed XML: ${err.textContent?.trim()}`);
-  return doc.documentElement;
+  if (err || !doc.documentElement)
+    throw new SCXMLParseError("SCXML_PARSE", `SCXML is not well-formed XML${err ? `: ${err.textContent?.trim()}` : ""}`);
+  const root = doc.documentElement;
+  const declared = root.getAttribute("xmlns");
+  // a parser without XML namespaces (linkedom) reads every element as XHTML
+  if (declared && root.namespaceURI !== declared)
+    throw new SCXMLParseError(
+      "SCXML_PARSE",
+      `The DOMParser ignores XML namespaces: <${root.localName} xmlns="${declared}"> came back in ${root.namespaceURI ?? "no namespace"}. ` +
+        "SCXML needs a standards-compliant XML parser, such as happy-dom's.",
+    );
+  return root;
 }
 
 // ──────────────────────────────── session ─────────────────────────────────
@@ -445,10 +458,19 @@ export class SCXMLSession extends EventTarget {
     return this.configuration.map((s) => s.id);
   }
 
-  /** Whether the state with this id is active. */
+  /**
+   * Whether the state with this id is active.
+   *
+   * @throws {RangeError} when the chart has no state with this id.
+   */
   isActive(id: string): boolean {
+    return this.configurationSet.has(this.stateById(id));
+  }
+
+  private stateById(id: string): StateNode {
     const s = this.model.byId.get(id);
-    return !!s && this.configurationSet.has(s);
+    if (!s) throw new RangeError(`no state "${id}" in ${this.model.name ? `chart "${this.model.name}"` : "the chart"}`);
+    return s;
   }
 
   /** Whether this state node is active. */
@@ -491,7 +513,11 @@ export class SCXMLSession extends EventTarget {
     return this.datamodel.snapshot(this.model.allData.map((d) => d.getAttribute("id")!));
   }
 
-  /** Enqueue an external event. */
+  /**
+   * Enqueue an external event. Events sent before `start()` wait in the queue
+   * and are processed, in order, once the session starts; events sent after
+   * it has terminated are dropped.
+   */
   send(name: string, data?: unknown) {
     this.enqueueExternal({ name, type: "external", data });
   }
@@ -617,11 +643,18 @@ export class SCXMLSession extends EventTarget {
    * (the configuration is cleared right after that, per the spec).
    *
    * `what`: a state id (active), several ids (all active) or a predicate.
-   * Rejects with `options.signal.reason` on abort, a `TimeoutError`
+   * Rejects with a `RangeError` at once when an id names no state of the
+   * chart, with `options.signal.reason` on abort, a `TimeoutError`
    * DOMException after `timeoutMs` (measured on the session's clock), or an
    * Error when the session terminates first.
    */
   waitFor(what: WaitCondition, options: WaitForOptions = {}): Promise<StateNode[]> {
+    if (typeof what !== "function")
+      try {
+        for (const id of typeof what === "string" ? [what] : what) this.stateById(id);
+      } catch (e) {
+        return Promise.reject(e);
+      }
     const test: (s: SCXMLSession) => boolean =
       typeof what === "function" ? what : (s) => (typeof what === "string" ? [what] : what).every((id) => s.isActive(id));
     const describe = typeof what === "function" ? "the condition" : `[${typeof what === "string" ? what : what.join(", ")}]`;
@@ -724,7 +757,12 @@ export class SCXMLSession extends EventTarget {
   }
 
   private isIdle() {
-    return this.exited || this.disposedDm || (!this.busy && !this.scheduled && !this.externalQueue.length && !this.internalQueue.length);
+    return (
+      !this.started ||
+      this.exited ||
+      this.disposedDm ||
+      (!this.busy && !this.scheduled && !this.externalQueue.length && !this.internalQueue.length)
+    );
   }
 
   private checkSettled() {
@@ -817,9 +855,10 @@ export class SCXMLSession extends EventTarget {
   }
 
   private enqueueExternal(ev: QueuedEvent) {
-    if (!this.running) return;
+    // before start() events wait in the queue; once the session has ended they are dropped
+    if (this.exited || this.disposedDm || (this.started && !this.running)) return;
     this.externalQueue.push(ev);
-    this.schedule();
+    if (this.started) this.schedule();
   }
 
   private enqueueInternal(ev: QueuedEvent) {

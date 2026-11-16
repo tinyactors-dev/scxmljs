@@ -7,8 +7,9 @@ must behave the same on the server and in the page.
 ## What's different
 
 **A DOMParser.** SCXML text is XML, and Node and Bun have no XML parser built in. Pass one as
-`domParser`; any standards-compliant implementation works, such as
-[happy-dom](https://github.com/capricorn86/happy-dom)'s or [linkedom](https://github.com/WebReflection/linkedom)'s:
+`domParser`; any standards-compliant XML implementation works, such as
+[happy-dom](https://github.com/capricorn86/happy-dom)'s. It has to implement XML namespaces, which
+linkedom's doesn't: with it, `parseSCXML()` throws an `SCXMLParseError` that says so.
 
 <!-- doctest: check -->
 ```ts
@@ -25,6 +26,10 @@ Without one, `createSession()` and `parseSCXML()` throw an `SCXMLParseError` wit
 `code: "SCXML_NO_DOMPARSER"` and instructions. Instead of text, you can also pass an `Element`
 you parsed yourself, or a compiled `Model`. Sessions keep the parser to read SCXML that arrives
 at run time (for example an `<invoke>` with `<content expr>`).
+
+**TypeScript.** The package's types use DOM types such as `Element` and `EventTarget`, so they
+bring in TypeScript's `dom` library: a Node-only project needs neither `"lib": ["dom"]` nor
+`skipLibCheck` for them.
 
 **The trusted data model** runs chart code in a `node:vm` context per session. `node:vm` is *not*
 a security boundary: code in the context can reach the host (see [SECURITY.md](../SECURITY.md)).

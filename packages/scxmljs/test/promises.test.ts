@@ -40,6 +40,21 @@ describe("done", () => {
   });
 });
 
+describe("send", () => {
+  test("events sent before start() are processed, in order, once it starts; after the end they're dropped", async () => {
+    const { s, clock } = await make(TWO_STEPS);
+    s.send("go");
+    await s.settled(); // not started: idle, the event waits
+    expect(s.activeStateIds()).toEqual([]);
+    s.send("go");
+    s.start();
+    clock.run();
+    expect(await s.done).toBe("bye");
+    s.send("go");
+    expect(clock.idle).toBe(true);
+  });
+});
+
 describe("settled", () => {
   test("resolves immediately when idle, and only after clock.run() with a VirtualClock", async () => {
     const { s, clock } = await make(TWO_STEPS);
@@ -130,11 +145,20 @@ describe("waitFor", () => {
     ac.abort(new Error("stop"));
     expect((await aborted.catch((e) => e)).message).toBe("stop");
 
-    const never = s.waitFor("nope");
+    const never = s.waitFor(["a", "b"]); // siblings: never both active
     s.send("go");
     s.send("go");
     clock.run();
-    expect((await never.catch((e) => e)).message).toContain("terminated before [nope] held");
+    expect((await never.catch((e) => e)).message).toContain("terminated before [a, b] held");
+  });
+
+  test("rejects at once when an id names no state, and isActive throws", async () => {
+    const { s } = await make(TWO_STEPS);
+    s.start();
+    const err = await s.waitFor(["b", "bb"]).catch((e) => e);
+    expect(err).toBeInstanceOf(RangeError);
+    expect(err.message).toBe('no state "bb" in the chart');
+    expect(() => s.isActive("aa")).toThrow(RangeError);
   });
 
   test("a throwing predicate rejects", async () => {

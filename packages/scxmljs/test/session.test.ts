@@ -7,6 +7,7 @@ import {
   MacrostepEvent,
   type MicrostepEvent,
   type OutboundSend,
+  SCXMLParseError,
   SCXMLValidationError,
   type SessionOptions,
   VirtualClock,
@@ -46,6 +47,23 @@ describe("validation", () => {
     ).catch((e) => e);
     expect(err.problems.join("\n")).toContain("<frobnicate> is not executable content");
     expect(err.problems.join("\n")).toContain('initial target "q" is not a descendant of "p"');
+  });
+
+  test("a DOMParser without XML namespaces (linkedom) gets a parse error that says so", async () => {
+    // what linkedom returns: the root in the XHTML namespace, its xmlns only an attribute
+    const noNamespaces = {
+      parseFromString() {
+        const d = new Window().document.implementation.createDocument("http://www.w3.org/1999/xhtml", "scxml");
+        d.documentElement.setAttribute("xmlns", "http://www.w3.org/2005/07/scxml");
+        return d;
+      },
+    };
+    const err = await createSession(doc(""), { domParser: noNamespaces }).catch((e) => e);
+    expect(err).toBeInstanceOf(SCXMLParseError);
+    expect(err.message).toContain("The DOMParser ignores XML namespaces");
+    // linkedom on malformed text: no root and no <parsererror>
+    const empty = { parseFromString: () => ({ documentElement: null, getElementsByTagName: () => [] }) };
+    expect((await createSession("<scxml", { domParser: empty }).catch((e) => e)).code).toBe("SCXML_PARSE");
   });
 
   test("generates ids for anonymous states", async () => {

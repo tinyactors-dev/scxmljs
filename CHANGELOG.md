@@ -114,6 +114,21 @@ private `--x-*` properties are not public API and can change in any release.
   no separate Send button); `event-data` is a `<details>` disclosure. The playback bar's queue
   readout is the `clock` part's tooltip. The English `focusSummary` no longer lists all
   descendants and `traffic` gives a message total.
+- `session.send()` before `start()` queues the event: it's processed, in order, once the session
+  starts. Before, it was silently dropped. Events sent after the session has ended are still
+  dropped.
+- `session.isActive(id)` throws a `RangeError` when the chart has no state with that id, and
+  `session.waitFor()` rejects with one at once. Before, a typo returned `false` or waited until
+  the timeout (or forever).
+
+### Fixed
+
+- `parseSCXML()` (and `createSession()` with text) throws an `SCXMLParseError` that names the
+  problem when the `DOMParser` doesn't implement XML namespaces, as linkedom's doesn't, and when
+  it returns no root element. Before, every chart failed validation with a misleading namespace
+  error, or a `TypeError`. The docs no longer suggest linkedom.
+- The package's type declarations bring in TypeScript's `dom` library, so Node-only projects
+  type-check without `"lib": ["dom"]` or `skipLibCheck`.
 
 ## [0.1.0] - 2026-09-28
 

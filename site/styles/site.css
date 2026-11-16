@@ -250,13 +250,6 @@ pre {
   margin: 0 auto;
   padding: 0 var(--gutter);
 }
-.eyebrow {
-  font: var(--type-label);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--accent-fg);
-  margin: 0 0 var(--space-3);
-}
 h1,
 h2,
 h3 {
@@ -364,6 +357,10 @@ h3 {
 .hero-demo scxml-view {
   display: block;
 }
+/* the traffic light has nothing to explain: no help buttons */
+.hero-demo scxml-view::part(help) {
+  display: none;
+}
 .showcase {
   margin: var(--space-6) 0 var(--space-12);
 }
@@ -372,9 +369,10 @@ h3 {
   padding: var(--space-3);
   overflow: hidden;
 }
-.showcase img {
+.showcase video {
   display: block;
   width: 100%;
+  height: auto;
   border-radius: var(--radius-2);
 }
 .showcase figcaption {

@@ -25,14 +25,21 @@ function watchErrors(page: Page) {
   return errors;
 }
 
-test("landing: the hero <scxml-view> runs", async ({ page }) => {
+test("landing: the hero <scxml-view> starts paused; steps and clicked events move it", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/");
   const hero = page.locator("#hero-view");
-  // the traffic light starts red and its delayed <send> moves it on: an active state changes
   const active = () => hero.evaluate((el) => ((el as any).session?.configuration ?? []).map((s: { id: string }) => s.id).join(","));
+  // the traffic light starts red and stays there: its 3 s timer waits for the visitor
   await expect.poll(active).toContain("red");
-  await expect.poll(active, { timeout: 15_000 }).not.toContain("red");
+  expect(await hero.evaluate((el) => (el as any).clock.playing)).toBe(false);
+  // stepping fires the delayed <send>
+  await hero.locator("[part~=step]").click();
+  await expect.poll(active).toContain("green");
+  // a clicked event goes through at once, though the clock stays paused
+  await hero.locator("[part~=transition][part~=live]", { hasText: "timer" }).click();
+  await expect.poll(active).toContain("yellow");
+  expect(await hero.evaluate((el) => (el as any).clock.playing)).toBe(false);
   expect(errors).toEqual([]);
 });
 

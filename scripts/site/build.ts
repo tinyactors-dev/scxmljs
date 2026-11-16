@@ -109,9 +109,7 @@ const emit = (
 
 // the explorer tour, the same files the READMEs link (docs/media.lock.json, written by scripts/media)
 const tour = (await Bun.file(join(root, "docs/media.lock.json")).json())["explorer-tour"]?.hash as string | undefined;
-const media = tour
-  ? { webp: `${MEDIA}/explorer-tour-${tour}.webp`, png: `${MEDIA}/explorer-tour-${tour}.png`, webm: `${MEDIA}/explorer-tour-${tour}.webm` }
-  : undefined;
+const media = tour ? { png: `${MEDIA}/explorer-tour-${tour}.png`, webm: `${MEDIA}/explorer-tour-${tour}.webm` } : undefined;
 if (!media) console.warn("  ! docs/media.lock.json has no explorer-tour: the landing page has no explorer tour");
 
 await emit(

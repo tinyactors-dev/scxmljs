@@ -15,7 +15,6 @@ const PLAYBACK_ICONS = [
   .join("");
 
 export interface Media {
-  webp: string;
   png: string;
   webm: string;
 }
@@ -49,7 +48,6 @@ export function landing(media: Media | undefined): string {
   return `<div class="wrap" data-pagefind-body>
   <section class="hero">
     <div>
-      <p class="eyebrow">SCXML 1.0 · ECMAScript data model</p>
       <h1>Statecharts you can <em>run</em>, see and step through</h1>
       <p class="lede">scxmljs is a correctness-first SCXML interpreter that passes every mandatory W3C test, with two custom elements that render running charts in any framework: <code>&lt;scxml-view&gt;</code> draws a whole chart, <code>&lt;scxml-explorer&gt;</code> explores whole systems level by level.</p>
       <div class="install">
@@ -63,17 +61,20 @@ export function landing(media: Media | undefined): string {
       </div>
     </div>
     <figure class="card hero-demo">
-      <scxml-view id="hero-view" trusted direction="right" fit src="/charts/traffic-light.scxml" aria-label="A live traffic light statechart"></scxml-view>
-      <figcaption><span>Live: <code>&lt;scxml-view src="traffic-light.scxml"&gt;</code></span><a href="/demos/gallery/">More charts</a></figcaption>
+      <scxml-view id="hero-view" trusted direction="right" fit src="/charts/traffic-light.scxml" aria-label="A traffic light statechart: press play, or click an event to send it"></scxml-view>
+      <figcaption><span>A live <code>&lt;scxml-view&gt;</code></span><a href="/demos/gallery/">More charts</a></figcaption>
     </figure>
   </section>
 ${
   media
     ? `  <figure class="showcase">
-    <a class="card frame" href="${media.webm}" aria-label="Watch the explorer tour (WebM video)">
-      <img src="${media.webp}" width="1600" height="1000" alt="The explorer stepping through an order-fulfilment system: the tree of states, the focused compound state, the events it accepts, and the system of machines and services." loading="lazy">
-    </a>
-    <figcaption><code>&lt;scxml-explorer&gt;</code> on a three-machine order system. <a href="${media.webm}">Full-resolution video</a> · <a href="/demos/explorer/">try it</a></figcaption>
+    <div class="card frame">
+      <video controls playsinline preload="metadata" width="1600" height="1000" poster="${media.png}" aria-label="The explorer stepping through an order-fulfilment system: the tree of states, the focused compound state, the events it accepts, and the system of machines and services.">
+        <source src="${media.webm}" type="video/webm">
+        <a href="${media.webm}">Download the explorer tour (WebM)</a>
+      </video>
+    </div>
+    <figcaption><code>&lt;scxml-explorer&gt;</code> on a three-machine order system. <a href="/demos/explorer/">Try it</a></figcaption>
   </figure>`
     : ""
 }

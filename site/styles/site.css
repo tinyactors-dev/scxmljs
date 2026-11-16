@@ -118,12 +118,6 @@ pre {
   letter-spacing: var(--tracking-tight);
   white-space: nowrap;
 }
-.brand small {
-  font: var(--type-label);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--fg-2);
-}
 .site-nav {
   display: flex;
   gap: var(--space-5);
@@ -236,12 +230,22 @@ pre {
   flex-wrap: wrap;
   gap: var(--space-3) var(--space-6);
   justify-content: space-between;
+  align-items: center;
   max-width: var(--page-max);
   margin: 0 auto;
   padding: var(--space-6) var(--gutter);
 }
 .site-footer a {
   color: var(--fg-2);
+}
+.site-footer .org {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  vertical-align: middle;
+}
+.site-footer .org img {
+  border-radius: var(--radius-2);
 }
 
 /* ── shared blocks ───────────────────────────────────────────────────── */

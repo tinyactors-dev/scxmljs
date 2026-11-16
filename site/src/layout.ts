@@ -4,6 +4,9 @@
  */
 import { REPO, SITE } from "../../scripts/docs/config.ts";
 
+/** the GitHub organisation behind the project: its logo and link are in the footer */
+const ORG = REPO.slice(0, REPO.lastIndexOf("/"));
+
 export interface Assets {
   /** hashed URLs of the bundled client entries, by entry name (e.g. "common", "landing") */
   js: Record<string, string>;
@@ -88,7 +91,7 @@ ${o.noFeedback ? "" : '<script src="https://ampcode.com/w/pw_0Om200aLtVMrM967bnS
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="inner">
-    <a class="brand" href="/">scxmljs <small>by tinyactors</small></a>
+    <a class="brand" href="/">scxmljs</a>
     <nav class="site-nav" id="site-nav" aria-label="Main">
 ${NAV.map(([sec, label, href]) => `      <a href="${href}"${sec === o.section ? ' aria-current="page"' : ""}>${label}</a>`).join("\n")}
       <a href="${REPO}">GitHub</a>
@@ -108,7 +111,7 @@ ${o.body}
 </main>
 <footer class="site-footer">
   <div class="inner">
-    <span>@tinyactors/scxmljs ${esc(o.version)} · MIT licence · <a href="${REPO}/commit/${o.commit}">${o.commit.slice(0, 7)}</a></span>
+    <span><a class="org" href="${ORG}"><img src="/tinyactors.png" width="32" height="32" alt="">tinyactors</a> · @tinyactors/scxmljs ${esc(o.version)} · MIT licence · <a href="${REPO}/commit/${o.commit}">${o.commit.slice(0, 7)}</a></span>
     <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="${REPO}">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
   </div>
 </footer>

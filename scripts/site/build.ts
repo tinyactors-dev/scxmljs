@@ -146,6 +146,7 @@ await emit(
   pages.llmChatDemo(),
   {
     scripts: ["llm-chat"],
+    noFeedback: true,
     head: [
       // the visitor's API key can only ever reach Anthropic; the real tools download from Wasmer
       `<meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://api.anthropic.com ${WASMER_HOSTS.join(" ")}">`,

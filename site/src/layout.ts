@@ -28,6 +28,8 @@ export interface PageOptions {
   head?: string;
   /** don't index in search (Pagefind) or sitemaps */
   noindex?: boolean;
+  /** leave out the Amp feedback widget (it can't load on a cross-origin isolated page) */
+  noFeedback?: boolean;
   version: string;
   commit: string;
 }
@@ -81,7 +83,7 @@ ${o.noindex ? '<meta name="robots" content="noindex">\n' : ""}<link rel="icon" h
 ${o.assets.fonts ? `<link rel="stylesheet" href="${o.assets.fonts}">\n` : ""}<link rel="stylesheet" href="${o.assets.css}">
 <script>${THEME_BOOT}</script>
 ${o.head ?? ""}${scripts.join("\n")}
-</head>
+${o.noFeedback ? "" : '<script src="https://ampcode.com/w/pw_0Om200aLtVMrM967bnSOCQY6JLhet2RH2BrJ86VESO0.js" async></script>\n'}</head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">

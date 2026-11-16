@@ -271,7 +271,8 @@ test("gallery: every chart renders with playback controls", async ({ page }) => 
   await page.goto("/demos/gallery/");
   const views = page.locator("scxml-view[data-gallery]");
   await expect(views).toHaveCount(4);
-  for (const v of await views.all()) await expect(v.locator("[part~=step]")).toBeVisible();
+  // the clocks play, so each view shows its play/pause button (Step only appears while paused)
+  for (const v of await views.all()) await expect(v.locator("[part~=play]")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -546,10 +547,6 @@ test("llm chat: downloads are announced up front and shown live, per package and
   await expect(terminal.locator(".chat-dl-rows li")).toHaveCount(3);
   await expect(terminal.locator(".chat-dl-rows li").first()).toContainText("Wasmer runtime");
   await expect(terminal.locator(".chat-dl-rows li progress").first()).toHaveAttribute("aria-label", /download/);
-  expect(await axe(page)).toEqual([]);
-  // tapping the indicator lists who is downloading
-  await page.click("#chat-dl-toggle");
-  await expect(page.locator("#chat-dl-list")).toContainText("Terminal");
   // done: cached coreutils, the indicator goes away
   await expect(terminal.locator(".chat-dl-total")).toHaveText("Ready.", { timeout: 15_000 });
   await expect(terminal.locator(".chat-dl-rows")).toContainText("from this browser's cache");
@@ -566,6 +563,11 @@ test("llm chat: downloads are announced up front and shown live, per package and
   await expect(page.locator("#chat-dl-text")).toContainText("Download failed: Python", { timeout: 15_000 });
   await expect(python.locator(".chat-dl-rows")).toContainText("failed: network error (fake)");
   await expect(python.getByRole("button", { name: "Try again" })).toBeVisible();
+  // the indicator stays up until a retry, so it can be inspected without racing the fast fake:
+  // tapping it lists the client and what became of its download
+  await page.click("#chat-dl-toggle");
+  await expect(page.locator("#chat-dl-list")).toContainText("Python: failed");
+  expect(await axe(page)).toEqual([]);
   // the fake fails once: trying again goes through the same package machine, and works
   await python.getByRole("button", { name: "Try again" }).click();
   await expect(python.locator(".chat-dl-total")).toHaveText("Ready.", { timeout: 15_000 });

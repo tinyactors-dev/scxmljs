@@ -111,8 +111,9 @@ ${o.body}
 </main>
 <footer class="site-footer">
   <div class="inner">
-    <span><a class="org" href="${ORG}"><img src="/tinyactors.png" width="32" height="32" alt="">tinyactors</a> · @tinyactors/scxmljs ${esc(o.version)} · MIT licence · <a href="${REPO}/commit/${o.commit}">${o.commit.slice(0, 7)}</a></span>
-    <span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> · <a href="${REPO}">GitHub</a> · <a href="/docs/security/">Security</a> · <a href="/docs/changelog/">Changelog</a></span>
+    <a class="org" href="${ORG}"><img src="/tinyactors.png" width="32" height="32" alt="">tinyactors</a>
+    <span class="meta"><span>@tinyactors/scxmljs ${esc(o.version)} ·</span> <span>MIT licence ·</span> <a href="${REPO}/commit/${o.commit}">${o.commit.slice(0, 7)}</a></span>
+    <span class="links"><span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> ·</span> <span><a href="${REPO}">GitHub</a> ·</span> <span><a href="/docs/security/">Security</a> ·</span> <a href="/docs/changelog/">Changelog</a></span>
   </div>
 </footer>
 </body>

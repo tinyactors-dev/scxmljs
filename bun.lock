@@ -64,7 +64,7 @@
     },
     "packages/scxmljs": {
       "name": "@tinyactors/scxmljs",
-      "version": "0.2.0-dev.0",
+      "version": "0.2.0",
       "dependencies": {
         "@jitl/quickjs-singlefile-browser-release-sync": "0.32.0",
         "quickjs-emscripten-core": "0.32.0",

@@ -18,6 +18,8 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-17
+
 ### Added
 
 - `<scxml-view>`: the `event-data` attribute gives label clicks event data (a JSON object from
@@ -171,5 +173,6 @@ The first release.
   violations), in Node, Bun and Deno from the packed tarball, and with React 19, Vue 3,
   Svelte 5 and Angular 22 apps; see [docs/bundling.md](docs/bundling.md#support).
 
-[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.2.0
 [0.1.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.1.0

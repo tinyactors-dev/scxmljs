@@ -1,0 +1,185 @@
+/*
+ * Cross-origin control document for a standalone Wasmer HTTP host.
+ *
+ * Serve a document importing this module at `/.wasmer/host.html` and the
+ * service worker at `/wasmer-service-worker.js`.
+ */
+const CONNECT = "wasmer-sdk:http-host-connect";
+const READY = "wasmer-sdk:http-host-ready";
+const ERROR = "wasmer-sdk:http-host-error";
+const WORKER_URL = "/wasmer-service-worker.js";
+let workerResolution;
+const expectedParentOrigin = new URLSearchParams(globalThis.location.search).get("parentOrigin");
+globalThis.addEventListener("message", (event) => {
+    const message = event.data;
+    if (message?.type !== CONNECT ||
+        !expectedParentOrigin ||
+        event.origin !== expectedParentOrigin) {
+        return;
+    }
+    const connection = event.ports[0];
+    if (!connection)
+        return;
+    void connect(connection);
+});
+async function connect(connection) {
+    try {
+        await ensureActiveWorker(true);
+        connection.addEventListener("message", (event) => {
+            void forwardToWorker(event);
+        });
+        connection.start();
+        connection.postMessage({ type: READY });
+    }
+    catch (error) {
+        connection.postMessage({
+            type: ERROR,
+            error: error instanceof Error ? error.message : String(error),
+        });
+        connection.close();
+    }
+}
+const routes = new Set();
+// This document outlives idle service-worker instances. Keep the sandbox port
+// here; transfer only replaceable bridge ports into the service worker.
+navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data?.type !== "wasmer-sdk:http-recover")
+        return;
+    const response = event.ports[0];
+    if (!response)
+        return;
+    const route = [...routes].find((candidate) => candidate.accepted);
+    if (route) {
+        response.postMessage({ serverId: route.id }, [attachBridge(route)]);
+    }
+    else {
+        response.postMessage({ serverId: null });
+    }
+    response.close();
+});
+function attachBridge(route) {
+    route.bridge?.close();
+    const channel = new MessageChannel();
+    route.bridge = channel.port1;
+    channel.port1.addEventListener("message", (event) => {
+        if (event.data?.type === "wasmer-sdk:http-ready")
+            route.accepted = true;
+        if (event.data?.type === "wasmer-sdk:http-error") {
+            routes.delete(route);
+            channel.port1.close();
+        }
+        route.owner.postMessage(event.data);
+    });
+    channel.port1.start();
+    return channel.port2;
+}
+async function forwardToWorker(event) {
+    try {
+        const worker = await ensureActiveWorker(false);
+        const message = event.data;
+        const owner = event.ports[0];
+        if (message?.type !== "wasmer-sdk:http-register" ||
+            typeof message.serverId !== "string" || !owner) {
+            worker.postMessage(event.data, [...event.ports]);
+            return;
+        }
+        const route = { id: message.serverId, owner, accepted: false };
+        routes.add(route);
+        owner.addEventListener("message", (response) => {
+            route.bridge?.postMessage(response.data);
+            if (response.data?.type === "wasmer-sdk:http-close") {
+                routes.delete(route);
+                route.bridge?.close();
+                owner.close();
+            }
+        });
+        owner.start();
+        worker.postMessage(event.data, [attachBridge(route)]);
+    }
+    catch (error) {
+        // Route registration messages carry a response port. Returning the error on
+        // it lets ports.expose() fail immediately instead of waiting for a timeout.
+        const response = event.ports[0];
+        if (!response)
+            return;
+        const message = event.data;
+        response.postMessage({
+            type: "wasmer-sdk:http-error",
+            serverId: typeof message?.serverId === "string" ? message.serverId : "",
+            error: describeError(error),
+        });
+        response.close();
+    }
+}
+function ensureActiveWorker(checkForUpdates) {
+    if (!workerResolution) {
+        workerResolution = resolveActiveWorker(checkForUpdates).finally(() => {
+            workerResolution = undefined;
+        });
+    }
+    return workerResolution;
+}
+async function resolveActiveWorker(checkForUpdates) {
+    if (!checkForUpdates) {
+        const registration = await navigator.serviceWorker.getRegistration("/");
+        const active = registration?.active;
+        if (active?.state === "activated")
+            return active;
+    }
+    const registration = await navigator.serviceWorker.register(WORKER_URL, {
+        scope: "/",
+        type: "module",
+        updateViaCache: "none",
+    });
+    try {
+        return await activatedWorker(registration);
+    }
+    catch {
+        // Chrome can retain a registration record after discarding all of its
+        // workers. Remove that unusable record and install a fresh worker once.
+        await registration.unregister();
+        const recovered = await navigator.serviceWorker.register(`${WORKER_URL}?recovery=${Date.now()}`, { scope: "/", type: "module", updateViaCache: "none" });
+        return activatedWorker(recovered);
+    }
+}
+async function activatedWorker(registration) {
+    const worker = registration.active ?? registration.waiting ?? registration.installing;
+    if (!worker || worker.state === "redundant") {
+        throw new Error("the Wasmer service worker is unavailable");
+    }
+    if (worker.state !== "activated")
+        await waitForActivation(worker);
+    const active = registration.active ?? worker;
+    if (active.state !== "activated") {
+        throw new Error("the Wasmer service worker did not activate");
+    }
+    return active;
+}
+function describeError(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+function waitForActivation(worker) {
+    return new Promise((resolve, reject) => {
+        const finish = (error) => {
+            clearTimeout(timeout);
+            worker.removeEventListener("statechange", onStateChange);
+            if (error)
+                reject(error);
+            else
+                resolve();
+        };
+        const onStateChange = () => {
+            if (worker.state === "activated") {
+                finish();
+            }
+            else if (worker.state === "redundant") {
+                finish(new Error("the Wasmer service worker became redundant"));
+            }
+        };
+        const timeout = setTimeout(() => finish(new Error("the Wasmer service worker did not activate")), 15_000);
+        worker.addEventListener("statechange", onStateChange);
+        onStateChange();
+    });
+}
+export {};
+//# sourceMappingURL=service-worker-host.js.map

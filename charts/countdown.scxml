@@ -1,0 +1,16 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="launch" initial="counting">
+  <state id="counting">
+    <invoke id="countdown" type="countdown">
+      <param name="from" expr="3"/>
+    </invoke>
+    <transition event="tick">
+      <log label="tick" expr="_event.data.left"/>
+    </transition>
+    <transition event="abort" target="aborted"/>
+    <transition event="done.invoke.countdown" target="launched"/>
+  </state>
+  <final id="launched">
+    <onentry><log label="launched"/></onentry>
+  </final>
+  <final id="aborted"/>
+</scxml>

@@ -525,6 +525,7 @@ export class SCXMLSession extends EventTarget {
   /** `interpret()` — spec Appendix D. */
   start(): this {
     if (this.started) return this;
+    if (this.disposedDm) throw new Error(`session ${this.sessionId} was disposed before it started: create a new session`);
     this.started = true;
     this.running = true;
     sessions.set(this.sessionId, this);
@@ -564,9 +565,11 @@ export class SCXMLSession extends EventTarget {
    * listeners installed by `connect()` / `bind()` and attributes set by
    * `reflect`, frees the data model context and leaves the session registry.
    * `done` resolves (with `undefined` if it hadn't finished). Safe to call
-   * more than once; the session can't be used afterwards.
+   * more than once; the session can't be used afterwards (`start()` throws).
    */
   dispose() {
+    // never started: it ends here, cancelled, without having run
+    if (!this.started) this.exited = this.wasCancelled = true;
     this.cancel();
     this.bridge?.cleanup();
     this.lifetime.abort();

@@ -35,8 +35,10 @@ describe("done", () => {
     expect(a.s.cancelled).toBe(true);
 
     const b = await make(TWO_STEPS);
-    b.s.dispose(); // never started
+    b.s.dispose(); // never started: it ended, cancelled, and can't start any more
     expect(await b.s.done).toBeUndefined();
+    expect([b.s.status, b.s.cancelled]).toEqual(["done", true]);
+    expect(() => b.s.start()).toThrow("was disposed before it started");
   });
 });
 

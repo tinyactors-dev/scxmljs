@@ -183,8 +183,15 @@ export function scxmlChildren(el: Element, ns: string | null): Element[] {
 /**
  * Compile an `<scxml>` element. `src` attributes on `<script>` and `<data>`
  * are fetched with `loader`; the result is synchronous when the loader is.
+ *
+ * @throws {TypeError} when given text: parse it first with `parseSCXML()`.
  */
 export function compile(root: Element, opts: { loader?: Loader } = {}): Model | Promise<Model> {
+  if (typeof root === "string")
+    throw new TypeError(
+      "compile() takes the parsed <scxml> Element, not SCXML text: parse it first with parseSCXML(text, domParser), " +
+        "or pass the text to createSession()",
+    );
   const model = build(root);
   const pending: Promise<void>[] = [];
   for (const el of [...model.scripts, ...scriptsIn(model), ...model.allData]) {

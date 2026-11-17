@@ -1,6 +1,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { Window } from "happy-dom";
 import {
+  compile,
   createSession,
   type IOProcessor,
   type IOSession,
@@ -64,6 +65,10 @@ describe("validation", () => {
     // linkedom on malformed text: no root and no <parsererror>
     const empty = { parseFromString: () => ({ documentElement: null, getElementsByTagName: () => [] }) };
     expect((await createSession("<scxml", { domParser: empty }).catch((e) => e)).code).toBe("SCXML_PARSE");
+  });
+
+  test("compile() given text says to parse it first", () => {
+    expect(() => compile(doc("") as unknown as Element)).toThrow("parse it first with parseSCXML(text, domParser)");
   });
 
   test("generates ids for anonymous states", async () => {

@@ -120,6 +120,10 @@ private `--x-*` properties are not public API and can change in any release.
 - `session.isActive(id)` throws a `RangeError` when the chart has no state with that id, and
   `session.waitFor()` rejects with one at once. Before, a typo returned `false` or waited until
   the timeout (or forever).
+- A session disposed before `start()` has ended: `status` is `"done"` and `cancelled` is `true`
+  (they said `"idle"` and `false` while `signal` was aborted and `done` resolved), and `start()`
+  throws an `Error` saying it was disposed (it threw QuickJS's `Lifetime not alive`, or ran on
+  a disposed data model).
 
 ### Fixed
 
@@ -129,6 +133,8 @@ private `--x-*` properties are not public API and can change in any release.
   error, or a `TypeError`. The docs no longer suggest linkedom.
 - The package's type declarations bring in TypeScript's `dom` library, so Node-only projects
   type-check without `"lib": ["dom"]` or `skipLibCheck`.
+- `compile()` given SCXML text throws a `TypeError` saying to parse it with `parseSCXML()` first,
+  instead of "root element is `<undefined>`".
 
 ## [0.1.0] - 2026-09-28
 

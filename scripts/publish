@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stages @tinyactors/scxmljs on npm. Only ever runs in GitHub Actions, from
-# .github/workflows/release.yml, on a pushed v* tag, using npm trusted
-# publishing (OIDC): no npm token exists anywhere, and the package carries a
+# .github/workflows/release.yml, on main (after a version bump) or on a pushed v* tag, using
+# npm trusted publishing (OIDC): no npm token exists anywhere, and the package carries a
 # provenance attestation.
 #
 # The trusted publisher is configured for STAGED publishing: CI can only
@@ -11,13 +11,17 @@
 #
 # Steps:
 #   1. refuse to run outside GitHub Actions (or without the OIDC token)
-#   2. the tag must be v<version from packages/scxmljs/package.json>
-#   3. if that version is already on npm, stop successfully (re-running a tag is harmless)
+#   2. on a tag: it must be v<version from packages/scxmljs/package.json>. On main: if that tag
+#      already exists elsewhere, the version wasn't bumped: stop successfully
+#   3. if that version is already on npm, stop successfully (re-running is harmless)
 #   4. scripts/release: the full release check (changelog, git, registry, full CI, tarball)
-#   5. npm stage publish (then a maintainer approves it)
+#   5. on main: tag the commit v<version> and push the tag
+#   6. npm stage publish (then a maintainer approves it)
+#   7. on main, for a release (not a prerelease): start site.yml on the new tag
 #
 # Release procedure (maintainer): bump the version in packages/scxmljs/package.json, add the
-# CHANGELOG entry with its date, commit, `git tag vX.Y.Z`, `git push origin main vX.Y.Z`.
+# CHANGELOG entry with its date, commit, `git push origin main`: the workflow tags it. Tagging
+# by hand (`git tag vX.Y.Z && git push origin main vX.Y.Z`) still works.
 #
 # Dist-tags: a prerelease goes to its first prerelease identifier and never touches "latest":
 #   0.2.0-dev.3 → dev   0.2.0-beta.1 → beta   1.0.0-rc.1 → rc   (install: npm i @tinyactors/scxmljs@dev)
@@ -33,10 +37,27 @@ fi
 
 version=$(node -p 'require("./packages/scxmljs/package.json").version')
 name=$(node -p 'require("./packages/scxmljs/package.json").name')
-if [ "${GITHUB_REF:-}" != "refs/tags/v$version" ]; then
-  echo "expected tag v$version (package.json), got ${GITHUB_REF:-<none>}" >&2
-  exit 1
-fi
+tag="v$version"
+on_main=false
+make_tag=false
+case "${GITHUB_REF:-}" in
+  "refs/tags/$tag") ;;
+  refs/heads/main)
+    on_main=true
+    # the commit the tag names, if it exists (an annotated tag's peeled "^{}" line sorts last)
+    tagged=$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}" | sort -k2 | tail -n1 | cut -f1)
+    if [ -z "$tagged" ]; then
+      make_tag=true
+    elif [ "$tagged" != "$(git rev-parse HEAD)" ]; then
+      echo "$tag already tags another commit: no version bump here, nothing to release."
+      exit 0
+    fi
+    ;;
+  *)
+    echo "expected tag $tag (package.json) or main, got ${GITHUB_REF:-<none>}" >&2
+    exit 1
+    ;;
+esac
 
 dist_tag=latest
 case "$version" in
@@ -54,12 +75,26 @@ fi
 # the full release check; it also installs the toolchain via scripts/ci
 scripts/release
 
+if [ "$make_tag" = true ]; then
+  git config user.name "github-actions[bot]"
+  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+  git tag -a "$tag" -m "$tag"
+  git push origin "refs/tags/$tag"
+  echo "tagged $(git rev-parse --short HEAD) as $tag"
+fi
+
 # npm >= 11.15.0 (staged publishing; trusted publishing needs 11.5.1) and Node >= 22.14; both come from mise.toml.
 # scripts/ci installed mise in its own process: make it reachable here too.
 export PATH="$HOME/.local/bin:$PATH" MISE_YES=1 MISE_TRUSTED_CONFIG_PATHS="$PWD"
 cd packages/scxmljs
 mise exec -- npm --version
 mise exec -- npm stage publish . --access public --tag "$dist_tag" --provenance
+
+if [ "$on_main" = true ] && [ "$dist_tag" = latest ]; then
+  # a tag pushed with the workflow's token starts no workflows: start the site deploy for it
+  gh workflow run site.yml --ref "$tag"
+  echo "started site.yml on $tag"
+fi
 
 cat <<MSG
 

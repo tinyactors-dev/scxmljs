@@ -163,6 +163,8 @@ export interface ChartLayout {
 
 const DEFAULT_SPACING: Spacing = { node: 18, layer: 44, padding: 14, edge: 10, label: 6 };
 const INITIAL_DOT = 10;
+/** how far a self loop reaches past its box, in edge spacings */
+const SELF_OUT = 1.6;
 /** down: how wide a box may grow to put the labels of its outgoing edges side by side */
 const LABEL_ROW = 320;
 
@@ -279,6 +281,8 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
   walk(root);
 
   const infos = new Map<StateNode, ContainerInfo>();
+  /** drawn as a loop on its own box (see routeEdges) */
+  const selfLoop = (t: TransitionNode, target: StateNode) => t.source === target && drawn(target) === target;
   const labelAlong = (t: TransitionNode) => {
     const l = opts.labelSize(t);
     return (down ? l.h : l.w) + 2 * sp.label;
@@ -556,7 +560,10 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
       for (const target of t.targets) {
         if (!within(target, c) || target === c) continue;
         const b = childOf(c, drawn(target));
-        if (b && b !== from && info.nodes.get(b)!.layer > a.layer) outgoing.set(a, (outgoing.get(a) ?? 0) + (down ? l.w : l.h) + sp.label);
+        // forward edges and self loops each take a port slot as wide as their label on the far side
+        const loop = b === from && selfLoop(t, target);
+        if (b && (loop || (b !== from && info.nodes.get(b)!.layer > a.layer)))
+          outgoing.set(a, (outgoing.get(a) ?? 0) + (down ? l.w : l.h) + sp.label + (loop ? sp.edge : 0));
       }
     }
     /** down: how many rows the labels leaving each box need */
@@ -579,9 +586,16 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
       for (const target of t.targets) {
         if (!within(target, c) || target === c) continue;
         const b = childOf(c, drawn(target));
-        if (!a || !b || a === b) continue;
+        if (!a || !b) continue;
         const na = info.nodes.get(a)!;
         const nb = info.nodes.get(b)!;
+        if (a === b) {
+          // a self loop reaches into the gap after its box, its label straddling the loop's far side
+          // (down: across the loop's far side; right: beside it)
+          if (selfLoop(t, target) && na.layer < layers.length - 1)
+            gapLabel[na.layer] = Math.max(gapLabel[na.layer]!, SELF_OUT * sp.edge + labelAlong(t) / (down ? 2 : 1));
+          continue;
+        }
         if (nb.layer !== na.layer) {
           // forward: label in the gap after the source; reversed: in the gap before it (it leaves backwards)
           const lo = Math.min(na.layer, nb.layer);
@@ -815,6 +829,10 @@ interface Attachment {
   at: number;
   /** room the edge wants beside its port: its label's width across the layers (down), or 0 */
   room: number;
+  /** the width of the slot it got */
+  slot?: number;
+  /** a self loop: keeps its room even when the side is too short for every label */
+  loop?: boolean;
 }
 
 /**
@@ -938,6 +956,9 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
         p.end = at(p.to, "near", Number.NEGATIVE_INFINITY);
         break;
       case "self":
+        // one slot on the far side, wide enough for the label to sit on the loop
+        p.start = at(p.from, "far", cy(p.from), labelCanon(p.transition).h + sp.label + sp.edge);
+        p.start.loop = true;
         break;
     }
   }
@@ -951,18 +972,28 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
     const headerAlong = info && down ? info.header : 0;
     const span = a0(list[0]!.side === "bottom" ? r.w - headerAlong : r.h - headerAcross);
     const start = list[0]!.side === "bottom" ? r.x + headerAlong : r.y + headerAcross;
-    const rooms = list.map((a) => Math.max(a.room, sp.edge));
-    const total = rooms.reduce((x, y) => x + y, 0);
+    let rooms = list.map((a) => Math.max(a.room, sp.edge));
+    let total = rooms.reduce((x, y) => x + y, 0);
+    const loops = list.filter((a) => a.loop).reduce((x, a) => x + Math.max(a.room, sp.edge), 0);
+    const others = list.filter((a) => !a.loop).length;
+    if (total > span && loops > 0 && loops + others * sp.edge <= span) {
+      // too short for every label: self loops keep their room (their label sits on them), the other
+      // ports share the rest evenly (their labels slide along their edges instead)
+      rooms = list.map((a) => (a.loop ? Math.max(a.room, sp.edge) : (span - loops) / others));
+      total = span;
+    }
     if (list.some((a) => a.room > 0) && total <= span) {
       // ports in slots as wide as their labels, the row of slots centred on the side
       let x = start + (span - total) / 2;
       list.forEach((a, i) => {
         a.at = x + rooms[i]! / 2;
+        a.slot = rooms[i]!;
         x += rooms[i]!;
       });
     } else
       list.forEach((a, i) => {
         a.at = start + span * ((i + 1) / (list.length + 1));
+        a.slot = span / (list.length + 1);
       });
   }
 
@@ -1163,9 +1194,11 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
         break;
       }
       case "self": {
-        const out = sp.edge * 1.6;
-        const yA = S.y + S.h * 0.3;
-        const yB = S.y + S.h * 0.7;
+        const out = sp.edge * SELF_OUT;
+        // the loop's ends, as far apart as its label needs, within its slot
+        const half = Math.max(sp.edge / 2, Math.min(labelCanon(p.transition).h + sp.label, p.start!.slot! - sp.edge) / 2);
+        const yA = p.start!.at - half;
+        const yB = p.start!.at + half;
         pts = [
           { x: S.x + S.w, y: yA },
           { x: S.x + S.w + out, y: yA },
@@ -1215,7 +1248,9 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
   const placed: Rect[] = [];
   const free = (r: Rect) => !placed.some((o) => overlaps(o, r)) && !obstacles.some((o) => overlaps(o, r));
   const labelled = new Set<TransitionNode>(); // a transition with several targets is labelled once
-  for (const { edge, points, prefer } of routed) {
+  // self loops first: their label has one place (on the loop); the others can slide along their edges
+  const labelOrder = [...routed.filter((r) => r.edge.kind === "self"), ...routed.filter((r) => r.edge.kind !== "self")];
+  for (const { edge, points, prefer } of labelOrder) {
     const real = ctx.opts.labelSize(edge.transition);
     if (!(real.w > 0 && real.h > 0) || labelled.has(edge.transition)) continue;
     labelled.add(edge.transition);

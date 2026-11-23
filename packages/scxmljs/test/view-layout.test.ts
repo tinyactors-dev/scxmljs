@@ -132,6 +132,34 @@ describe("layoutChart", async () => {
     expect(l.boxes.find((b) => b.node.id === "h")!.kind).toBe("history");
     expect(l.inside.get(byId(m, "a"))!.map((t) => t.events[0])).toEqual(["noop"]);
   });
+
+  // the retry loop on the website: the self loop's ports sat on top of the forward edges' and its
+  // label, given no room, was dropped onto "charged"
+  for (const direction of ["down", "right"] as const)
+    for (const retry of ["timeout", "timeout.after.a.while.so.try.charging.the.card.once.more"])
+      test(`self loop beside forward edges (${direction}, ${retry.length > 10 ? "wider than the box" : "short"} label)`, async () => {
+        const m = await load(`<scxml ${NS} initial="charging">
+          <state id="charging">
+            <transition event="charged" target="paid"/>
+            <transition event="${retry}" target="charging"/>
+            <transition event="timeout" target="failed"/>
+          </state><final id="paid"/><final id="failed"/></scxml>`);
+        const l = lay(m, direction);
+        check(l);
+        const loop = l.edges.find((e) => e.kind === "self")!;
+        const others = l.edges.filter((e) => e !== loop);
+        // its own ports: neither end of the loop meets another edge leaving the box
+        const along = (p: { x: number; y: number }) => (direction === "down" ? p.x : p.y);
+        for (const e of others)
+          for (const p of [loop.points[0]!, loop.points.at(-1)!]) expect(Math.abs(along(e.points[0]!) - along(p))).toBeGreaterThan(5);
+        // labels never overlap, and the loop's label sits between the loop's ends
+        const labels = l.edges.map((e) => e.label!);
+        for (const a of labels) for (const b of labels) if (a !== b) expect(overlap(a, b)).toBe(false);
+        const [lo, hi] = [along(loop.points[0]!), along(loop.points.at(-1)!)].sort((a, b) => a - b);
+        const mid = direction === "down" ? loop.label!.x + loop.label!.w / 2 : loop.label!.y + loop.label!.h / 2;
+        expect(mid).toBeGreaterThan(lo!);
+        expect(mid).toBeLessThan(hi!);
+      });
 });
 
 describe("layoutChart: space", () => {

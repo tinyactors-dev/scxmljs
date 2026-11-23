@@ -962,6 +962,19 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
         break;
     }
   }
+  /** where an edge between sibling boxes reaches the box on the later layer: level with the port it
+   *  leaves from, or with the last dummy of its corridor */
+  const arrives = new Map<Attachment, number | Attachment>();
+  for (const p of pending) {
+    if (p.route !== "forward" && p.route !== "reversed") continue;
+    const fwd = p.route === "forward";
+    const [early, late] = fwd ? [p.from, p.to] : [p.to, p.from];
+    const c = p.container;
+    if (early.parent !== c || late.parent !== c) continue; // nested ends may detour around siblings
+    const last = infos.get(c)!.chains.get(`${early.id}→${late.id}`)?.at(-1);
+    arrives.set(fwd ? p.end! : p.start!, last ? contentOrigin(c).y + last.y + last.h / 2 : fwd ? p.start! : p.end!);
+  }
+  const range = new Map<Attachment[], { start: number; span: number }>();
   for (const list of attachments.values()) {
     list.sort((a, b) => a.key - b.key);
     const box = boxOf.get(list[0]!)!;
@@ -995,6 +1008,29 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
         a.at = start + span * ((i + 1) / (list.length + 1));
         a.slot = span / (list.length + 1);
       });
+    range.set(list, { start, span });
+  }
+  // the last mile: a port where its edge arrives moves to meet it, so the edge runs straight in
+  // (between its neighbours, and off a final's rounded ends; a history circle keeps its ports)
+  for (const list of attachments.values()) {
+    const box = boxOf.get(list[0]!)!;
+    if (list[0]!.side !== "near" || box.kind === "history") continue;
+    const r = R(box);
+    const { start, span } = range.get(list)!;
+    const inset = box.kind === "final" ? (down ? r.w / 2 : r.h / 4) : sp.edge;
+    list.forEach((a, i) => {
+      const from = arrives.get(a);
+      if (from === undefined) return;
+      const want = typeof from === "number" ? from : from.at;
+      const lo = Math.max(start + inset, i > 0 ? list[i - 1]!.at + sp.edge : Number.NEGATIVE_INFINITY);
+      const hi = Math.min(start + span - inset, i + 1 < list.length ? list[i + 1]!.at - sp.edge : Number.POSITIVE_INFINITY);
+      if (lo <= hi) a.at = Math.min(hi, Math.max(lo, want));
+      // still short: the port it leaves from slides within its slot to meet it
+      if (typeof from !== "number" && Math.abs(a.at - want) > 0.5 && boxOf.get(from)!.kind !== "history") {
+        const half = Math.max(0, ((from.slot ?? 0) - sp.edge) / 2);
+        from.at = Math.min(from.at + half, Math.max(from.at - half, a.at));
+      }
+    });
   }
 
   // ── 3. bend channels per gap (in order of the source port) and lanes per parallel state ──
@@ -1272,7 +1308,11 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
       const horizontal = Math.abs(a.y - b.y) < 0.01;
       const room = horizontal ? Math.abs(b.x - a.x) - size.w : Math.abs(b.y - a.y) - size.h;
       if (room < 4) continue;
-      for (const t of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+      // an edge between layers that runs straight from its port: the label just past the port first
+      const len = segLen(segs[i]!);
+      const nearPort =
+        i === 0 && horizontal && (edge.kind === "forward" || edge.kind === "back") ? [(size.w / 2 + 2 * sp.label) / len] : [];
+      for (const t of [...nearPort, 0.5, 0.3, 0.7, 0.15, 0.85]) {
         const r = rectAt(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
         // keep the label inside the segment's extent
         if (
@@ -1310,19 +1350,24 @@ function routeEdges(ctx: RouteContext): Pick<ChartLayout, "edges" | "initials" |
       if (chosen) break;
     }
     if (!chosen) {
-      // step aside from the preferred segment, closest first
-      const [a, b] = segs[prefer]!;
-      const horizontal = Math.abs(a.y - b.y) < 0.01;
-      const mx = (a.x + b.x) / 2;
-      const my = (a.y + b.y) / 2;
-      const step = (horizontal ? size.h : size.w) + 4;
-      for (const k of [1, -1, 2, -2, 3, -3]) {
-        const r = horizontal ? rectAt(mx, my + k * step * 0.6) : rectAt(mx + k * step * 0.6, my);
-        if (free(inflate(r, 2))) {
-          chosen = r;
-          break;
+      // step aside from a segment, closest first: the preferred one, then the others
+      const mid = (i: number) => {
+        const [a, b] = segs[i]!;
+        return { horizontal: Math.abs(a.y - b.y) < 0.01, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+      };
+      for (const i of order) {
+        const { horizontal, mx, my } = mid(i);
+        const step = (horizontal ? size.h : size.w) + 4;
+        for (const k of [1, -1, 2, -2, 3, -3, 4, -4, 5, -5]) {
+          const r = horizontal ? rectAt(mx, my + k * step * 0.6) : rectAt(mx + k * step * 0.6, my);
+          if (free(inflate(r, 2))) {
+            chosen = r;
+            break;
+          }
         }
+        if (chosen) break;
       }
+      const { mx, my } = mid(prefer);
       chosen ??= rectAt(mx, my);
     }
     placed.push(chosen);

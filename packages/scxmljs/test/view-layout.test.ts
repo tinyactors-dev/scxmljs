@@ -159,7 +159,27 @@ describe("layoutChart", async () => {
         const mid = direction === "down" ? loop.label!.x + loop.label!.w / 2 : loop.label!.y + loop.label!.h / 2;
         expect(mid).toBeGreaterThan(lo!);
         expect(mid).toBeLessThan(hi!);
+        // the last mile: an edge to the next layer whose ports can line up runs straight, no jog
+        for (const e of others) expect(e.points).toHaveLength(2);
       });
+
+  test("the last mile: ports on the arriving side line up with where their edges come from", async () => {
+    const m = await load(`<scxml ${NS} initial="a">
+      <state id="a"><transition event="x" target="b"/><transition event="y" target="c"/></state>
+      <state id="b"><transition event="z" target="c"/></state><state id="c"/></scxml>`);
+    for (const direction of ["down", "right"] as const) {
+      const l = lay(m, direction);
+      check(l);
+      const edge = (from: string, to: string) => l.edges.find((e) => e.from.id === from && e.to.id === to)!;
+      // to the next layer: one straight line
+      expect(edge("a", "b").points).toHaveLength(2);
+      expect(edge("b", "c").points).toHaveLength(2);
+      // past a layer: the arrow comes in level with the corridor, no jog before the arrowhead
+      const across = (p: { x: number; y: number }) => (direction === "down" ? p.x : p.y);
+      const ac = edge("a", "c").points;
+      expect(across(ac.at(-1)!)).toBeCloseTo(across(ac.at(-2)!), 5);
+    }
+  });
 });
 
 describe("layoutChart: space", () => {

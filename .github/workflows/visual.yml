@@ -1,0 +1,32 @@
+# New screenshot baselines, rendered where CI renders them: "Run workflow" on a branch runs
+# scripts/visual.sh --update-snapshots (the pinned Playwright image, with the network the pages'
+# web fonts need) and commits the baselines that changed to that branch. Look at them before
+# merging (CLAUDE.md: look at changed baselines before accepting them).
+name: visual
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: visual-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/visual.sh --update-snapshots
+        env:
+          SCXML_VISUAL_REQUIRED: "1"
+      - name: commit changed baselines
+        run: |
+          git add tests/browser/specs/__screenshots__
+          if git diff --cached --quiet; then
+            echo "baselines unchanged"
+            exit 0
+          fi
+          git diff --cached --stat
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test(visual): baselines rendered on CI"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

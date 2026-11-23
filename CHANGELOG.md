@@ -18,6 +18,18 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
+### Fixed
+
+- `<scxml-view>`: a transition from a state to itself is drawn as a loop with its own place on the
+  box's side, beside the box's other edges. Before, the loop ran on top of the edges leaving the
+  same side, and its label could land on another edge's label.
+- `<scxml-view>`: edges run straight into their target where they can, instead of ending in a
+  short sideways step just before the arrowhead (about half the bends in top-to-bottom layouts,
+  a sixth in left-to-right ones). Labels sit closer to the state they leave, and a label no
+  longer covers a state when the diagram is crowded.
+
 ## [0.2.0] - 2026-11-17
 
 ### Added
@@ -173,6 +185,7 @@ The first release.
   violations), in Node, Bun and Deno from the packed tarball, and with React 19, Vue 3,
   Svelte 5 and Angular 22 apps; see [docs/bundling.md](docs/bundling.md#support).
 
-[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.3.0
 [0.2.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.2.0
 [0.1.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.1.0

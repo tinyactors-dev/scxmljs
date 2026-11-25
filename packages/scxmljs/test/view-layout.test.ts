@@ -135,6 +135,39 @@ describe("layoutChart", async () => {
 
   // the retry loop on the website: the self loop's ports sat on top of the forward edges' and its
   // label, given no room, was dropped onto "charged"
+  test("a cycle through the initial state is drawn from it, however much weight runs back", async () => {
+    // two ways back to the cart (declined, gave up) against one way out (checkout): the
+    // initial `cart` still comes first, and the ways back are the reversed edges
+    const m = await load(`<scxml ${NS} initial="cart">
+      <state id="cart"><transition event="checkout" target="paying"/></state>
+      <state id="paying">
+        <transition event="charged" target="paid"/>
+        <transition event="declined" target="cart"/>
+        <transition event="error.communication" cond="attempts &lt; 3" target="retrying"/>
+        <transition event="error.communication" target="cart"/>
+      </state>
+      <state id="retrying"><transition event="retry" target="paying"/></state>
+      <final id="paid"/></scxml>`);
+    for (const direction of ["down", "right"] as const) {
+      const l = lay(m, direction);
+      check(l);
+      const at = (id: string) => {
+        const r = l.boxes.find((b) => b.node.id === id)!.rect;
+        return direction === "down" ? r.y : r.x;
+      };
+      expect(at("cart")).toBeLessThan(at("paying"));
+      expect(at("paying")).toBeLessThan(at("retrying"));
+      expect(at("paying")).toBeLessThan(at("paid"));
+      const kind = (from: string, to: string, event: string) =>
+        l.edges.find(
+          (e) => e.transition.source.id === from && e.transition.events.includes(event) && e.transition.targets.some((t) => t.id === to),
+        )!.kind;
+      expect(kind("cart", "paying", "checkout")).toBe("forward");
+      expect(kind("paying", "cart", "declined")).toBe("back");
+      expect(kind("retrying", "paying", "retry")).toBe("back");
+    }
+  });
+
   for (const direction of ["down", "right"] as const)
     for (const retry of ["timeout", "timeout.after.a.while.so.try.charging.the.card.once.more"])
       test(`self loop beside forward edges (${direction}, ${retry.length > 10 ? "wider than the box" : "short"} label)`, async () => {

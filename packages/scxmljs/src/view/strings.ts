@@ -41,6 +41,26 @@ export interface ViewStrings {
   noDescription: string;
   /** Heading of the list of a state's transitions in its help popover. */
   helpTransitions: string;
+  /** Accessible name of the panel listing what the stand-in for an I/O processor `type` received. */
+  standInLabel: (type: string) => string;
+  /** How many messages a stand-in received (the count's accessible name and tooltip). */
+  received: (n: number) => string;
+  /** A stand-in that has received nothing yet. */
+  nothingReceived: string;
+  /** Title of the panel of the chart's variables (the `variables` attribute). */
+  variablesLabel: string;
+  /** Accessible name of the bar of preset sends (the `sends` attribute) and the restart button. */
+  runLabel: string;
+  /** The restart button: run the chart again, in a fresh session. */
+  restart: string;
+  /** The hint when a plain wheel meets the diagram (it scrolls the page); `key` is "Ctrl" or "⌘". */
+  hintWheel: (key: string) => string;
+  /** The hint when one finger moves over the diagram (it scrolls the page). */
+  hintTouch: string;
+  /** A transition's target in a state's help popover: a link that flies the view to that state. */
+  goTo: (state: string) => string;
+  /** The diamond before a transition's condition in a state's help popover. */
+  condition: string;
   /** Button that zooms in. */
   zoomIn: string;
   /** Button that zooms out. */
@@ -122,6 +142,16 @@ export const defaultViewStrings: ViewStrings = {
   helpLabel: (name) => `About ${name}`,
   noDescription: "No description: document a state with an XML comment right before it, or set the view's descriptions property.",
   helpTransitions: "Transitions",
+  standInLabel: (type) => `What ${type} received`,
+  received: (n) => (n === 1 ? "1 message received" : `${n} messages received`),
+  nothingReceived: "Nothing yet",
+  variablesLabel: "Variables",
+  runLabel: "Run the chart",
+  restart: "Restart (a fresh session)",
+  hintWheel: (key) => `${key} + scroll to zoom`,
+  hintTouch: "Use two fingers to move the diagram",
+  goTo: (state) => `Go to ${state}`,
+  condition: "Condition",
   zoomIn: "Zoom in (+)",
   zoomOut: "Zoom out (−)",
   zoomReset: "Fit to width (0)",

@@ -24,7 +24,10 @@
  * ("all" | "sends" | "off"), `fit` (scale down to the element's width),
  * `warnings` ("off" hides the list of authoring warnings — see `model.warnings`),
  * `event-data` (JSON object from event names to the data a label click sends,
- * e.g. `{"login": {"user": "ada"}}`).
+ * e.g. `{"login": {"user": "ada"}}`), `variables` (list the chart's variables
+ * under the diagram), `sends` (JSON array of `{event, data?, label?}`: buttons
+ * that send those events). A chart that sends to an I/O processor nobody
+ * handles (`<send type="payments">`) gets a stand-in that lists what it received.
  *
  * Properties: `session` (a host-created session; the element then creates,
  * starts and disposes nothing), `options` (extra SessionOptions for sessions
@@ -49,7 +52,8 @@
  * `history` `collapsed` `active`), `state-name`, `transition` / `edge-label`
  * (+ `live` `fired`), `event`, `cond`, `internal`, `edge` (+ `live` `fired`),
  * `initial`, `expand`, `collapse`, `help`, `help-popover`, `zoom`, `notice`,
- * `error`, `controls`, `play`, `step`, `speeds`, `clock`, `warnings`, `warning`.
+ * `error`, `controls`, `play`, `step`, `speeds`, `clock`, `warnings`, `warning`,
+ * `run`, `preset-send`, `restart`, `panels`, `panel` (+ `variables` `stand-in`).
  */
 import { type Clock, PlaybackClock } from "../clock.ts";
 import type { DataModelFactory } from "../datamodel-base.ts";
@@ -58,11 +62,12 @@ import { parseSCXML, SCXMLSession, type SessionOptions } from "../session.ts";
 import type { MicrostepEvent } from "../session-events.ts";
 import { Announcer } from "../ui/announcer.ts";
 import * as icons from "../ui/icons.ts";
-import { eventName, NOTATION_CSS } from "../ui/notation.ts";
+import { eventName, glyph, NOTATION_CSS } from "../ui/notation.ts";
 import { arrowMarker, icon } from "../ui/svg.ts";
 import { lazySheet, NARROW_WIDTH, themeSheet } from "../ui/theme.ts";
 import { reflow, sourceDescription } from "./describe.ts";
 import { autoCollapse, type ChartLayout, type Direction, layoutChart, portalTransitions, type Size } from "./layout.ts";
+import { type StandIn, standIn, unhandledSendTypes, variablesPanel } from "./panels.ts";
 import { defaultViewStrings, type ViewStateKind, type ViewStrings } from "./strings.ts";
 import { VIEW_CSS } from "./styles.ts";
 
@@ -123,6 +128,13 @@ const PAN_KEEP = 48;
 /** The arrow keys pan by this much (px), with Shift by PAN_PAGE. */
 const PAN_STEP = 40;
 const PAN_PAGE = 240;
+/** How long flying to a state takes (ms), and how long it stays marked after (ms). */
+const JOURNEY_MS = 650;
+const VISITED_MS = 1400;
+/** How long a gesture hint stays after the gesture stops (ms). */
+const HINT_MS = 1400;
+/** Apple's keyboards zoom with ⌘, the others with Ctrl. */
+const MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 /** How long revealing the active states glides (ms). */
 const GLIDE_MS = 250;
 const FIRED_MS = 900;
@@ -168,11 +180,27 @@ async function engine(trusted: boolean): Promise<DataModelFactory> {
  */
 export class ScxmlView extends ElementBase {
   /** Attributes the element reacts to. */
-  static observedAttributes = ["src", "trusted", "autostart", "interactive", "data", "direction", "max-states", "fit", "warnings"];
+  static observedAttributes = [
+    "src",
+    "trusted",
+    "autostart",
+    "interactive",
+    "data",
+    "direction",
+    "max-states",
+    "fit",
+    "warnings",
+    "variables",
+    "sends",
+  ];
 
   #shadow!: ShadowRoot;
   #el!: {
+    hint: HTMLElement;
     frame: HTMLElement;
+    run: HTMLElement;
+    restart: HTMLButtonElement;
+    panels: HTMLElement;
     controls: HTMLElement;
     play: HTMLButtonElement;
     step: HTMLButtonElement;
@@ -199,6 +227,9 @@ export class ScxmlView extends ElementBase {
   #model?: Model;
   #source?: string;
   #options: ViewOptions = {};
+  /** Stand-ins for the I/O processors the chart sends to and nobody handles (sessions the element creates). */
+  #standIns: StandIn[] = [];
+  #variables?: ReturnType<typeof variablesPanel>;
   #clock?: Clock;
   #strings: ViewStrings = defaultViewStrings;
   #descriptions?: ViewDescriptions;
@@ -462,6 +493,10 @@ export class ScxmlView extends ElementBase {
         this.#foldsFor = undefined;
         this.#relayout();
         break;
+      case "variables":
+      case "sends":
+        this.#renderPanels();
+        break;
       default:
         this.#relayout();
     }
@@ -503,7 +538,13 @@ export class ScxmlView extends ElementBase {
       const datamodel = opts.datamodel ?? (await engine(this.trusted));
       if (generation !== this.#generation) return;
       const data = { ...this.#dataAttribute(), ...opts.data };
-      const session = new SCXMLSession(model, { ...opts, loader, datamodel, data, clock: this.#clock });
+      // a send to a processor nobody handles would fail in the view: a stand-in keeps it, and the panel shows it
+      let session: SCXMLSession | undefined;
+      const now = () => session?.clock.now() ?? 0;
+      const standIns = unhandledSendTypes(root, opts.ioprocessors ?? []).map((type) => standIn(type, this.#strings, now));
+      const ioprocessors = [...(opts.ioprocessors ?? []), ...standIns.map((s) => s.processor)];
+      session = new SCXMLSession(model, { ...opts, ioprocessors, loader, datamodel, data, clock: this.#clock });
+      this.#standIns = standIns;
       this.#attach(session, true);
       this.#emit<ViewLoadDetail>("scxml-load", { session, model });
       if (this.autostart) session.start();
@@ -548,6 +589,9 @@ export class ScxmlView extends ElementBase {
   #attach(session: SCXMLSession, owned: boolean) {
     this.#session = session;
     this.#owned = owned;
+    if (!owned) this.#standIns = []; // a host's session: the host handles its processors
+    for (const s of this.#standIns) s.restart();
+    this.#renderPanels();
     this.#model = session.model;
     this.#fired.clear();
     this.#steps = 0;
@@ -583,6 +627,7 @@ export class ScxmlView extends ElementBase {
 
   #teardownSession() {
     for (const f of this.#unwire.splice(0)) f();
+    this.#variables?.watch(undefined);
     cancelAnimationFrame(this.#decayRaf);
     if (this.#owned) this.#session?.dispose();
     this.#session = undefined;
@@ -741,12 +786,21 @@ export class ScxmlView extends ElementBase {
     );
     const nav = h("div", { class: "nav", hidden: "" }, zoom, fit);
     const help = h("div", { class: "help-popover", part: "help-popover", role: "dialog", tabindex: "-1", id: "help-popover", hidden: "" });
-    const viewport = h("div", { class: "viewport" }, canvas, controls, nav, help);
+    const hint = h("div", { class: "hint", part: "hint", "aria-hidden": "true", hidden: "" });
+    const viewport = h("div", { class: "viewport" }, canvas, hint, controls, nav, help);
     const live = h("div", { class: "sr-only", role: "status", "aria-live": "polite", "aria-atomic": "true" });
-    const frame = h("div", { class: "frame", part: "frame" }, notice, sendStatus, warnings, error, viewport, live);
+    // under the diagram, for a chart run as a demo (#renderPanels)
+    const restart = iconButton("restart", "restart", t.restart, icon(icons.rotateCcw, 16), () => this.reload());
+    const run = h("div", { class: "run", part: "run", role: "group", "aria-label": t.runLabel, hidden: "" });
+    const panels = h("div", { class: "panels", part: "panels", hidden: "" });
+    const frame = h("div", { class: "frame", part: "frame" }, notice, sendStatus, warnings, error, viewport, run, panels, live);
     this.#shadow.append(frame);
     this.#el = {
+      hint,
       frame,
+      run,
+      restart,
+      panels,
       controls,
       play,
       step,
@@ -791,8 +845,9 @@ export class ScxmlView extends ElementBase {
     canvas.addEventListener(
       "wheel",
       (e) => {
-        // a plain wheel scrolls the page; pinch-zoom on a trackpad arrives as a wheel event with ctrlKey
-        if (!(e.ctrlKey || e.metaKey) || !this.#layout) return;
+        // a plain wheel scrolls the page (with a hint how to zoom); a trackpad pinch arrives as a wheel event with ctrlKey
+        if (!this.#layout) return;
+        if (!(e.ctrlKey || e.metaKey)) return this.#hint(this.#strings.hintWheel(MAC ? "⌘" : "Ctrl"));
         e.preventDefault();
         this.#takeOver();
         // a wheel notch (~100px) zooms by about a fifth; a pinch sends many small deltas
@@ -846,6 +901,13 @@ export class ScxmlView extends ElementBase {
     };
     canvas.addEventListener("pointerup", end);
     canvas.addEventListener("pointercancel", end);
+    // a double click zooms in on the spot, or back to fit (as a double tap does)
+    canvas.addEventListener("dblclick", (e) => {
+      const target = e.composedPath()[0] as Element;
+      if (target?.closest?.("button, a, input, select, textarea, summary") || !this.#layout) return;
+      e.preventDefault();
+      this.#zoomToggle({ x: e.clientX, y: e.clientY });
+    });
     help.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
@@ -891,7 +953,8 @@ export class ScxmlView extends ElementBase {
           const t = e.touches[0]!;
           if (!start.moved && Math.abs(t.clientX - start.x) + Math.abs(t.clientY - start.y) > 8) {
             start.moved = true;
-            // one finger scrolls the page, not the diagram: nothing to take over
+            // one finger scrolls the page, not the diagram: say how to move it
+            this.#hint(this.#strings.hintTouch);
           }
         }
         if (!pinch || e.touches.length !== 2) return;
@@ -916,9 +979,7 @@ export class ScxmlView extends ElementBase {
       if (tap && now - tap.at < DOUBLE_TAP_MS && Math.hypot(s0.x - tap.x, s0.y - tap.y) < 30) {
         tap = undefined;
         e.preventDefault();
-        const anchor = { x: s0.x, y: s0.y };
-        if (this.#zoom != null && this.#zoom > this.#fitScale() + 0.01) this.#zoomTo(null);
-        else this.#zoomTo(Math.max(1, this.#scale * 2), anchor);
+        this.#zoomToggle({ x: s0.x, y: s0.y });
       } else tap = { x: s0.x, y: s0.y, at: now };
     };
     canvas.addEventListener("touchend", end, { passive: false });
@@ -927,13 +988,66 @@ export class ScxmlView extends ElementBase {
     canvas.addEventListener("gesturestart", (e) => e.preventDefault());
   }
 
+  /** A double tap or click: zoom in on `anchor`, or, when zoomed in already, back to fit (like Photos). */
+  #zoomToggle(anchor: { x: number; y: number }) {
+    if (this.#zoom != null && this.#zoom > this.#fitScale() + 0.01) this.#zoomTo(null);
+    else this.#zoomTo(Math.max(1, this.#scale * 2), anchor);
+  }
+
+  #hintTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * A short hint over the diagram, for a gesture the canvas leaves to the page (a plain wheel, one
+   * finger): how to zoom or move it instead, as an embedded map says. It stays while the gesture
+   * goes on and fades HINT_MS after it stops; it takes no pointer, and the live region is not told
+   * (a keyboard or screen-reader user has `+` `-` `0` and the arrow keys).
+   */
+  #hint(text: string) {
+    const hint = this.#el.hint;
+    if (hint.textContent !== text) hint.textContent = text;
+    hint.hidden = false;
+    hint.classList.add("shown");
+    clearTimeout(this.#hintTimer);
+    this.#hintTimer = setTimeout(() => {
+      hint.classList.remove("shown");
+      this.#hintTimer = setTimeout(() => (hint.hidden = true), 200);
+    }, HINT_MS);
+  }
+
   /** The automatic scale (what "fit" goes back to). */
   #fitScale(): number {
+    return this.#autoScale();
+  }
+
+  /**
+   * The automatic scale. A diagram wider than the element is scaled down: with `fit` all the way
+   * to the element's width, otherwise no further than `--scxml-min-scale` (default 0.65, so labels
+   * stay legible), and you pan to the rest. A smaller one grows up to `--scxml-max-scale` (default
+   * 1: actual size), as far as the element's width allows, and its height when it has one
+   * (`--scxml-height`), so a small chart fills its frame instead of sitting in a corner.
+   */
+  #autoScale(): number {
     const layout = this.#layout;
-    const available = this.#el.canvas.clientWidth - 2 * MARGIN;
-    if (!layout || !(available > 0) || available >= layout.width) return 1;
-    const floor = this.fit ? 0 : this.#minScale();
-    return Math.min(1, Math.max(floor, available / layout.width));
+    const canvas = this.#el.canvas;
+    const available = canvas.clientWidth - 2 * MARGIN;
+    if (!layout || !(available > 0) || !(layout.width > 0)) return 1;
+    if (available < layout.width) {
+      const floor = this.fit ? 0 : this.#minScale();
+      return Math.min(1, Math.max(floor, available / layout.width));
+    }
+    const raw = Number.parseFloat(getComputedStyle(this).getPropertyValue("--scxml-max-scale"));
+    const ceiling = Number.isFinite(raw) ? Math.min(MAX_ZOOM, Math.max(1, raw)) : 1;
+    if (ceiling <= 1) return 1;
+    let scale = Math.min(ceiling, available / layout.width);
+    // a frame of a set height (--scxml-height): grow no taller than the room it leaves the drawing
+    const limit = Number.parseFloat(getComputedStyle(this.#el.frame).maxHeight);
+    if (Number.isFinite(limit) && layout.height > 0) {
+      const chrome = this.#el.frame.getBoundingClientRect().height - canvas.clientHeight;
+      const padding = Number.parseFloat(getComputedStyle(canvas).paddingBottom) || 0;
+      const room = limit - Math.max(0, chrome) - padding - 2 * MARGIN;
+      if (room > 0) scale = Math.min(scale, room / layout.height);
+    }
+    return Math.max(1, scale);
   }
 
   /**
@@ -1065,6 +1179,94 @@ export class ScxmlView extends ElementBase {
 
   #glideTimer: ReturnType<typeof setTimeout> | undefined;
 
+  #journeyRaf = 0;
+
+  /**
+   * Fly the view to `state` (a target in a help popover): the diagram point at the canvas's middle
+   * travels to the state's centre while the scale dips when the trip is long, so both ends pass
+   * through view (a map's "fly to"), then the state is marked for a moment and its help opens.
+   * With reduced motion, or no layout yet, it jumps. A state inside a folded container flies to
+   * the folded box. The view is the user's from then on ("fit" goes back).
+   */
+  #journey(state: StateNode) {
+    const layout = this.#layout;
+    const canvas = this.#el.canvas;
+    let node: StateNode | null = state;
+    let target = layout?.boxes.find((b) => b.node === node);
+    while (layout && !target && node?.parent) {
+      node = node.parent;
+      target = layout.boxes.find((b) => b.node === node);
+    }
+    if (!layout || !target || !node) return;
+    const arrive = node;
+    this.#closeHelp(false);
+    this.#takeOver();
+    cancelAnimationFrame(this.#journeyRaf);
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
+    const s0 = this.#scale;
+    // the end: the state at the same scale, unless it's larger than the canvas, then as large as fits
+    const room = Math.min((cw - 2 * MARGIN) / target.rect.w, (ch - 2 * MARGIN) / target.rect.h);
+    const s1 = Math.max(MIN_ZOOM, Math.min(s0, room > 0 ? room : s0));
+    const middle = (s: number) => ({ x: (cw / 2 - MARGIN - this.#pan.x) / s, y: (ch / 2 - MARGIN - this.#pan.y) / s });
+    const c0 = middle(s0);
+    const c1 = { x: target.rect.x + target.rect.w / 2, y: target.rect.y + target.rect.h / 2 };
+    // the longer the trip (in screens), the further the scale dips halfway, so both ends pass through view
+    const trip = Math.hypot((c1.x - c0.x) * s0, (c1.y - c0.y) * s0) / Math.max(1, Math.hypot(cw, ch));
+    const dip = Math.min(0.6, Math.max(0, (trip - 0.4) * 0.5));
+    const at = (c: { x: number; y: number }, s: number) => ({ x: cw / 2 - MARGIN - c.x * s, y: ch / 2 - MARGIN - c.y * s });
+    const wasZoom = this.#zoom;
+    const freeze = () => {
+      // like zooming by hand: the canvas keeps its height while the drawing moves inside it
+      if (this.#zoom == null && ch > 0) canvas.style.setProperty("height", `${ch}px`);
+    };
+    const place = (c: { x: number; y: number }, s: number) => {
+      if (Math.abs(s - this.#scale) > 1e-6) {
+        freeze();
+        this.#zoom = s;
+        this.#applyFit();
+      }
+      const p = at(c, this.#scale);
+      this.#panTo(p.x, p.y);
+    };
+    const done = () => {
+      // back to the automatic scale when the trip ended at it
+      if (wasZoom == null && Math.abs(s1 - this.#autoScale()) < 1e-6 && this.#zoom != null) {
+        this.#zoom = null;
+        canvas.style.removeProperty("height");
+        this.#applyFit();
+        const p = at(c1, this.#scale);
+        this.#panTo(p.x, p.y);
+      }
+      this.#syncFit();
+      const box = this.#boxes.get(arrive);
+      if (box) {
+        box.classList.remove("visited");
+        void box.offsetWidth; // restart the animation
+        box.classList.add("visited");
+        setTimeout(() => box.classList.remove("visited"), VISITED_MS);
+        const help = box.querySelector<HTMLElement>("button.help");
+        if (help) this.#openHelp(arrive, help);
+      }
+    };
+    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || typeof requestAnimationFrame === "undefined") {
+      place(c1, s1);
+      return done();
+    }
+    const start = performance.now();
+    const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+    const frame = (time: number) => {
+      const t = Math.min(1, (time - start) / JOURNEY_MS);
+      const e = ease(t);
+      const s = (s0 + (s1 - s0) * e) * (1 - dip * Math.sin(Math.PI * t));
+      place({ x: c0.x + (c1.x - c0.x) * e, y: c0.y + (c1.y - c0.y) * e }, s);
+      if (t < 1) this.#journeyRaf = requestAnimationFrame(frame);
+      else done();
+    };
+    this.#journeyRaf = requestAnimationFrame(frame);
+  }
+
   /** Open the help popover of `state` next to its button. */
   #openHelp(state: StateNode, button: HTMLElement) {
     const t = this.#strings;
@@ -1079,28 +1281,39 @@ export class ScxmlView extends ElementBase {
     const body = text
       ? h("div", { class: "help-text" }, ...reflow(text).map((para) => h("p", {}, para)))
       : h("p", { class: "help-none" }, t.noDescription);
+    // each transition in the diagram's notation: its events, its condition after the diamond, and
+    // its targets, each a link that flies the view there (#journey)
     const shown = state.transitions.filter((tr) => tr.element);
+    const row = (tr: TransitionNode) => {
+      const li = h("li", {});
+      const events = h("span", { class: "help-events" });
+      if (tr.events.length)
+        tr.events.forEach((ev, i) => {
+          if (i) events.append(" ");
+          events.append(eventName(ev));
+        });
+      else events.append(h("span", { class: "help-eventless" }, t.eventless));
+      li.append(events);
+      if (tr.cond)
+        li.append(h("span", { class: "help-cond", title: tr.cond }, glyph(icons.diamond, t.condition, true), truncate(tr.cond, 40)));
+      if (tr.targets.length) {
+        const to = h("span", { class: "help-to" }, h("span", { class: "arrow", "aria-hidden": "true" }, "→"));
+        tr.targets.forEach((target, i) => {
+          if (i) to.append(", ");
+          const go = h(
+            "button",
+            { type: "button", class: "go", part: "go", title: t.goTo(target.id), "aria-label": t.goTo(target.id) },
+            target.id,
+          );
+          go.addEventListener("click", () => this.#journey(target));
+          to.append(go);
+        });
+        li.append(to);
+      }
+      return li;
+    };
     const list = shown.length
-      ? [
-          h("div", { class: "help-sub" }, t.helpTransitions),
-          h(
-            "ul",
-            { class: "help-transitions" },
-            ...shown.map((tr) =>
-              h(
-                "li",
-                {},
-                [
-                  tr.events.join(" ") || t.eventless,
-                  tr.cond && `[${truncate(tr.cond, 40)}]`,
-                  tr.targets.length ? `→ ${tr.targets.map((s) => s.id).join(", ")}` : "",
-                ]
-                  .filter(Boolean)
-                  .join(" "),
-              ),
-            ),
-          ),
-        ]
+      ? [h("div", { class: "help-sub" }, t.helpTransitions), h("ul", { class: "help-transitions" }, ...shown.map(row))]
       : [];
     pop.replaceChildren(heading, body, ...list);
     pop.setAttribute("aria-label", t.helpLabel(name));
@@ -1488,17 +1701,67 @@ export class ScxmlView extends ElementBase {
     }
     el.setAttribute("aria-label", t.transitionLabel(tr.events.join(" ") || t.eventless, targets));
     el.title = [tr.events.join(" ") || t.eventless, tr.cond && `[${tr.cond}]`, targets && `→ ${targets}`].filter(Boolean).join(" ");
-    if (interactive)
-      el.addEventListener("click", () => {
-        const session = this.#session;
-        if (!session || !name) return;
-        const detail: ViewSendDetail = { session, name, data: this.#eventData(name) };
-        if (!this.#emit<ViewSendDetail>("scxml-send", detail, true)) return;
-        this.#watchOutcome(session, name);
-        session.send(name, detail.data);
-        if (this.announce !== "off") this.#say(t.announceSent(name), true);
-      });
+    if (interactive) el.addEventListener("click", () => name && this.#sendEvent(name));
     return el;
+  }
+
+  /**
+   * Send `name` as the reader did (a label, a preset send): `scxml-send` first (cancelable, its
+   * `detail.data` writable; it starts as `data`, else the `event-data` attribute's), then what came
+   * of it, and the live region says so.
+   */
+  #sendEvent(name: string, data: unknown = this.#eventData(name)) {
+    const session = this.#session;
+    if (!session) return;
+    const detail: ViewSendDetail = { session, name, data };
+    if (!this.#emit<ViewSendDetail>("scxml-send", detail, true)) return;
+    this.#watchOutcome(session, name);
+    session.send(name, detail.data);
+    if (this.announce !== "off") this.#say(this.#strings.announceSent(name), true);
+  }
+
+  /** The preset sends of the `sends` attribute: a JSON array of `{event, data?, label?}`. */
+  #presetSends(): { event: string; data?: unknown; label?: string }[] {
+    const raw = this.getAttribute("sends");
+    if (!raw) return [];
+    try {
+      const list = JSON.parse(raw) as unknown;
+      if (!Array.isArray(list)) throw new Error("not an array");
+      return list.filter((s): s is { event: string; data?: unknown; label?: string } => typeof s?.event === "string" && !!s.event);
+    } catch {
+      console.warn(`scxml-view: the sends attribute is not a JSON array of {event, data, label}: ${raw}`);
+      return [];
+    }
+  }
+
+  /**
+   * Under the diagram, when the page asks for them or the chart needs them: the run bar (preset
+   * sends, then restart at its outer edge) and the panels (the variables, then a stand-in for each
+   * processor nobody handles).
+   */
+  #renderPanels() {
+    const e = this.#el;
+    if (!e) return;
+    const t = this.#strings;
+    const session = this.#session;
+    const showVariables = this.hasAttribute("variables") && this.getAttribute("variables") !== "false";
+    if (showVariables) this.#variables ??= variablesPanel(t);
+    this.#variables?.watch(showVariables ? session : undefined);
+    const panels = [...(showVariables && this.#variables ? [this.#variables.panel] : []), ...this.#standIns.map((s) => s.panel)];
+    e.panels.replaceChildren(...panels);
+    e.panels.hidden = !panels.length;
+    const sends = this.#presetSends().map(({ event, data, label }) => {
+      const b = h(
+        "button",
+        { type: "button", class: "chip ev-chip live preset", part: "preset-send", title: event },
+        label ? label : eventName(event),
+      );
+      b.addEventListener("click", () => this.#sendEvent(event, data === undefined ? this.#eventData(event) : data));
+      return b;
+    });
+    const restart = this.#owned && session && (sends.length || panels.length);
+    e.run.replaceChildren(...sends, ...(restart ? [e.restart] : []));
+    e.run.hidden = !sends.length && !restart;
   }
 
   #measure(s: StateNode, collapsed: boolean): Size {
@@ -1572,22 +1835,11 @@ export class ScxmlView extends ElementBase {
     box.hidden = false;
   }
 
-  /**
-   * A diagram wider than the element is scaled down: with `fit` all the way to the element's
-   * width, otherwise no further than `--scxml-min-scale` (default 0.65, so labels stay legible),
-   * and you pan to the rest. `--scxml-min-scale: 1` turns the automatic scaling off.
-   */
+  /** Scale the drawing: the explicit zoom, or the automatic scale (#autoScale). */
   #applyFit() {
     const d = this.#el.diagram;
     const layout = this.#layout;
-    const available = this.#el.canvas.clientWidth - 2 * MARGIN;
-    let scale = 1;
-    if (this.#zoom != null) scale = this.#zoom;
-    else if (layout && available > 0 && available < layout.width) {
-      const raw = Number.parseFloat(getComputedStyle(this).getPropertyValue("--scxml-min-scale"));
-      const floor = this.fit ? 0 : Number.isFinite(raw) ? Math.min(1, Math.max(0.1, raw)) : DEFAULT_MIN_SCALE;
-      scale = Math.min(1, Math.max(floor, available / layout.width));
-    }
+    const scale = this.#zoom ?? this.#autoScale();
     this.#scale = scale;
     this.#el.canvas.classList.toggle("zoomed", this.#zoom != null);
     const level = this.#strings.zoomLevel(Math.round(scale * 100));

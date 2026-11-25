@@ -446,7 +446,12 @@ describe("<scxml-view>", () => {
     expect(pop.hidden).toBe(false);
     expect(help.getAttribute("aria-expanded")).toBe("true");
     expect(pop.querySelector(".help-text")?.textContent).toBe("The customer is still choosing.");
-    expect(pop.querySelector(".help-transitions")?.textContent).toBe("checkout → pay");
+    // each transition in notation: the event, then its target, a link
+    const row = pop.querySelector(".help-transitions li")!;
+    expect(row.querySelector(".help-events")?.textContent).toBe("checkout");
+    const go = row.querySelector<HTMLButtonElement>("button.go")!;
+    expect(go.textContent).toBe("pay");
+    expect(go.getAttribute("aria-label")).toBe("Go to pay");
     pop.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(pop.hidden).toBe(true);
     expect(root.activeElement).toBe(help);
@@ -552,6 +557,15 @@ describe("<scxml-view>", () => {
     expect(fire("WheelEvent", "wheel", { deltaY: 40 })).toBe(true);
     expect(fit.hidden).toBe(true);
     expect(pan()).toBe("0 0");
+    // …but a hint says how to zoom (happy-dom's navigator is no Mac's)
+    const hint = root.querySelector<HTMLElement>(".hint")!;
+    expect(hint.hidden).toBe(false);
+    expect(hint.textContent).toBe("Ctrl + scroll to zoom");
+    // a double click zooms in on the spot, another goes back to fit
+    fire("MouseEvent", "dblclick", { clientX: 20, clientY: 20 });
+    expect(el.zoom).toBe(2);
+    fire("MouseEvent", "dblclick", { clientX: 20, clientY: 20 });
+    expect(el.zoom).toBe(1);
     // Ctrl + wheel zooms
     fire("WheelEvent", "wheel", { deltaY: -100, ctrlKey: true, clientX: 5, clientY: 5 });
     expect(el.zoom).toBeGreaterThan(1.1);
@@ -593,6 +607,7 @@ describe("<scxml-view>", () => {
     fire("TouchEvent", "touchend", { touches: [], changedTouches: [touch(20, 60)] });
     expect(fit.hidden).toBe(true);
     expect(pan()).toBe("0 0");
+    expect(hint.textContent).toBe("Use two fingers to move the diagram");
     // two fingers moving together pan (the page doesn't scroll), the scale stays
     fire("TouchEvent", "touchstart", { touches: [touch(10, 10, 1), touch(50, 10, 2)] });
     expect(fire("TouchEvent", "touchmove", { touches: [touch(30, 40, 1), touch(70, 40, 2)] })).toBe(false);
@@ -606,6 +621,95 @@ describe("<scxml-view>", () => {
     fire("TouchEvent", "touchend", { touches: [] });
     expect(el.zoom).toBe(2);
     el.remove();
+  });
+
+  test("a help popover's targets fly the view to that state, mark it and open its help", async () => {
+    const { el, root } = await mount({ trusted: "" }, LIGHT);
+    const states = el.model!.states;
+    const from = states.find((st) => st.transitions.some((tr) => tr.targets.length && tr.element))!;
+    const tr = from.transitions.find((x) => x.targets.length && x.element)!;
+    const to = tr.targets[0]!;
+    box(root, from.id).querySelector<HTMLButtonElement>("button.help")!.click();
+    const pop = root.querySelector<HTMLElement>(".help-popover")!;
+    const go = [...pop.querySelectorAll<HTMLButtonElement>("button.go")].find((b) => b.textContent === to.id)!;
+    go.click();
+    expect(pop.hidden).toBe(true); // it closes while the view flies
+    await new Promise((r) => setTimeout(r, 900));
+    await frame();
+    expect(box(root, to.id).classList.contains("visited")).toBe(true);
+    expect(pop.hidden).toBe(false);
+    expect(pop.querySelector(".help-head strong")?.textContent).toBe(to.id);
+    // the view is the user's now: "fit" goes back
+    expect(root.querySelector<HTMLButtonElement>(".zoom-reset")!.hidden).toBe(false);
+    el.remove();
+  });
+
+  test("a chart run as a demo: stand-ins for unhandled processors, the variables, preset sends and restart", async () => {
+    const ORDER = `<scxml ${NS} name="order" initial="cart">
+      <datamodel><data id="total" expr="0"/></datamodel>
+      <state id="cart">
+        <transition event="add"><assign location="total" expr="total + _event.data.price"/></transition>
+        <transition event="checkout" target="paying"/>
+      </state>
+      <state id="paying">
+        <onentry><send type="payments" event="charge"><param name="amount" expr="total"/></send></onentry>
+        <transition event="charged" target="paid"/>
+      </state>
+      <final id="paid"/></scxml>`;
+    const sends = JSON.stringify([
+      { event: "add", data: { price: 30 }, label: "Add a notebook" },
+      { event: "add", data: { price: 12 } },
+    ]);
+    const { el, root } = await mount({ trusted: "", variables: "", sends }, ORDER);
+    const run = root.querySelector<HTMLElement>(".run")!;
+    const panels = root.querySelector<HTMLElement>(".panels")!;
+    expect(run.hidden).toBe(false);
+    expect(panels.hidden).toBe(false);
+    // the preset sends: their label, or the event's name; then restart, at the outer edge
+    const presets = [...run.querySelectorAll<HTMLButtonElement>(".preset")];
+    expect(presets.map((b) => b.textContent)).toEqual(["Add a notebook", "add"]);
+    expect(run.lastElementChild?.classList.contains("restart")).toBe(true);
+    // the variables, after each step
+    const variables = () => [...root.querySelectorAll(".variables dd")].map((d) => d.textContent);
+    expect(variables()).toEqual(["0"]);
+    presets[0]!.click();
+    presets[1]!.click();
+    await frame();
+    expect(variables()).toEqual(["42"]);
+    // a send to "payments", which nobody handles: its stand-in keeps it, instead of error.communication
+    const standIn = root.querySelector<HTMLElement>(".stand-in")!;
+    expect(standIn.getAttribute("aria-label")).toBe("What payments received");
+    expect(standIn.querySelector(".log")?.textContent).toBe("Nothing yet");
+    labelFor(root, "checkout").click();
+    await frame();
+    expect(standIn.querySelector(".count")?.getAttribute("aria-label")).toBe("1 message received");
+    expect(standIn.querySelector(".log li")?.textContent).toContain('{"amount":42}');
+    expect(el.session!.isActive("paying")).toBe(true);
+    // the reader plays the service: its reply's label
+    labelFor(root, "charged").click();
+    await frame();
+    expect(el.session!.status).toBe("done");
+    // restart: a fresh session, an empty stand-in
+    const first = el.session;
+    const reloaded = once<ViewLoadDetail>(el, "scxml-load");
+    root.querySelector<HTMLButtonElement>(".restart")!.click();
+    await reloaded;
+    await frame();
+    expect(el.session).not.toBe(first);
+    expect(variables()).toEqual(["0"]);
+    expect(root.querySelector(".stand-in .log")?.textContent).toBe("Nothing yet");
+    // turned off: the bar and the panel go; a processor the page gives takes the stand-in's place
+    el.removeAttribute("sends");
+    el.removeAttribute("variables");
+    expect(run.querySelector(".preset")).toBeNull();
+    expect(root.querySelectorAll(".panel").length).toBe(1);
+    el.remove();
+    const handled = await mount({ trusted: "" }, ORDER, (v) => {
+      v.options = { ioprocessors: [{ type: "payments", location: () => "payments", send() {} }] };
+    });
+    expect(handled.root.querySelector<HTMLElement>(".panels")!.hidden).toBe(true);
+    expect(handled.root.querySelector<HTMLElement>(".run")!.hidden).toBe(true);
+    handled.el.remove();
   });
 
   test("while playing untouched, the playback controls shrink to the play button; movement brings them back", async () => {

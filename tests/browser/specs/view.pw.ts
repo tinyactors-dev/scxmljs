@@ -114,6 +114,44 @@ test.describe("<scxml-view> layout", () => {
     await expect.poll(() => zoom(page)).toBe(1);
   });
 
+  test("a small chart grows up to --scxml-max-scale, held back by the element's width and its set height", async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 900 });
+    await page.goto("/fixtures/view.html");
+    await ready(page);
+    const view = page.locator("#inline");
+    const scale = () => view.evaluate((v) => (v as HTMLElement & { zoom: number }).zoom);
+    const small = `<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="a"><state id="a"><transition event="go" target="b"/></state><final id="b"/></scxml>`;
+    await page.evaluate((source) => {
+      const v = document.querySelector("#inline") as HTMLElement & { source: string };
+      v.style.width = "800px";
+      v.source = source;
+    }, small);
+    await expect(view.locator("[data-state=b]")).toHaveCount(1);
+    await expect.poll(scale).toBe(1); // the default: actual size
+    // like --scxml-min-scale, it's read when the element lays out or resizes
+    await view.evaluate((v) => {
+      (v as HTMLElement).style.setProperty("--scxml-max-scale", "1.5");
+      (v as HTMLElement).style.width = "801px";
+    });
+    await expect.poll(scale).toBe(1.5);
+    // the drawing's frame grows with it: nothing is cut off, nothing pans
+    const fits = () =>
+      view.evaluate((v) => {
+        const c = v.shadowRoot!.querySelector(".canvas")!.getBoundingClientRect();
+        const d = v.shadowRoot!.querySelector(".diagram")!.getBoundingClientRect();
+        return d.right <= c.right + 1 && d.bottom <= c.bottom + 1;
+      });
+    expect(await fits()).toBe(true);
+    // a set height taller than the chart but shorter than half again its size holds it back
+    await view.evaluate((v) => {
+      (v as HTMLElement).style.setProperty("--scxml-height", "260px");
+      (v as HTMLElement).style.width = "800px";
+    });
+    await expect.poll(scale).toBeLessThan(1.5);
+    expect(await scale()).toBeGreaterThan(1);
+    expect(await fits()).toBe(true);
+  });
+
   test("zoom with Ctrl + wheel around the pointer, pan by dragging, fold, and read a state's help", async ({ page }) => {
     await page.goto("/fixtures/view.html");
     await ready(page);

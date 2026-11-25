@@ -49,6 +49,7 @@ glyph has exactly one meaning, and both elements share them.
 | `list` / `network` | show the focus as a list / as a diagram | "List" / "Diagram" |
 | `funnel` | only active states | an "active" checkbox |
 | `play`, `pause`, `step-forward` | playback | "▶ Play", "Step ⏭" |
+| `rotate-ccw` | restart: run the chart again from the start, in a fresh session | "Run again" |
 | `chevron-down` / `chevron-right` | fold / unfold a container | |
 | `circle-help` | what a state is about (its description) | |
 | `scan`, `minus`, `plus` | fit, zoom out, zoom in | |

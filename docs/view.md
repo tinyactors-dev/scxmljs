@@ -70,6 +70,8 @@ from the page, it disposes the session it created.
 | `event-data` | | JSON object from event names to the data a click on that event's label sends, e.g. `{"login": {"user": "ada"}}`. Host code can also set `detail.data` in an `scxml-send` listener |
 | `announce` | `all` | what the live region reads out: `all` (steps and sent events), `sends`, or `off` |
 | `warnings` | `show` | `off` hides the list of authoring warnings above the diagram |
+| `variables` | absent | list the chart's variables under the diagram, after each step; see [running a chart as a demo](#running-a-chart-as-a-demo) |
+| `sends` | | JSON array of `{"event", "data", "label"}`: a button for each, under the diagram, that sends that event with that data (`label` is the button's text, the event's name without it), e.g. `[{"event": "add", "data": {"price": 12}, "label": "Add a pen"}]` |
 
 Changing `src`, `trusted`, `autostart` or `data` loads the chart again with a fresh session.
 
@@ -158,9 +160,11 @@ what's useful at the moment.
 - **Pan** in any direction, past the drawing's edges (some of it always stays in view): drag the
   diagram's background, or use the arrow keys while it has focus (with Shift, further). The
   diagram is a canvas, not a scrolling box: a plain scroll wheel, or a trackpad's two-finger
-  swipe, scrolls the page past it, as on an embedded map.
-- **Touch:** one finger scrolls the page, two fingers move the diagram: they pan it and
-  pinch-zoom it, the spot between them staying under them. A double tap zooms in on that spot,
+  swipe, scrolls the page past it, as on an embedded map, and a short hint over the diagram says
+  how to zoom instead ("Ctrl + scroll to zoom", ⌘ on a Mac). A double click zooms in on that
+  spot, and when you're zoomed in, back to fit.
+- **Touch:** one finger scrolls the page (a hint says "Use two fingers to move the diagram"), two
+  fingers move the diagram: they pan it and pinch-zoom it, the spot between them staying under them. A double tap zooms in on that spot,
   and when you're zoomed in, back to fit. Buttons are larger, and − and + give way to the
   gestures.
 - **Playback** (with a `PlaybackClock`): play or pause, Step (only while paused), the speed (one
@@ -186,8 +190,12 @@ focusing a chip outlines the target, and clicking it sends the event like any la
 ## Describing states
 
 Every state has a help button (a question mark) after its name. It opens a popover with the
-state's kind, its description and its transitions. The description is the XML comment right
-before the state:
+state's kind, its description and its transitions, in the diagram's notation: each event, its
+condition after a diamond, and its targets. A target is a link: it flies the view to that state
+(zooming out on the way when it's far), marks it for a moment and opens its help, so you can
+follow a flow from state to state. With reduced motion it jumps. The description is the XML
+comment right before the state, its lines joined into paragraphs (a blank line starts a new one,
+a list item keeps its line):
 
 <!-- doctest: scxml -->
 ```xml
@@ -227,6 +235,37 @@ When a chart has more boxes than `max-states`, the element folds the largest com
 single boxes, shows a notice, and keeps the active states visible. Unfold a box with its chevron,
 or everything with **Expand all** in the notice. See [large charts](large-charts.md).
 
+## Running a chart as a demo
+
+A chart on a page is often there to be tried: the reader sends it events, sees what it does
+with its data, and plays the services it talks to. The element does all of it without code:
+
+<!-- doctest: html files=order.scxml -->
+```html
+<scxml-view src="order.scxml" variables
+  sends='[{"event": "order.created", "data": {"id": 7}, "label": "Created, as #7"}]'>
+</scxml-view>
+```
+
+`order.scxml` sends `order.create` to an `api` processor and waits for `order.created`. The
+element lists the request under the diagram, in the `api` stand-in, and the button plays the
+service's answer, with the order's id the chart reads (`_event.data.id`).
+
+- **Stand-ins.** A chart that sends to an I/O processor nobody handles (`<send type="payments">`,
+  with no `payments` processor in `options.ioprocessors`) would fail each such send with
+  `error.communication`. The element gives it a stand-in instead, which keeps what it receives
+  and lists it under the diagram, newest first, with when it came and its data. The reader
+  plays the service by clicking its reply's label (`order.created`), or a preset send's button. Give a processor of that type in
+  `options.ioprocessors` and it replaces the stand-in.
+- **`variables`** lists the chart's variables (`session.snapshot()`) after each step.
+- **`sends`** puts a button for each preset event under the diagram: the same send as a label's
+  click (`scxml-send` first, then the live region), with the data you gave.
+- **Restart** (the `rotate-ccw` glyph) sits at the end of that bar whenever it shows, and runs
+  the chart again in a fresh session, as `reload()` does.
+
+None of it shows for a session the page hands the element (`session`): the page handles its
+processors itself.
+
 ## Keyboard and screen readers
 
 - Transition labels are buttons: Tab to them, Enter or Space sends the event.
@@ -250,7 +289,7 @@ The element uses the shared `--scxml-*` tokens and exposes these parts:
 | Part | Modifiers | |
 |---|---|---|
 | `frame` | | everything inside the element |
-| `canvas` | | the scrolling area |
+| `canvas` | | the area the diagram pans and zooms in |
 | `state` | `atomic` `compound` `parallel` `parallel-region` `final` `history` `collapsed` `active` `reached` | a state's box (`reached`: where a terminated session ended) |
 | `state-name` | | the name in a box |
 | `transition`, `edge-label` | `live` `fired` | a transition label (a button unless `interactive="false"`) |
@@ -259,7 +298,7 @@ The element uses the shared `--scxml-*` tokens and exposes these parts:
 | `edge` | `live` `fired` | an arrow |
 | `initial` | | the initial-state marker |
 | `expand`, `collapse` | | the fold toggle of a folded / an expanded container |
-| `help`, `help-popover` | | a state's help button, and the popover it opens |
+| `help`, `help-popover`, `go` | | a state's help button, the popover it opens, and a target in it (a link that flies the view there) |
 | `portal`, `target` | `live` `fired` | a transition listed in its source's box (with `transition`), and the target it names |
 | `empty` | | the hint shown while there's nothing to show |
 | `notice` | | the "large chart" notice |
@@ -268,6 +307,9 @@ The element uses the shared `--scxml-*` tokens and exposes these parts:
 | `warnings`, `warning` | | the authoring-warnings list and each item |
 | `controls`, `play`, `step`, `speeds`, `clock` | | the playback controls at the bottom left (with a `PlaybackClock`); `speeds` is one button that cycles |
 | `zoom`, `zoom-out`, `zoom-level`, `zoom-in`, `fit` | | the zoom controls at the bottom right: −, the level (sets 100%), +, and back to the automatic view |
+| `hint` | | the short hint over the diagram after a plain wheel or a one-finger swipe |
+| `run`, `preset-send`, `restart` | | the bar under the diagram: a button for each of `sends`, and restart |
+| `panels`, `panel` | `variables` `stand-in` | the panels under the bar: the variables, and what each stand-in received |
 
 `live` marks transitions whose source state is active, `fired` those that fired within the last
 second. `--scxml-height` caps the element's height (default: none). Details and examples are in

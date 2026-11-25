@@ -21,6 +21,41 @@ export const VIEW_CSS = /* css */ `
 .canvas.panning * { cursor: grabbing !important; }
 .diagram { position: relative; margin: 12px; }
 .diagram.gliding { transition: transform 250ms ease; }
+/* a gesture hint over the diagram: solid, centred, it takes no pointer */
+.hint { position: absolute; left: 50%; top: 50%; z-index: 2; transform: translate(-50%, -50%); pointer-events: none;
+  max-width: calc(100% - 32px); box-sizing: border-box; padding: 8px 14px; border: 1px solid var(--x-b2); border-radius: 999px;
+  background: var(--x-bg); color: var(--x-fg1); font: 500 13px var(--x-sans); text-align: center;
+  box-shadow: 0 6px 24px -8px color-mix(in srgb, var(--x-fg1) 35%, transparent); opacity: 0; transition: opacity 200ms ease; }
+.hint[hidden] { display: none; }
+.hint.shown { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .hint { transition: none; } }
+
+/* ── under the diagram, for a chart run as a demo: the run bar, then the panels ── */
+.run, .panels { border-top: 1px solid var(--x-b1); background: var(--x-s1); }
+.run[hidden], .panels[hidden] { display: none; }
+.run { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px; }
+.run .preset { height: 26px; padding: 0 10px; font-size: 12px; }
+.run .restart { margin-inline-start: auto; display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0;
+  border: 1px solid var(--x-b2); border-radius: 999px; background: var(--x-bg); color: var(--x-fg2); cursor: pointer; }
+.run .restart:hover { color: var(--x-fg1); background: var(--x-s2); }
+.run .restart:focus-visible, .run .preset:focus-visible { outline: 2px solid var(--x-accent); outline-offset: 1px; }
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: var(--x-b1); }
+.panel { background: var(--x-s1); padding: 10px 12px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 6px;
+  font: 12px var(--x-sans); color: var(--x-fg3); }
+.panel-head .name { font: 12px var(--x-mono); color: var(--x-fg1); }
+.panel-head .count { display: inline-flex; align-items: center; gap: 4px; font: 12px var(--x-mono); font-variant-numeric: tabular-nums; }
+.panel .log { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; max-height: 168px; overflow-y: auto;
+  font: 12px var(--x-mono); color: var(--x-fg2); }
+.panel .log li { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.panel .log .at { color: var(--x-fg3); min-width: 3.2em; font-variant-numeric: tabular-nums; }
+.panel .log .target { color: var(--x-fg3); white-space: nowrap; }
+.panel .log .empty { color: var(--x-fg3); font-family: var(--x-sans); }
+.panel .value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--x-fg2); }
+.panel .variables { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; font: 12px var(--x-mono); }
+.panel .variables dt { color: var(--x-fg1); }
+.panel .variables dd { margin: 0; min-width: 0; }
+.panel .variables .value { display: block; white-space: normal; overflow-wrap: anywhere; }
 :host([fit]) .diagram { transform-origin: 0 0; }
 
 /* ── boxes ─────────────────────────────────────────────── */
@@ -111,22 +146,40 @@ button.label:disabled, button.chip:disabled { cursor: default; }
 
 /* ── help popover ──────────────────────────────────────── */
 .help-popover {
-  position: absolute; z-index: 3; box-sizing: border-box; width: max-content; max-width: min(340px, calc(100% - 8px)); overflow-y: auto; overscroll-behavior: contain;
-  padding: 10px 12px; border: 1px solid var(--x-b2); border-radius: calc(var(--x-r) + 2px);
-  background: var(--x-bg); color: var(--x-fg1); font: 12.5px/1.45 var(--x-sans);
+  position: absolute; z-index: 3; box-sizing: border-box; width: max-content; max-width: min(360px, calc(100% - 8px)); overflow-y: auto; overscroll-behavior: contain;
+  padding: 12px 14px; border: 1px solid var(--x-b2); border-radius: calc(var(--x-r) + 2px);
+  background: var(--x-bg); color: var(--x-fg1); font: 13px/1.55 var(--x-sans);
   box-shadow: 0 6px 24px -8px color-mix(in srgb, var(--x-fg1) 35%, transparent);
 }
 .help-popover[hidden] { display: none; }
 .help-popover:focus { outline: none; }
 .help-popover:focus-visible { outline: 2px solid var(--x-accent); outline-offset: 1px; }
-.help-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
-.help-head strong { font: 600 13px var(--x-mono); overflow-wrap: anywhere; }
-.help-kind { font-size: 11.5px; color: var(--x-fg3); }
-.help-text p { margin: 0 0 6px; white-space: pre-wrap; }
+.help-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.help-head strong { font: 600 14px var(--x-mono); overflow-wrap: anywhere; }
+.help-kind { font-size: 12px; color: var(--x-fg3); }
+.help-text { max-width: 34em; }
+.help-text p { margin: 0 0 8px; white-space: pre-wrap; text-wrap: pretty; }
 .help-text p:last-child { margin-bottom: 0; }
 .help-none { margin: 0; color: var(--x-fg3); font-style: italic; }
-.help-sub { margin-top: 8px; font-size: 11px; font-weight: 600; color: var(--x-fg3); text-transform: uppercase; letter-spacing: .04em; }
-.help-transitions { margin: 3px 0 0; padding-left: 16px; font: 11.5px/1.5 var(--x-mono); color: var(--x-fg2); }
+.help-sub { margin: 12px 0 4px; padding-top: 10px; border-top: 1px solid var(--x-b1); font-size: 11px; font-weight: 600; color: var(--x-fg3); text-transform: uppercase; letter-spacing: .05em; }
+.help-transitions { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font: 12px/1.5 var(--x-mono); color: var(--x-fg2); }
+.help-transitions li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.help-eventless { color: var(--x-fg3); font-style: italic; font-family: var(--x-sans); }
+.help-cond { display: inline-flex; align-items: baseline; gap: 3px; color: var(--x-wait); }
+.help-cond .glyph { align-self: center; display: inline-flex; }
+.help-to .arrow { color: var(--x-fg3); margin-right: 4px; }
+.help-to .go { all: unset; cursor: pointer; color: var(--x-accent-fg); font-weight: 600;
+  text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--x-accent) 45%, transparent); text-underline-offset: 2px; }
+.help-to .go:hover { text-decoration-color: currentColor; }
+.help-to .go:focus-visible { outline: 2px solid var(--x-accent); outline-offset: 2px; border-radius: 2px; }
+/* a state the view just flew to: a ring that fades */
+.box.visited { animation: visited 1.4s ease-out; }
+@keyframes visited {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--x-accent) 70%, transparent); }
+  25% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--x-accent) 45%, transparent); }
+  100% { box-shadow: 0 0 0 12px transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .box.visited { animation: none; outline: 2px solid var(--x-accent); outline-offset: 3px; } }
 
 
 /* ── notices, errors, controls ─────────────────────────── */

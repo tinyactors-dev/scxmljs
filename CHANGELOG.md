@@ -18,6 +18,27 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+### Added
+
+- `<scxml-view>` runs a chart as a demo with no code of the page's: a chart that sends to an I/O
+  processor nobody handles (`<send type="payments">`) gets a stand-in, which lists what it
+  received under the diagram instead of failing the send, and the reader answers by clicking the
+  reply's label; the `variables` attribute lists the chart's variables after each step; the
+  `sends` attribute (`[{"event", "data", "label"}]`) puts a button under the diagram for each
+  preset event; and a restart button (the `rotate-ccw` glyph) runs the chart again in a fresh
+  session. A processor the page gives in `options.ioprocessors` replaces the stand-in. New parts:
+  `run`, `preset-send`, `restart`, `panels`, `panel`.
+- `<scxml-view>`: `--scxml-max-scale` grows a diagram smaller than the element, up to that scale,
+  as far as the element's width allows and, with `--scxml-height`, its height: a small chart fills
+  its frame instead of sitting in a corner. The default, `1`, keeps actual size. Use it instead of
+  scaling the element with CSS `zoom`, which the canvas's panning does not follow.
+- `<scxml-view>`: a state's help popover shows its transitions in the diagram's notation, and each
+  target is a link that flies the view to that state (zooming out on the way when it's far), marks
+  it and opens its help: a flow can be followed from state to state. New part: `go`.
+- `<scxml-view>`: a short hint over the diagram says how to zoom or move it when a plain wheel or a
+  one-finger swipe meets it ("Ctrl + scroll to zoom", "Use two fingers to move the diagram"), and a
+  double click zooms in on the spot, or back to fit, as a double tap does. New part: `hint`.
+
 ### Changed
 
 - `<scxml-view>`: the diagram is a canvas instead of a scrolling box. It pans in every direction,

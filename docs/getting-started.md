@@ -9,12 +9,8 @@ chart, run it headless, then render it in a page.
 npm install @tinyactors/scxmljs
 ```
 
-Outside browsers you also need a `DOMParser` to read SCXML text. Any standards-compliant one
-works; the examples use [happy-dom](https://github.com/capricorn86/happy-dom):
-
-```sh
-npm install happy-dom
-```
+That's all: outside browsers (Node, Bun, Deno) the library reads SCXML text with its own XML
+parser. In a browser it uses the browser's `DOMParser`.
 
 ## Write a chart
 
@@ -82,7 +78,6 @@ region's own states, exits the whole parallel state and resets **every** region:
 <!-- doctest: run -->
 ```ts
 import { createSession } from "@tinyactors/scxmljs";
-import { Window } from "happy-dom";
 
 const chart = (type: string) => `
   <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript">
@@ -102,7 +97,7 @@ const chart = (type: string) => `
   </scxml>`;
 
 for (const type of ["", ' type="internal"']) {
-  const session = await createSession(chart(type), { domParser: new new Window().DOMParser() });
+  const session = await createSession(chart(type));
   session.start();
   session.send("tick"); // the SLA region moves on…
   session.send("assign"); // …and assigning the ticket should leave it alone
@@ -130,11 +125,9 @@ session has processed everything queued.
 ```ts
 import { readFile } from "node:fs/promises";
 import { createSession } from "@tinyactors/scxmljs";
-import { Window } from "happy-dom";
 
-const { DOMParser } = new Window();
 const source = await readFile("traffic-light.scxml", "utf8");
-const session = await createSession(source, { domParser: new DOMParser() });
+const session = await createSession(source);
 
 session.start();
 console.log(session.activeStateIds()); // the configuration, in document order
@@ -167,14 +160,9 @@ instead: time only moves when you move it, and everything is deterministic.
 ```ts
 import { readFile } from "node:fs/promises";
 import { createSession, VirtualClock } from "@tinyactors/scxmljs";
-import { Window } from "happy-dom";
 
-const { DOMParser } = new Window();
 const clock = new VirtualClock();
-const session = await createSession(await readFile("traffic-light.scxml", "utf8"), {
-  clock,
-  domParser: new DOMParser(),
-});
+const session = await createSession(await readFile("traffic-light.scxml", "utf8"), { clock });
 
 session.addEventListener("macrostep", (e) => {
   // after the chart ends, the last macrostep reports an empty configuration

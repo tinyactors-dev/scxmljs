@@ -82,10 +82,8 @@ positions. Use it to draw charts with SVG, canvas, or your framework's component
 import { readFile, writeFile } from "node:fs/promises";
 import { compile, parseSCXML } from "@tinyactors/scxmljs/trusted";
 import { layoutChart } from "@tinyactors/scxmljs/view";
-import { Window } from "happy-dom";
 
-const { DOMParser } = new Window();
-const model = await compile(parseSCXML(await readFile("traffic-light.scxml", "utf8"), new DOMParser()));
+const model = await compile(parseSCXML(await readFile("traffic-light.scxml", "utf8")));
 
 // sizes would normally come from measuring rendered text; fixed ones will do here
 const layout = layoutChart(model.root, {
@@ -160,10 +158,8 @@ Example, with the media player from the screenshots
 import { readFile } from "node:fs/promises";
 import { createSession, type StateNode } from "@tinyactors/scxmljs/trusted";
 import { acceptedEvents, activeExpansion, followTarget, treeRows } from "@tinyactors/scxmljs/explorer";
-import { Window } from "happy-dom";
 
-const { DOMParser } = new Window();
-const session = await createSession(await readFile("player.scxml", "utf8"), { domParser: new DOMParser() });
+const session = await createSession(await readFile("player.scxml", "utf8"));
 session.start();
 session.send("play");
 await session.settled();

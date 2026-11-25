@@ -6,26 +6,20 @@ must behave the same on the server and in the page.
 
 ## What's different
 
-**A DOMParser.** SCXML text is XML, and Node and Bun have no XML parser built in. Pass one as
-`domParser`; any standards-compliant XML implementation works, such as
-[happy-dom](https://github.com/capricorn86/happy-dom)'s. It has to implement XML namespaces, which
-linkedom's doesn't: with it, `parseSCXML()` throws an `SCXMLParseError` that says so.
+**XML.** Node, Bun and Deno have no `DOMParser`, so the library reads SCXML text with its own
+XML parser: nothing to install or pass.
 
 <!-- doctest: check -->
 ```ts
 import { createSession } from "@tinyactors/scxmljs";
-import { Window } from "happy-dom";
 
-const { DOMParser } = new Window();
-const session = await createSession("<scxml xmlns='http://www.w3.org/2005/07/scxml' version='1.0'/>", {
-  domParser: new DOMParser(),
-});
+const session = await createSession("<scxml xmlns='http://www.w3.org/2005/07/scxml' version='1.0'/>");
 ```
 
-Without one, `createSession()` and `parseSCXML()` throw an `SCXMLParseError` with
-`code: "SCXML_NO_DOMPARSER"` and instructions. Instead of text, you can also pass an `Element`
-you parsed yourself, or a compiled `Model`. Sessions keep the parser to read SCXML that arrives
-at run time (for example an `<invoke>` with `<content expr>`).
+A `DOMParser` you pass as `domParser` is used instead (it has to implement XML namespaces, which
+linkedom's doesn't). Instead of text, you can also pass an `Element` you parsed yourself, or a
+compiled `Model`. Sessions keep the parser to read SCXML that arrives at run time (for example an
+`<invoke>` with `<content expr>`).
 
 **TypeScript.** The package's types use DOM types such as `Element` and `EventTarget`, so they
 bring in TypeScript's `dom` library: a Node-only project needs neither `"lib": ["dom"]` nor
@@ -43,11 +37,10 @@ browsers.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createSession } from "@tinyactors/scxmljs";
-import { Window } from "happy-dom";
 
 const dir = "charts";
 const loader = (src: string) => readFile(join(dir, src), "utf8");
-const session = await createSession(await loader("main.scxml"), { loader, domParser: new new Window().DOMParser() });
+const session = await createSession(await loader("main.scxml"), { loader });
 ```
 
 **The elements** can be imported on the server (for example during server-side rendering). The
@@ -62,10 +55,8 @@ drives [`login.scxml`](examples/login.scxml) over HTTP:
 ```ts
 import { readFile } from "node:fs/promises";
 import { compile, createSession, parseSCXML, type SCXMLSession } from "@tinyactors/scxmljs";
-import { Window } from "happy-dom";
 
-const domParser = new new Window().DOMParser();
-const model = await compile(parseSCXML(await readFile("login.scxml", "utf8"), domParser));
+const model = await compile(parseSCXML(await readFile("login.scxml", "utf8")));
 const sessions = new Map<string, SCXMLSession>();
 
 const server = Bun.serve({
@@ -76,7 +67,7 @@ const server = Bun.serve({
         const { id, event } = req.params;
         let session = sessions.get(id);
         if (!session) {
-          session = await createSession(model, { domParser, sessionId: id });
+          session = await createSession(model, { sessionId: id });
           sessions.set(id, session.start());
           session.addEventListener("done", () => sessions.delete(id));
         }

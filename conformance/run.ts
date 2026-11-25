@@ -5,6 +5,7 @@
  *   bun conformance/run.ts 144 147 355     # just these
  *   bun conformance/run.ts --verbose 216   # with logs and errors
  *   bun conformance/run.ts --mandatory     # skip optional tests
+ *   bun conformance/run.ts --builtin-xml   # parse with the library's own XML parser, not happy-dom
  *
  * A test passes when its session reaches the top-level <final id="pass">.
  * Time is virtual: delayed events fire instantly, timeouts cost nothing.
@@ -15,6 +16,8 @@ const args = process.argv.slice(2);
 const verbose = args.includes("--verbose");
 // --trusted: run against the trusted data model (host JS engine, node:vm here) instead of QuickJS
 const trusted = args.includes("--trusted");
+// --builtin-xml: read the charts with the library's own XML parser (src/xml) instead of happy-dom's
+const xml = args.includes("--builtin-xml") ? "builtin" : "happy-dom";
 const mandatoryOnly = args.includes("--mandatory");
 const json = args.includes("--json");
 const only = new Set(args.filter((a) => !a.startsWith("--")));
@@ -22,7 +25,7 @@ const only = new Set(args.filter((a) => !a.startsWith("--")));
 const selected = manifest.filter((e) => !e.manual && (!only.size || only.has(e.id)) && (!mandatoryOnly || e.conformance === "mandatory"));
 const results: { id: string; conformance: string; outcome: Outcome; detail: string }[] = [];
 for (const entry of selected) {
-  const r = await runOne(entry, trusted);
+  const r = await runOne(entry, trusted, xml);
   results.push({ id: entry.id, conformance: entry.conformance, outcome: r.outcome, detail: r.detail });
   if (!json && (r.outcome !== "pass" || verbose)) {
     console.log(`${r.outcome.toUpperCase().padEnd(7)} ${entry.id.padEnd(5)} [${entry.conformance}] ${entry.description.slice(0, 110)}`);
@@ -35,7 +38,7 @@ const count = (c: string, o?: Outcome) => results.filter((r) => r.conformance ==
 if (json) console.log(JSON.stringify(results, null, 2));
 else {
   console.log(
-    `\n${trusted ? "[trusted] " : "[sandboxed] "}mandatory: ${count("mandatory", "pass")}/${count("mandatory")} pass` +
+    `\n${trusted ? "[trusted] " : "[sandboxed] "}${xml === "builtin" ? "[builtin xml] " : ""}mandatory: ${count("mandatory", "pass")}/${count("mandatory")} pass` +
       `   optional: ${count("optional", "pass")}/${count("optional")} pass` +
       `   (manual tests skipped: ${manifest.filter((e) => e.manual).length})`,
   );

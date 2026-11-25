@@ -34,7 +34,8 @@ export class Session extends SCXMLSession {
  * is not started: call `start()`. Call `dispose()` when you are done with it.
  *
  * `source` is SCXML text, an `<scxml>` element or a model from `compile()`.
- * Parsing text outside browsers needs `opts.domParser`.
+ * Text is parsed with the browser's `DOMParser`, or the library's own outside browsers
+ * (`opts.domParser` overrides both).
  */
 export async function createSession(source: string | Element | Model, opts: SessionOptions = {}): Promise<Session> {
   await loadQuickJS();

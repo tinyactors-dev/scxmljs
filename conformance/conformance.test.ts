@@ -27,6 +27,24 @@ for (const trusted of [false, true]) {
   });
 }
 
+/** The same suite, with the charts read by the library's own XML parser (src/xml) instead of happy-dom's. */
+for (const trusted of [false, true]) {
+  describe(trusted ? "conformance, built-in XML parser (trusted)" : "conformance, built-in XML parser (sandboxed)", () => {
+    const automatic = manifest.filter((e) => !e.manual);
+    test("160 mandatory tests run automatically", () => {
+      expect(automatic.filter((e) => e.conformance === "mandatory")).toHaveLength(160);
+    });
+    for (const entry of automatic) {
+      const expected = entry.conformance === "optional" && HTTP_PROCESSOR.has(entry.id) ? "fail-or-timeout" : "pass";
+      test(`${entry.id} [${entry.conformance}]`, async () => {
+        const r = await runTest(entry, trusted, "builtin");
+        if (expected === "pass") expect(`${r.outcome} ${r.detail}`.trim()).toBe("pass");
+        else expect(r.outcome).not.toBe("pass");
+      });
+    }
+  });
+}
+
 /**
  * The "manual" tests, read once by a person (verdicts and reasoning in
  * MANUAL.md) and pinned here so they can't regress. 513 is not applicable:

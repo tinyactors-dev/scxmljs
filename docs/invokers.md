@@ -53,7 +53,6 @@ a `PlaybackClock` in the elements (pause and step included):
 ```ts
 import { readFile } from "node:fs/promises";
 import { createSession, type Invoker, VirtualClock } from "@tinyactors/scxmljs";
-import { Window } from "happy-dom";
 
 const clock = new VirtualClock();
 
@@ -73,10 +72,8 @@ const countdown: Invoker = (ctx) => {
   };
 };
 
-const { DOMParser } = new Window();
 const session = await createSession(await readFile("countdown.scxml", "utf8"), {
   clock,
-  domParser: new DOMParser(),
   invokers: { countdown },
 });
 session.addEventListener("log", (e) => console.log(`${clock.now()} ms: ${e.label} ${e.value ?? ""}`.trim()));

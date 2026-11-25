@@ -93,11 +93,9 @@ session.start();
 ```ts
 import { readFile } from "node:fs/promises";
 import { createSession } from "@tinyactors/scxmljs";
-import { Window } from "happy-dom"; // outside browsers, SCXML text needs a DOMParser
 
-const { DOMParser } = new Window();
 const source = await readFile("traffic-light.scxml", "utf8");
-const session = await createSession(source, { domParser: new DOMParser() });
+const session = await createSession(source); // outside browsers, the library parses the XML itself
 
 session.start();
 console.log(session.activeStateIds().join(" "));

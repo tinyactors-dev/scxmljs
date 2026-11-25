@@ -151,9 +151,9 @@ and a trusted session in `<scxml-explorer>` (`tests/browser/specs/csp.pw.ts`).
 | Chrome, Edge (Chromium) | tested in CI: Chromium 153 (and Chrome 154 by hand) | Chromium 123 or later (from the features used; older versions aren't tested) |
 | Firefox | tested in CI: Firefox 155 | Firefox 120 or later (from the features used) |
 | Safari | tested in CI with WebKit 26.6 (Playwright's build, see below) | Safari 17.5 or later (from the features used) |
-| Node | tested in CI: 26.10 (and 22.3 by hand) | 22.3 or later (`process.getBuiltinModule`), and a DOMParser such as happy-dom |
-| Bun | tested in CI: 1.4 | a DOMParser such as happy-dom |
-| Deno | tested in CI: 2.9 | `--allow-read --allow-env --allow-sys`, and a DOMParser such as happy-dom (`npm:happy-dom`) |
+| Node | tested in CI: 26.10 (and 22.3 by hand) | 22.3 or later (`process.getBuiltinModule`) |
+| Bun | tested in CI: 1.4 | 1.4 or later |
+| Deno | tested in CI: 2.9 | `--allow-read --allow-env --allow-sys` |
 
 What "tested in CI" covers:
 

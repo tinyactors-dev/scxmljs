@@ -51,6 +51,7 @@ import {
   SendEvent,
   type SessionEventMap,
 } from "./session-events.ts";
+import { DOMParser as BuiltinDOMParser } from "./xml/index.ts";
 
 // ─────────────────────────────── public types ───────────────────────────────
 
@@ -184,7 +185,7 @@ export interface SessionOptions {
   invokers?: Record<string, Invoker>;
   /** Resolves `src` attributes (`<script>`, `<data>`, `<invoke>`). May return synchronously. */
   loader?: Loader;
-  /** Needed to parse SCXML given as text (invoke src/srcexpr/content expressions). Defaults to the global DOMParser. */
+  /** Needed to parse SCXML given as text (invoke src/srcexpr/content expressions). Defaults to the global DOMParser, else the library's own XML parser. */
   domParser?: DOMParserLike;
   /** Initial values overriding `<data>` of the same id (the host's or the invoker's params). */
   data?: Record<string, unknown>;
@@ -241,29 +242,16 @@ export function resolveModel(source: string | Element | Model, opts: SessionOpti
 /**
  * Parse SCXML text into its `<scxml>` element.
  *
- * Browsers have a `DOMParser`; Node, Bun and Deno don't, so pass one there
- * (any standards-compliant XML implementation, e.g. happy-dom's; linkedom's
- * ignores XML namespaces, so it can't read SCXML).
+ * Uses `domParser` when given, else the environment's `DOMParser` (browsers
+ * have one), else the library's own XML parser (Node, Bun and Deno have
+ * none). A `domParser` must implement XML namespaces (happy-dom's does;
+ * linkedom's doesn't, so it can't read SCXML).
  *
- * @throws {SCXMLParseError} `code: "SCXML_NO_DOMPARSER"` when no parser is
- *   available, `code: "SCXML_PARSE"` when the text isn't well-formed XML or
- *   the parser doesn't implement XML namespaces.
+ * @throws {SCXMLParseError} `code: "SCXML_PARSE"` when the text isn't
+ *   well-formed XML or the parser doesn't implement XML namespaces.
  */
 export function parseSCXML(source: string, domParser?: DOMParserLike): Element {
-  const parser = domParser ?? (typeof DOMParser !== "undefined" ? new DOMParser() : undefined);
-  if (!parser)
-    throw new SCXMLParseError(
-      "SCXML_NO_DOMPARSER",
-      [
-        "No DOMParser is available to parse SCXML text in this environment.",
-        "Browsers provide one; Node, Bun and Deno don't. Either:",
-        "  • pass one in the options, e.g. with happy-dom:",
-        '      import { Window } from "happy-dom";',
-        "      const { DOMParser } = new Window();",
-        "      await createSession(source, { domParser: new DOMParser() });",
-        "  • or pass an already-parsed <scxml> Element (or a compiled model) instead of text.",
-      ].join("\n"),
-    );
+  const parser = domParser ?? defaultDOMParser();
   const doc = parser.parseFromString(source, "application/xml") as Document;
   const err = doc.getElementsByTagName("parsererror")[0];
   if (err || !doc.documentElement)
@@ -278,6 +266,11 @@ export function parseSCXML(source: string, domParser?: DOMParserLike): Element {
         "SCXML needs a standards-compliant XML parser, such as happy-dom's.",
     );
   return root;
+}
+
+/** The environment's `DOMParser`, else the library's own. */
+function defaultDOMParser(): DOMParserLike {
+  return typeof DOMParser !== "undefined" ? new DOMParser() : new BuiltinDOMParser();
 }
 
 // ──────────────────────────────── session ─────────────────────────────────
@@ -1638,8 +1631,7 @@ function scxmlChildrenAny(el: Element): Element[] {
 
 /** Parse arbitrary XML text into a document element (throws when it isn't XML). */
 function parseSCXMLLike(text: string, domParser?: DOMParserLike): Element {
-  const parser = domParser ?? (typeof DOMParser !== "undefined" ? new DOMParser() : undefined);
-  if (!parser) throw new Error("no DOMParser");
+  const parser = domParser ?? defaultDOMParser();
   const doc = parser.parseFromString(text, "application/xml") as Document;
   if (doc.getElementsByTagName("parsererror").length) throw new Error("not XML");
   return doc.documentElement;

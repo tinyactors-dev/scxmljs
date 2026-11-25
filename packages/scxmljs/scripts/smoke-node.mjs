@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Smoke test of the BUILT package in Node: both entry points, through the
- * package's "exports" map (self-reference by name), with happy-dom's DOMParser.
+ * package's "exports" map (self-reference by name), with happy-dom's DOMParser and with none
+ * (the built-in XML parser).
  *
  *   node scripts/smoke-node.mjs                      # this package (after `bun run build`)
  *   node scripts/smoke-node.mjs <package-specifier>  # e.g. an installed tarball's name
@@ -53,13 +54,26 @@ for (const specifier of [base, `${base}/trusted`]) {
     if (data?.answer !== 42) fail(`${specifier}: expected done data { answer: 42 }, got ${JSON.stringify(data)}`);
     else console.log(`✓ ${specifier}: chart ran to completion in ${(performance.now() - t0).toFixed(0)} ms`);
 
-    // outside browsers, parsing text without a DOMParser must fail with a helpful, coded error
+    // outside browsers, text parses with the library's own XML parser: no DOMParser to install
+    {
+      const ownClock = new lib.VirtualClock();
+      const own = await lib.createSession(chart, { clock: ownClock });
+      own.start();
+      for (let i = 0; i < 20 && own.status !== "done"; i++) {
+        ownClock.run();
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      const result = await Promise.race([own.done, new Promise((r) => setTimeout(() => r("timeout"), 2000))]);
+      own.dispose();
+      if (result?.answer !== 42) fail(`${specifier}: without a DOMParser, expected { answer: 42 }, got ${JSON.stringify(result)}`);
+      else console.log(`✓ ${specifier}: ran from text with the built-in XML parser`);
+    }
     try {
-      await lib.createSession(chart);
-      fail(`${specifier}: expected an SCXMLParseError without a DOMParser`);
+      await lib.createSession("<scxml><state></scxml>");
+      fail(`${specifier}: expected an SCXMLParseError for XML that isn't well-formed`);
     } catch (e) {
-      if (e?.code !== "SCXML_NO_DOMPARSER") fail(`${specifier}: expected code SCXML_NO_DOMPARSER, got ${e?.code}: ${e?.message}`);
-      else console.log(`✓ ${specifier}: missing DOMParser → ${e.name} (${e.code})`);
+      if (e?.code !== "SCXML_PARSE") fail(`${specifier}: expected code SCXML_PARSE, got ${e?.code}: ${e?.message}`);
+      else console.log(`✓ ${specifier}: XML that isn't well-formed → ${e.name} (${e.code})`);
     }
   } catch (e) {
     fail(`${specifier}: ${e?.stack ?? e}`);

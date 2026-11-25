@@ -4,7 +4,7 @@
  *
  *   Node, Bun, Deno   run packages/scxmljs/scripts/smoke-node.mjs against the installed package
  *                     (both entry points, data, scripts, delays, invoke, donedata, the explorer
- *                     module without a DOM, and the missing-DOMParser error)
+ *                     module without a DOM, and parsing with no DOMParser)
  *   bun build         bundle all four browser entry points from node_modules for the browser
  *
  * (A plain HTML page loading the files through an import map is covered by the browser tests:

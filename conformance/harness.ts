@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { Window } from "happy-dom";
 import { createSession, SCXMLValidationError, VirtualClock } from "../packages/scxmljs/src/index.ts";
 import * as trustedEntry from "../packages/scxmljs/src/trusted.ts";
+import { DOMParser as BuiltinDOMParser } from "../packages/scxmljs/src/xml/index.ts";
 
 export interface Entry {
   id: string;
@@ -22,9 +23,18 @@ export type Outcome = "pass" | "fail" | "timeout" | "error";
 const here = import.meta.dir;
 export const manifest: Entry[] = JSON.parse(readFileSync(join(here, "manifest.json"), "utf8"));
 const window = new Window();
-const domParser = new window.DOMParser() as unknown as { parseFromString(s: string, t: string): Document };
+const happyDOMParser = new window.DOMParser() as unknown as { parseFromString(s: string, t: string): Document };
+const builtinDOMParser = new BuiltinDOMParser();
 
-export async function runTest(entry: Entry, trusted: boolean): Promise<{ outcome: Outcome; detail: string; logs: string[] }> {
+/** Which XML parser reads the charts: happy-dom's, or the library's own (`src/xml`). */
+export type XMLParserChoice = "happy-dom" | "builtin";
+
+export async function runTest(
+  entry: Entry,
+  trusted: boolean,
+  xml: XMLParserChoice = "happy-dom",
+): Promise<{ outcome: Outcome; detail: string; logs: string[] }> {
+  const domParser = xml === "builtin" ? builtinDOMParser : happyDOMParser;
   const create = trusted ? trustedEntry.createSession : createSession;
   const path = join(here, entry.file);
   const dir = dirname(path);

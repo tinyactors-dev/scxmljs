@@ -11,14 +11,12 @@ result. The examples use `bun test`; any test runner works.
 import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { createSession, VirtualClock } from "@tinyactors/scxmljs";
-import { Window } from "happy-dom";
 
-const { DOMParser } = new Window();
 const source = await readFile("traffic-light.scxml", "utf8");
 
 async function start() {
   const clock = new VirtualClock();
-  const session = await createSession(source, { clock, domParser: new DOMParser() });
+  const session = await createSession(source, { clock });
   session.start();
   return { clock, session };
 }
@@ -120,7 +118,7 @@ test("the login form signs in", async () => {
     <form data-scxml-send="login"><input name="user" value="ada"><button>Log in</button></form>
     <button id="logout" data-scxml-send="logout">Log out</button>`;
 
-  const session = await createSession(await readFile("login.scxml", "utf8"), { domParser: new window.DOMParser() });
+  const session = await createSession(await readFile("login.scxml", "utf8"));
   session.start();
   bind(session, document as unknown as Document, { reflectEnabled: true });
   const logout = document.querySelector("#logout")!;

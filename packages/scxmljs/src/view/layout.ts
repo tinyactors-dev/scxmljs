@@ -7,8 +7,9 @@
  * layered (Sugiyama-style) layout of the transitions between them:
  *   1. transitions between descendants of two different children are lifted to
  *      an edge between those children;
- *   2. cycles are broken by a depth-first search from the initial child
- *      (document order breaks ties); the back edges are routed separately;
+ *   2. cycles are broken by a greedy feedback arc set that starts from the
+ *      initial child (document order breaks ties); the back edges are routed
+ *      separately;
  *   3. layers by longest path; edges spanning several layers get dummy nodes
  *      that reserve a corridor through the layers in between;
  *   4. crossings are reduced with barycentre sweeps (the best order wins);
@@ -420,8 +421,9 @@ export function layoutChart(root: StateNode, opts: LayoutOptions): ChartLayout {
     const edges = [...weights.values()];
 
     // 2. break cycles: a greedy feedback arc set (Eades, Lin & Smyth) on edge weights —
-    //    sinks go last, sources first, otherwise the node with the most (out − in) weight;
-    //    the initial child gets a slight head start, document order breaks ties
+    //    sinks go last, sources first; within a cycle the initial child comes first (a
+    //    chart reads from where it starts), then the node with the most (out − in) weight;
+    //    document order breaks ties
     const stateNodes = [...info.nodes.values()];
     const order = stateNodes;
     const initialSet = new Set(initialTargets.map((t) => info.nodes.get(t)!));
@@ -1444,7 +1446,11 @@ function simplify(input: Point[]): Point[] {
 /**
  * Greedy feedback arc set ordering (Eades, Lin & Smyth 1993), weighted: returns
  * each node's position in an order that keeps most edge weight pointing
- * forward. Deterministic: ties go to `preferred` nodes, then to input order.
+ * forward. When no node is a source or a sink, a `preferred` node (the initial
+ * child) goes first whatever its weights, so a cycle through the initial state
+ * is drawn from it: a retry loop's heavier way back (paying → cart) must not
+ * put `paying` before the `cart` the chart starts in. Deterministic: then the
+ * most (out − in) weight, then input order.
  */
 function feedbackArcOrder<N>(nodes: N[], edges: { from: N; to: N; weight: number }[], preferred: Set<N>): Map<N, number> {
   const left: N[] = [];
@@ -1476,11 +1482,17 @@ function feedbackArcOrder<N>(nodes: N[], edges: { from: N; to: N; weight: number
       }
     }
     if (!remaining.size) break;
+    const start = nodes.find((n) => remaining.has(n) && preferred.has(n));
+    if (start !== undefined) {
+      remaining.delete(start);
+      left.push(start);
+      continue;
+    }
     let best: N | undefined;
     let bestDelta = Number.NEGATIVE_INFINITY;
     for (const n of nodes) {
       if (!remaining.has(n)) continue;
-      const delta = outW(n) - inW(n) + (preferred.has(n) ? 0.5 : 0);
+      const delta = outW(n) - inW(n);
       if (delta > bestDelta) {
         bestDelta = delta;
         best = n;

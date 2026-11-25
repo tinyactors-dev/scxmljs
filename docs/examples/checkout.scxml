@@ -1,0 +1,76 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:xs="http://www.w3.org/2001/XMLSchema"
+       version="1.0" datamodel="ecmascript" name="checkout" initial="cart">
+  <xs:schema>
+    <xs:element name="add">
+      <xs:annotation><xs:documentation>Put a product in the cart.</xs:documentation></xs:annotation>
+      <xs:complexType>
+        <xs:sequence>
+          <xs:element name="sku" type="Sku"/>
+          <xs:element name="quantity" default="1">
+            <xs:simpleType><xs:restriction base="xs:positiveInteger"><xs:maxInclusive value="20"/></xs:restriction></xs:simpleType>
+          </xs:element>
+          <xs:element name="gift" type="xs:boolean" minOccurs="0"/>
+        </xs:sequence>
+      </xs:complexType>
+    </xs:element>
+    <xs:element name="ship">
+      <xs:annotation><xs:documentation>Where and when to deliver.</xs:documentation></xs:annotation>
+      <xs:complexType>
+        <xs:sequence>
+          <xs:element name="name" type="xs:string"/>
+          <xs:element name="street" type="xs:string"/>
+          <xs:element name="city" type="xs:string"/>
+          <xs:element name="country">
+            <xs:simpleType><xs:restriction base="xs:string">
+              <xs:enumeration value="DE"/><xs:enumeration value="EE"/><xs:enumeration value="FR"/><xs:enumeration value="NL"/>
+            </xs:restriction></xs:simpleType>
+          </xs:element>
+          <xs:element name="deliverOn" type="xs:date" minOccurs="0"/>
+        </xs:sequence>
+      </xs:complexType>
+    </xs:element>
+    <xs:element name="pay">
+      <xs:complexType>
+        <xs:choice>
+          <xs:element name="card">
+            <xs:complexType><xs:sequence>
+              <xs:element name="number"><xs:simpleType><xs:restriction base="xs:string"><xs:pattern value="\d{16}"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="expiry"><xs:simpleType><xs:restriction base="xs:string"><xs:pattern value="(0[1-9]|1[0-2])/\d{2}"/></xs:restriction></xs:simpleType></xs:element>
+            </xs:sequence></xs:complexType>
+          </xs:element>
+          <xs:element name="voucher">
+            <xs:simpleType><xs:restriction base="xs:string"><xs:pattern value="[A-Z0-9]{8}"/></xs:restriction></xs:simpleType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+    <xs:simpleType name="Sku">
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="notebook"/><xs:enumeration value="pen"/><xs:enumeration value="mug"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:schema>
+  <datamodel>
+    <data id="cart" expr="[]"/>
+    <data id="address" expr="null"/>
+    <data id="paidWith" expr="null"/>
+  </datamodel>
+  <!-- The cart: add products, take them out again. -->
+  <state id="cart">
+    <transition event="add"><script>cart.push(_event.data)</script></transition>
+    <transition event="remove"><script>cart = cart.filter(function (i) { return i.sku !== _event.data.sku })</script></transition>
+    <transition event="checkout" cond="cart.length &gt; 0" target="shipping"/>
+  </state>
+  <!-- Shipping: the address the parcel goes to. -->
+  <state id="shipping">
+    <transition event="ship" target="payment"><assign location="address" expr="_event.data"/></transition>
+    <transition event="back" target="cart"/>
+  </state>
+  <!-- Payment: a card or a voucher. -->
+  <state id="payment">
+    <transition event="pay" target="placed"><assign location="paidWith" expr="Object.keys(_event.data)[0]"/></transition>
+    <transition event="back" target="shipping"/>
+  </state>
+  <!-- The order is placed. -->
+  <final id="placed"/>
+</scxml>

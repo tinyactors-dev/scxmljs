@@ -1,7 +1,8 @@
 {
-  "@tinyactors/scxmljs": { "minKB": 67, "gzipKB": 22, "lazyGzipKB": 319 },
-  "@tinyactors/scxmljs/trusted": { "minKB": 60, "gzipKB": 20 },
+  "@tinyactors/scxmljs": { "minKB": 81, "gzipKB": 26, "lazyGzipKB": 319 },
+  "@tinyactors/scxmljs/trusted": { "minKB": 74, "gzipKB": 24 },
   "@tinyactors/scxmljs/explorer": { "minKB": 102, "gzipKB": 32 },
-  "@tinyactors/scxmljs/view": { "minKB": 145, "gzipKB": 48, "lazyGzipKB": 324 },
+  "@tinyactors/scxmljs/view": { "minKB": 175, "gzipKB": 58, "lazyGzipKB": 324 },
+  "@tinyactors/scxmljs/data": { "minKB": 28, "gzipKB": 9 },
   "@tinyactors/scxmljs/themes/tinyactors.css": { "minKB": 2, "gzipKB": 1 }
 }

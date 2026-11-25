@@ -11,12 +11,41 @@ until 1.0, a **minor** version (0.1 → 0.2) may contain breaking changes, and a
 **Changed** or **Removed** with what to do instead.
 
 The public API is everything the entry points export (`@tinyactors/scxmljs`, `/trusted`, `/view`,
-`/explorer`), the custom elements' attributes, properties, events, slots and `::part()` names,
+`/explorer`, `/data`), the custom elements' attributes, properties, events, slots and `::part()` names,
 the `--scxml-*` custom properties, and `themes/tinyactors.css`. Anything marked `@internal`,
 the files under `dist/` other than the entry points, class names inside the shadow DOM and the
 private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
+
+### Added
+
+- Charts can say what data their events take, with an XML Schema inside the chart: each top-level
+  `<xs:element name>` of an `<xs:schema>` (XML Schema's namespace) describes the `_event.data` of
+  the event of that name. The interpreter ignores it. See [event data](docs/data.md).
+- `<scxml-view>` asks for an event's data before it sends it: a click on the label of an event that
+  takes data (`add …`) opens a form built from the chart's schema, or, without one, a field for each
+  name the chart reads as `_event.data.name`. Send or Enter sends it; Cancel or Escape doesn't; a
+  value the schema refuses shows its problems instead. The `event-forms` attribute (`auto`,
+  `always`, `off`) decides when, with `event-data` still the page's way to give data without asking.
+- A new entry point, `@tinyactors/scxmljs/data`: the `<scxml-data>` custom element, which shows,
+  edits and composes a value as a schema describes it (objects, lists to their bounds, choices,
+  enumerations, numbers with their bounds, booleans, dates, patterns, optional fields, types that
+  refer to themselves), and the schema reader behind it (`readSchemas`, `check`, `initialValue`).
+- Outside browsers, SCXML text is parsed with no `DOMParser` to install: the library has its own XML
+  parser and DOM (namespaces, entities, CDATA, comments, processing instructions, errors with
+  their line and column). It runs the W3C conformance suite 160/160 in both data models and reads
+  every chart of the repository as happy-dom does. A browser still uses its own `DOMParser`, and a
+  `domParser` option still overrides both.
+
+### Changed
+
+- The parser adds about 6 KB (gzip) to every entry point that parses SCXML, in browsers too:
+  `parseSCXML` is synchronous, so it can't be loaded only where it's needed.
+
+### Removed
+
+- The `SCXML_NO_DOMPARSER` code of `SCXMLParseError`: there is always a parser now.
 
 ## [0.4.0] - 2026-11-25
 

@@ -68,6 +68,7 @@ from the page, it disposes the session it created.
 | `max-states` | `150` | fold the largest compound states until at most this many boxes are drawn |
 | `fit` | absent | scale the diagram all the way down to the element's width instead of panning. Without it, a diagram wider than the element is still scaled down, but not below `--scxml-min-scale` (0.65), and you pan to the rest. Either way this is the automatic zoom; [zooming by hand](#zoom-pan-and-folding) overrides it |
 | `event-data` | | JSON object from event names to the data a click on that event's label sends, e.g. `{"login": {"user": "ada"}}`. Host code can also set `detail.data` in an `scxml-send` listener |
+| `event-forms` | `auto` | when a click asks for an event's data with a form (from the chart's `xs:schema`, or the names it reads of `_event.data`): `auto` unless `event-data` gives some, `always`, or `off`. See [event data](data.md) |
 | `announce` | `all` | what the live region reads out: `all` (steps and sent events), `sends`, or `off` |
 | `warnings` | `show` | `off` hides the list of authoring warnings above the diagram |
 | `variables` | absent | list the chart's variables under the diagram, after each step; see [running a chart as a demo](#running-a-chart-as-a-demo) |

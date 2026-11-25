@@ -36,6 +36,7 @@ const IMPORT_MAP = JSON.stringify(
       "@tinyactors/scxmljs/trusted": "/dist/trusted.js",
       "@tinyactors/scxmljs/view": "/dist/view.js",
       "@tinyactors/scxmljs/explorer": "/dist/explorer.js",
+      "@tinyactors/scxmljs/data": "/dist/data.js",
       "quickjs-emscripten-core": "/modules/quickjs-emscripten-core/dist/index.mjs",
       "@jitl/quickjs-singlefile-browser-release-sync": "/modules/@jitl/quickjs-singlefile-browser-release-sync/dist/index.mjs",
       "@jitl/quickjs-ffi-types": "/modules/@jitl/quickjs-ffi-types/dist/index.mjs",

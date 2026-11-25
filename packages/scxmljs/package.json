@@ -35,6 +35,10 @@
     "./src/explorer/element.ts",
     "./src/view.ts",
     "./src/view/element.ts",
+    "./dist/data.js",
+    "./dist/data/element.js",
+    "./src/data.ts",
+    "./src/data/element.ts",
     "*.css"
   ],
   "exports": {
@@ -57,6 +61,11 @@
       "types": "./dist/view.d.ts",
       "import": "./dist/view.js",
       "default": "./dist/view.js"
+    },
+    "./data": {
+      "types": "./dist/data.d.ts",
+      "import": "./dist/data.js",
+      "default": "./dist/data.js"
     },
     "./themes/tinyactors.css": "./dist/themes/tinyactors.css",
     "./package.json": "./package.json"

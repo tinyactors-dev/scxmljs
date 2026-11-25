@@ -146,20 +146,37 @@ button.label:disabled, button.chip:disabled { cursor: default; }
 }
 
 /* ── help popover ──────────────────────────────────────── */
-.help-popover {
+.help-popover, .form-popover {
   position: absolute; z-index: 3; box-sizing: border-box; width: max-content; max-width: min(360px, calc(100% - 8px)); overflow-y: auto; overscroll-behavior: contain;
   padding: 12px 14px; border: 1px solid var(--x-b2); border-radius: calc(var(--x-r) + 2px);
   background: var(--x-bg); color: var(--x-fg1); font: 13px/1.55 var(--x-sans);
   box-shadow: 0 6px 24px -8px color-mix(in srgb, var(--x-fg1) 35%, transparent);
 }
-.help-popover[hidden] { display: none; }
+.help-popover[hidden], .form-popover[hidden] { display: none; }
+/* ── event form: the data an event takes, asked for before it is sent ── */
+.form-popover { width: min(340px, calc(100% - 8px)); display: grid; gap: 10px; }
+.form-popover .help-head { margin: 0; }
+.form-doc { margin: 0; color: var(--x-fg2); font-size: 12.5px; text-wrap: pretty; }
+/* the actions stay in sight when the form scrolls inside a short popover */
+.form-actions {
+  display: flex; justify-content: flex-end; gap: 6px; position: sticky; bottom: -12px; z-index: 1;
+  margin: 0 -14px -12px; padding: 8px 14px 12px; background: var(--x-bg);
+}
+.form-actions button {
+  height: 28px; padding: 0 12px; border-radius: var(--x-r); font: 500 12.5px var(--x-sans); cursor: pointer;
+  border: 1px solid var(--x-b2); background: var(--x-s1); color: var(--x-fg1); transition: background var(--x-dur), border-color var(--x-dur);
+}
+.form-actions button:hover { background: var(--x-s2); }
+.form-actions .primary { background: var(--x-accent); border-color: var(--x-accent); color: var(--x-on-accent); }
+.form-actions .primary:hover { background: color-mix(in srgb, var(--x-accent) 88%, var(--x-fg1)); }
+.ev-chip .takes { margin-left: 1px; color: var(--x-fg3); font-weight: 600; letter-spacing: .02em; }
 /* it comes in from its button, and fades out when the view flies away (HELP_FADE_MS) */
-.help-popover:not([hidden]) { animation: help-in 160ms cubic-bezier(.2, .8, .2, 1); }
+.help-popover:not([hidden]), .form-popover:not([hidden]) { animation: help-in 160ms cubic-bezier(.2, .8, .2, 1); }
 .help-popover.leaving { animation: help-out 140ms ease-in forwards; pointer-events: none; }
 @keyframes help-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
 @keyframes help-out { to { opacity: 0; transform: scale(.98); } }
-@media (prefers-reduced-motion: reduce) { .help-popover:not([hidden]), .help-popover.leaving { animation: none; } }
-.help-popover:focus { outline: none; }
+@media (prefers-reduced-motion: reduce) { .help-popover:not([hidden]), .help-popover.leaving, .form-popover:not([hidden]) { animation: none; } }
+.help-popover:focus, .form-popover:focus { outline: none; }
 .help-popover:focus-visible { outline: 2px solid var(--x-accent); outline-offset: 1px; }
 .help-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .help-head strong { font: 600 14px var(--x-mono); overflow-wrap: anywhere; }

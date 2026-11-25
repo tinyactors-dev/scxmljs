@@ -26,6 +26,8 @@ const GLOBALS = [
   "cancelAnimationFrame",
   "getComputedStyle",
   "CustomEvent",
+  "Event",
+  "CSS",
   "KeyboardEvent",
   "fetch",
 ] as const;
@@ -170,13 +172,102 @@ describe("<scxml-view>", () => {
     el.remove();
   });
 
+  test("an event that takes data asks for it: a form from the chart's schema, or from what it reads", async () => {
+    const SHOP = `<scxml ${NS} xmlns:xs="http://www.w3.org/2001/XMLSchema" initial="cart">
+      <xs:schema>
+        <xs:element name="add">
+          <xs:annotation><xs:documentation>Put an item in the cart.</xs:documentation></xs:annotation>
+          <xs:complexType><xs:sequence>
+            <xs:element name="sku"><xs:simpleType><xs:restriction base="xs:string">
+              <xs:enumeration value="tea"/><xs:enumeration value="mug"/>
+            </xs:restriction></xs:simpleType></xs:element>
+            <xs:element name="quantity" type="xs:positiveInteger"/>
+          </xs:sequence></xs:complexType>
+        </xs:element>
+      </xs:schema>
+      <datamodel><data id="items" expr="[]"/><data id="paid" expr="0"/></datamodel>
+      <state id="cart">
+        <transition event="add"><script>items.push(_event.data)</script></transition>
+        <transition event="pay" cond="_event.data.amount &gt; 0" target="done"><assign location="paid" expr="_event.data.amount"/></transition>
+        <transition event="clear"><assign location="items" expr="[]"/></transition>
+      </state>
+      <state id="done"/>
+    </scxml>`;
+    const { el, root } = await mount({ trusted: "" }, SHOP);
+    const form = () => root.querySelector<HTMLFormElement>(".form-popover")!;
+    const data = () => form().querySelector("scxml-data") as unknown as HTMLElement & { value: unknown; shadowRoot: ShadowRoot };
+    // the labels say which events take data; clear takes none and sends at once
+    expect(labelFor(root, "add").querySelector(".takes")).not.toBeNull();
+    expect(labelFor(root, "clear").querySelector(".takes")).toBeNull();
+    (labelFor(root, "clear") as HTMLButtonElement).click();
+    await frame();
+    expect(form().hidden).toBe(true);
+
+    // add: the schema's form, its documentation, its first value; Send sends it
+    (labelFor(root, "add") as HTMLButtonElement).click();
+    await frame();
+    expect(form().hidden).toBe(false);
+    expect(form().getAttribute("aria-label")).toBe("Data for add");
+    expect(form().querySelector(".form-doc")?.textContent).toBe("Put an item in the cart.");
+    expect(data().value).toEqual({ sku: "tea", quantity: 1 });
+    const select = data().shadowRoot.querySelector("select") as HTMLSelectElement;
+    select.value = "mug";
+    select.dispatchEvent(new Event("change"));
+    form().dispatchEvent(new Event("submit", { cancelable: true }));
+    await frame();
+    expect(form().hidden).toBe(true);
+    expect(el.session!.snapshot().items).toEqual([{ sku: "mug", quantity: 1 }]);
+
+    // an invalid value isn't sent: its problem shows
+    (labelFor(root, "add") as HTMLButtonElement).click();
+    await frame();
+    const qty = data().shadowRoot.querySelector('input[type="number"]') as HTMLInputElement;
+    qty.value = "0";
+    qty.dispatchEvent(new Event("input"));
+    form().dispatchEvent(new Event("submit", { cancelable: true }));
+    await frame();
+    expect(form().hidden).toBe(false);
+    expect(el.session!.snapshot().items).toHaveLength(1);
+    // Escape closes it, sending nothing
+    form().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(form().hidden).toBe(true);
+
+    // pay: no schema, so a field for each name the chart reads of _event.data
+    (labelFor(root, "pay") as HTMLButtonElement).click();
+    await frame();
+    const names = Array.from(data().shadowRoot.querySelectorAll(".field > .name")).map((n) => n.textContent);
+    expect(names).toEqual(["amount"]);
+    const amount = data().shadowRoot.querySelector("textarea") as HTMLTextAreaElement;
+    amount.value = "12.5";
+    amount.dispatchEvent(new Event("input"));
+    form().querySelector<HTMLButtonElement>('[part="form-send"]')!.click();
+    form().dispatchEvent(new Event("submit", { cancelable: true }));
+    await frame();
+    expect(el.session!.isActive("done")).toBe(true);
+    expect(el.session!.snapshot().paid).toBe(12.5);
+    el.remove();
+
+    // event-data given: sent as before, unless event-forms="always" (then it fills the form)
+    const b = await mount({ trusted: "", "event-data": JSON.stringify({ pay: { amount: 3 } }) }, SHOP);
+    (labelFor(b.root, "pay") as HTMLButtonElement).click();
+    await frame();
+    expect(b.el.session!.isActive("done")).toBe(true);
+    b.el.remove();
+    const c = await mount({ trusted: "", "event-forms": "always", "event-data": JSON.stringify({ pay: { amount: 3 } }) }, SHOP);
+    (labelFor(c.root, "pay") as HTMLButtonElement).click();
+    await frame();
+    const cdata = c.root.querySelector(".form-popover scxml-data") as unknown as { value: unknown };
+    expect(cdata.value).toEqual({ amount: 3 });
+    c.el.remove();
+  });
+
   test("clicked events: data from event-data or scxml-send, and feedback when nothing changes", async () => {
     // the docs' login chart: its guard reads _event.data.user, so a bare click can't sign in
     const LOGIN = await Bun.file(new URL("../../../docs/examples/login.scxml", import.meta.url)).text();
     const status = (root: ShadowRoot) => root.querySelector<HTMLElement>(".send-status")!;
 
-    // no data: the guard throws (counts as false) and the element says why nothing happened
-    const a = await mount({ trusted: "" }, LOGIN);
+    // no data (and no form to ask for it): the guard throws (counts as false) and the element says why nothing happened
+    const a = await mount({ trusted: "", "event-forms": "off" }, LOGIN);
     (labelFor(a.root, "login") as HTMLButtonElement).click();
     await frame();
     expect(a.el.session!.isActive("signed-out")).toBe(true);

@@ -40,6 +40,7 @@ export const GROUPS: { name: string; items: { file: string | null; label?: strin
     items: [
       { file: "docs/view.md" },
       { file: "docs/explorer.md" },
+      { file: "docs/data.md" },
       { file: "docs/theming.md" },
       { file: "docs/custom-ui.md" },
       { file: "docs/design-principles.md" },

@@ -56,6 +56,8 @@
  * `run`, `preset-send`, `restart`, `panels`, `panel` (+ `variables` `stand-in`).
  */
 import { type Clock, PlaybackClock } from "../clock.ts";
+import type { ScxmlData } from "../data/element.ts";
+import type { Field } from "../data/xsd.ts";
 import type { DataModelFactory } from "../datamodel-base.ts";
 import { compile, isCompound, type Model, type StateNode, type TransitionNode } from "../model.ts";
 import { parseSCXML, SCXMLSession, type SessionOptions } from "../session.ts";
@@ -67,6 +69,7 @@ import { arrowMarker, icon } from "../ui/svg.ts";
 import { lazySheet, NARROW_WIDTH, themeSheet } from "../ui/theme.ts";
 import { anchoredZoom, easeInOut, glide, type Move, smoothPath, type View } from "./camera.ts";
 import { reflow, sourceDescription } from "./describe.ts";
+import { eventFields } from "./forms.ts";
 import { autoCollapse, type ChartLayout, type Direction, layoutChart, portalTransitions, type Size } from "./layout.ts";
 import { type StandIns, standIns, unhandledSendTypes, variablesPanel } from "./panels.ts";
 import { defaultViewStrings, type ViewStateKind, type ViewStrings } from "./strings.ts";
@@ -219,6 +222,7 @@ export class ScxmlView extends ElementBase {
     zoom: HTMLElement;
     zoomLevel: HTMLButtonElement;
     help: HTMLElement;
+    form: HTMLFormElement;
   };
 
   // what's shown
@@ -273,6 +277,9 @@ export class ScxmlView extends ElementBase {
   /** How far the drawing is moved from where the automatic view puts it (px, on screen). */
   #pan = { x: 0, y: 0 };
   #helpFor?: { state: StateNode; button: HTMLElement };
+  /** The data each event takes (forms.ts), and the open form: the event and the label it opened from. */
+  #fields = new Map<string, Field>();
+  #formFor?: { name: string; button: HTMLElement };
   /** Keep the active states in view (until the user pans or zooms; "fit to width" resumes). */
   #follow = true;
   /** The active states last revealed, so a step that changes nothing doesn't move the drawing. */
@@ -594,6 +601,7 @@ export class ScxmlView extends ElementBase {
     this.#standIns?.restart();
     this.#renderPanels();
     this.#model = session.model;
+    this.#fields = eventFields(session.model);
     this.#fired.clear();
     this.#steps = 0;
     this.#last = new Set(session.configuration);
@@ -787,8 +795,15 @@ export class ScxmlView extends ElementBase {
     );
     const nav = h("div", { class: "nav", hidden: "" }, zoom, fit);
     const help = h("div", { class: "help-popover", part: "help-popover", role: "dialog", tabindex: "-1", id: "help-popover", hidden: "" });
+    const form = h("form", {
+      class: "help-popover form-popover",
+      part: "form-popover",
+      role: "dialog",
+      tabindex: "-1",
+      hidden: "",
+    }) as HTMLFormElement;
     const hint = h("div", { class: "hint", part: "hint", "aria-hidden": "true", hidden: "" });
-    const viewport = h("div", { class: "viewport" }, canvas, hint, controls, nav, help);
+    const viewport = h("div", { class: "viewport" }, canvas, hint, controls, nav, help, form);
     const live = h("div", { class: "sr-only", role: "status", "aria-live": "polite", "aria-atomic": "true" });
     // under the diagram, for a chart run as a demo (#renderPanels)
     const restart = iconButton("restart", "restart", t.restart, icon(icons.rotateCcw, 16), () => this.reload());
@@ -820,6 +835,7 @@ export class ScxmlView extends ElementBase {
       zoom,
       zoomLevel,
       help,
+      form,
     };
     for (const type of ["pointermove", "pointerdown", "keydown", "focusin", "wheel", "touchstart"])
       viewport.addEventListener(type, () => this.#wake(), { passive: true });
@@ -842,7 +858,7 @@ export class ScxmlView extends ElementBase {
 
   /** Zoom (Ctrl/⌘ + wheel, pinch, + − 0), pan (drag), and closing the help popover. */
   #wireNavigation() {
-    const { canvas, help } = this.#el;
+    const { canvas, help, form } = this.#el;
     canvas.addEventListener(
       "wheel",
       (e) => {
@@ -917,9 +933,27 @@ export class ScxmlView extends ElementBase {
       e.stopPropagation();
       this.#closeHelp(true);
     });
+    form.addEventListener("keydown", (e) => {
+      // Enter sends from any box but a multi-line one (the boxes are in <scxml-data>'s shadow
+      // root, where the browser's implicit submission doesn't reach)
+      const target = e.composedPath()[0] as HTMLElement;
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing && target.localName !== "textarea" && target.localName !== "button") {
+        e.preventDefault();
+        this.#submitForm();
+        return;
+      }
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      this.#closeForm(true);
+    });
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      this.#submitForm();
+    });
     this.#shadow.addEventListener("pointerdown", (e) => {
-      if (!this.#helpFor) return;
       const path = e.composedPath();
+      if (this.#formFor && !path.includes(form) && !path.includes(this.#formFor.button)) this.#closeForm(false);
+      if (!this.#helpFor) return;
       if (!path.includes(help) && !path.includes(this.#helpFor.button)) this.#closeHelp(false);
     });
   }
@@ -1397,12 +1431,22 @@ export class ScxmlView extends ElementBase {
    * more room, as tall as that room (it scrolls inside), so the frame never cuts it off.
    */
   #placeHelp() {
+    const form = this.#formFor;
+    if (form && !this.#el.form.hidden) {
+      if (!form.button.isConnected) this.#closeForm(false);
+      else this.#place(this.#el.form, form.button);
+    }
     const open = this.#helpFor;
     const pop = this.#el.help;
     if (!open || pop.hidden) return;
     if (!open.button.isConnected) return this.#closeHelp(false);
+    this.#place(pop, open.button);
+  }
+
+  /** Place a popover next to its button: below it, or above when it fits only there, else on the side with more room. */
+  #place(pop: HTMLElement, button: HTMLElement) {
     const vp = (pop.parentElement as HTMLElement).getBoundingClientRect();
-    const b = open.button.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
     const w = pop.offsetWidth;
     const maxLeft = Math.max(4, vp.width - w - 4);
     pop.style.setProperty("left", `${Math.min(maxLeft, Math.max(4, b.left - vp.left + b.width / 2 - 20))}px`);
@@ -1753,6 +1797,8 @@ export class ScxmlView extends ElementBase {
       // the event's name as written: the namespace quieter, its kind in the state colours
       el.append(h("span", { part: "event" }, tr.events.length ? eventName(ev) : ev));
     });
+    if (interactive && name && this.#fields.has(name))
+      el.append(h("span", { class: "takes", part: "takes-data", title: t.takesData, "aria-hidden": "true" }, "…"));
     if (tr.cond) el.append(h("span", { class: "cond", part: "cond" }, `[${truncate(tr.cond, 22)}]`));
     const targets = tr.targets.map((s) => s.id).join(", ");
     if (withTarget) {
@@ -1761,8 +1807,74 @@ export class ScxmlView extends ElementBase {
     }
     el.setAttribute("aria-label", t.transitionLabel(tr.events.join(" ") || t.eventless, targets));
     el.title = [tr.events.join(" ") || t.eventless, tr.cond && `[${tr.cond}]`, targets && `→ ${targets}`].filter(Boolean).join(" ");
-    if (interactive) el.addEventListener("click", () => name && this.#sendEvent(name));
+    if (interactive) el.addEventListener("click", () => name && this.#activate(name, el));
     return el;
+  }
+
+  /**
+   * A label was clicked: send its event, or first ask for its data when it takes some (a schema
+   * or what the chart reads, forms.ts) and the page gave none (`event-forms`: `auto`, `always`, `off`).
+   */
+  #activate(name: string, button: HTMLElement) {
+    const mode = this.getAttribute("event-forms") ?? "auto";
+    const field = this.#fields.get(name);
+    const given = this.#eventData(name);
+    if (!field || mode === "off" || (mode !== "always" && given !== undefined)) return this.#sendEvent(name);
+    if (this.#formFor?.button === button) return this.#closeForm(false);
+    void this.#openForm(name, field, button, given);
+  }
+
+  /** The form for `name`'s data, next to the label it opened from: `<scxml-data>` (loaded on demand), Send and Cancel. */
+  async #openForm(name: string, field: Field, button: HTMLElement, given: unknown) {
+    const t = this.#strings;
+    this.#closeHelp(false);
+    if (this.#formFor) this.#formFor.button.setAttribute("aria-expanded", "false");
+    this.#formFor = { name, button };
+    button.setAttribute("aria-expanded", "true");
+    const { ScxmlData } = await import("../data/element.ts");
+    if (!customElements.get("scxml-data")) customElements.define("scxml-data", ScxmlData);
+    if (this.#formFor?.button !== button) return; // closed, or another opened, while it loaded
+    const data = document.createElement("scxml-data") as ScxmlData;
+    data.setAttribute("part", "form-data");
+    data.field = { ...field, name };
+    if (given !== undefined) data.value = given;
+    const send = h("button", { type: "submit", class: "primary", part: "form-send" }, t.formSend);
+    const cancel = h("button", { type: "button", class: "secondary", part: "form-cancel" }, t.formCancel);
+    cancel.addEventListener("click", () => this.#closeForm(true));
+    const head = h("div", { class: "help-head" }, h("strong", {}, eventName(name)));
+    const doc = field.doc ? [h("p", { class: "form-doc" }, field.doc)] : [];
+    const pop = this.#el.form;
+    pop.replaceChildren(head, ...doc, data, h("div", { class: "form-actions" }, cancel, send));
+    pop.setAttribute("aria-label", t.formLabel(name));
+    pop.hidden = false;
+    this.#place(pop, button);
+    // what needs typing first: the form's first box, else Send
+    requestAnimationFrame(() => {
+      const first = data.shadowRoot?.querySelector<HTMLElement>("input:not([type=checkbox]), select, textarea");
+      (first ?? send).focus({ preventScroll: true });
+      this.#placeHelp();
+    });
+    data.addEventListener("input", () => this.#placeHelp());
+  }
+
+  #submitForm() {
+    const open = this.#formFor;
+    const data = this.#el.form.querySelector("scxml-data") as ScxmlData | null;
+    if (!open || !data) return;
+    if (!data.reportValidity()) return;
+    const value = data.value;
+    this.#closeForm(true);
+    this.#sendEvent(open.name, value);
+  }
+
+  #closeForm(refocus: boolean) {
+    const open = this.#formFor;
+    this.#formFor = undefined;
+    this.#el.form.hidden = true;
+    this.#el.form.replaceChildren();
+    if (!open) return;
+    open.button.setAttribute("aria-expanded", "false");
+    if (refocus && open.button.isConnected) open.button.focus();
   }
 
   /**

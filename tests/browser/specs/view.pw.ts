@@ -85,6 +85,42 @@ test.describe("<scxml-view>", () => {
   });
 });
 
+test.describe("<scxml-view> event forms", () => {
+  test("an event with a schema asks for its data: typed, checked, sent with Enter", async ({ page }) => {
+    await page.goto("/fixtures/view.html");
+    await page.evaluate(() => {
+      const v = document.createElement("scxml-view");
+      v.id = "shop";
+      v.setAttribute("trusted", "");
+      (v as unknown as { source: string }).source =
+        `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="1.0" datamodel="ecmascript" initial="cart">
+        <xs:schema><xs:element name="add"><xs:complexType><xs:sequence>
+          <xs:element name="sku"><xs:simpleType><xs:restriction base="xs:string"><xs:enumeration value="tea"/><xs:enumeration value="mug"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="quantity" type="xs:positiveInteger"/>
+        </xs:sequence></xs:complexType></xs:element></xs:schema>
+        <datamodel><data id="items" expr="[]"/></datamodel>
+        <state id="cart"><transition event="add"><assign location="items" expr="items.concat([_event.data])"/></transition></state>
+      </scxml>`;
+      document.body.append(v);
+    });
+    const view = page.locator("#shop");
+    await view.locator("button.label, button.chip", { hasText: /^add/ }).first().click();
+    const form = view.locator(".form-popover");
+    await expect(form).toBeVisible();
+    const data = form.locator("scxml-data");
+    // the first box has the focus; a bad number is refused with its problem, not sent
+    await data.locator("select").selectOption("mug");
+    await data.locator('input[type="number"]').fill("0");
+    await data.locator('input[type="number"]').press("Enter");
+    await expect(data.locator(".problem:not([hidden])")).toHaveText(/At least 1/);
+    await data.locator('input[type="number"]').fill("2");
+    await data.locator('input[type="number"]').press("Enter");
+    await expect(form).toBeHidden();
+    const items = await view.evaluate((el) => (el as unknown as { session: { snapshot(): { items: unknown } } }).session.snapshot().items);
+    expect(items).toEqual([{ sku: "mug", quantity: 2 }]);
+  });
+});
+
 test.describe("<scxml-view> layout", () => {
   const zoom = (page: import("@playwright/test").Page) =>
     page.evaluate(() => {

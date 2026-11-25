@@ -5,7 +5,8 @@
     "../../packages/scxmljs/src/index.ts",
     "../../packages/scxmljs/src/trusted.ts",
     "../../packages/scxmljs/src/explorer.ts",
-    "../../packages/scxmljs/src/view.ts"
+    "../../packages/scxmljs/src/view.ts",
+    "../../packages/scxmljs/src/data.ts"
   ],
   "tsconfig": "../../packages/scxmljs/tsconfig.build.json",
   "out": "../../docs/api",

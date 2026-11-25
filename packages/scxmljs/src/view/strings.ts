@@ -57,6 +57,14 @@ export interface ViewStrings {
   hintTouch: string;
   /** A transition's target in a state's help popover: a link that flies the view to that state. */
   goTo: (state: string) => string;
+  /** The form that asks for an event's data before it is sent: its label, its buttons. */
+  formLabel: (event: string) => string;
+  /** The form's button that sends the event. */
+  formSend: string;
+  /** The form's button that closes it, sending nothing. */
+  formCancel: string;
+  /** After an event's name on a label: the event takes data, and a click asks for it. */
+  takesData: string;
   /** The diamond before a transition's condition in a state's help popover. */
   condition: string;
   /** Button that zooms in. */
@@ -148,6 +156,10 @@ export const defaultViewStrings: ViewStrings = {
   hintWheel: (key) => `${key} + scroll to zoom`,
   hintTouch: "Use two fingers to move the diagram",
   goTo: (state) => `Go to ${state}`,
+  formLabel: (event) => `Data for ${event}`,
+  formSend: "Send",
+  formCancel: "Cancel",
+  takesData: "takes data",
   condition: "Condition",
   zoomIn: "Zoom in (+)",
   zoomOut: "Zoom out (−)",

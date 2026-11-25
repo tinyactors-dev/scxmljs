@@ -54,7 +54,7 @@ from text (including parsing, compiling and loading the engine).
 ```
 
 Raise `max-states` to fold less (the layout slows down with the number of boxes); lower it for a
-compact overview. `fit` scales the drawing down to the element's width instead of scrolling.
+compact overview. `fit` scales the drawing down to the element's width instead of panning.
 
 ## `<scxml-explorer>` stays small
 

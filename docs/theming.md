@@ -58,8 +58,8 @@ The defaults are light / dark.
 | `--scxml-radius` | `4px` | corner radius |
 | `--scxml-duration` | `140ms` | transitions (none with `prefers-reduced-motion`) |
 | `--scxml-row-height` | `30px` | explorer tree rows |
-| `--scxml-min-scale` | `0.65` | how far `<scxml-view>` scales a too-wide diagram down before it scrolls instead (`1`: never; the `fit` attribute ignores it) |
-| `--scxml-height` | view: none; explorer: `min(860px, 100dvh - 32px)` | the element's height (the view scrolls inside it) |
+| `--scxml-min-scale` | `0.65` | how far `<scxml-view>` scales a too-wide diagram down before you pan to the rest instead (`1`: never; the `fit` attribute ignores it) |
+| `--scxml-height` | view: none; explorer: `min(860px, 100dvh - 32px)` | the element's height (the view's diagram pans inside it) |
 
 The elements don't load fonts. If a token names a web font, load it in your page.
 

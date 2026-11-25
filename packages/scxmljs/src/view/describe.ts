@@ -60,3 +60,28 @@ function dedent(text: string): string {
     .join("\n")
     .trim();
 }
+
+/** A line that starts a list item (`- `, `* `, `• `, `1. `, `2) `): it keeps its own line when text is reflowed. */
+const ITEM = /^\s*(?:[-*•]|\d+[.)])\s/;
+
+/**
+ * Text as the help popover shows it: paragraphs (split at blank lines), each one's lines joined
+ * with spaces, since a comment's line breaks are where its source was wrapped, not where its
+ * sentences end. A list item keeps its own line.
+ *
+ *   "A declined card sends it back; a service that cannot be\nreached is tried again."
+ *     → ["A declined card sends it back; a service that cannot be reached is tried again."]
+ */
+export function reflow(text: string): string[] {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .split(/\n[ \t]*\n/)
+    .map((paragraph) =>
+      paragraph
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .reduce((out, line) => (out && !ITEM.test(line) ? `${out} ${line}` : out ? `${out}\n${line}` : line), ""),
+    )
+    .filter(Boolean);
+}

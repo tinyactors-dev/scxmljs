@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, jest, test } from "bun:test";
 import { Window } from "happy-dom";
 import { PlaybackClock, VirtualClock } from "../src/index.ts";
 import { createSession } from "../src/trusted.ts";
+import { reflow } from "../src/view/describe.ts";
 import type { ScxmlView, ViewErrorDetail, ViewLoadDetail, ViewSendDetail } from "../src/view.ts";
 
 const window = new Window({ url: "http://localhost/charts/" });
@@ -450,6 +451,10 @@ describe("<scxml-view>", () => {
     expect(pop.hidden).toBe(true);
     expect(root.activeElement).toBe(help);
 
+    // a comment's line breaks are where its source was wrapped: the popover joins them
+    box(root, "pay").querySelector<HTMLButtonElement>("button.help")!.click();
+    expect([...pop.querySelectorAll(".help-text p")].map((p) => p.textContent)).toEqual(["Taking the money. Retries twice."]);
+
     box(root, "r1").querySelector<HTMLButtonElement>("button.help")!.click();
     expect(pop.querySelector(".help-none")).toBeTruthy();
     el.descriptions = { r1: "The first region." };
@@ -512,7 +517,8 @@ describe("<scxml-view>", () => {
     expect(el.zoom).toBe(1);
     root.querySelector<HTMLButtonElement>(".zoom-in")!.click();
     expect(el.zoom).toBe(1.25);
-    expect(diagram.style.transform).toBe("scale(1.25)");
+    // zoomed around the canvas's middle (a corner here: happy-dom lays nothing out), so it moves a little too
+    expect(diagram.style.transform).toEndWith("scale(1.25)");
     expect(root.querySelector(".zoom-level")?.textContent).toBe("125%");
     expect(fit.hidden).toBe(false);
     expect(root.querySelector<HTMLElement>(".viewport")!.hasAttribute("data-zooming")).toBe(true);
@@ -529,7 +535,7 @@ describe("<scxml-view>", () => {
     el.remove();
   });
 
-  test("input: wheel and drag take over the view; touch scrolls, pinches and double-taps", async () => {
+  test("input: the page keeps one finger and a plain wheel; drag, two fingers, keys and Ctrl + wheel move the canvas", async () => {
     const { el, root } = await mount({ trusted: "" }, LIGHT);
     const w = window as unknown as Record<string, new (type: string, init?: object) => Event>;
     const canvas = root.querySelector<HTMLElement>(".canvas")!;
@@ -541,9 +547,11 @@ describe("<scxml-view>", () => {
         if ((e as unknown as Record<string, unknown>)[k] !== v) Object.defineProperty(e, k, { value: v });
       return canvas.dispatchEvent(e);
     };
-    // a plain wheel scrolls: the view is the user's now ("fit" offers the way back)
-    fire("WheelEvent", "wheel", { deltaY: 40 });
-    expect(fit.hidden).toBe(false);
+    const pan = () => root.querySelector<HTMLElement>(".diagram")!.dataset.pan;
+    // a plain wheel is the page's: the canvas doesn't scroll, nothing moves, nothing is taken over
+    expect(fire("WheelEvent", "wheel", { deltaY: 40 })).toBe(true);
+    expect(fit.hidden).toBe(true);
+    expect(pan()).toBe("0 0");
     // Ctrl + wheel zooms
     fire("WheelEvent", "wheel", { deltaY: -100, ctrlKey: true, clientX: 5, clientY: 5 });
     expect(el.zoom).toBeGreaterThan(1.1);
@@ -554,9 +562,18 @@ describe("<scxml-view>", () => {
     fire("PointerEvent", "pointerdown", { button: 0, pointerType: "mouse", pointerId: 1, clientX: 10, clientY: 10 });
     fire("PointerEvent", "pointermove", { pointerId: 1, clientX: 60, clientY: 40 });
     expect(canvas.classList.contains("panning")).toBe(true);
+    expect(pan()).toBe("50 30");
     expect(fit.hidden).toBe(false);
     fire("PointerEvent", "pointerup", { pointerId: 1 });
     expect(canvas.classList.contains("panning")).toBe(false);
+    fit.click();
+    expect(pan()).toBe("0 0");
+    // the arrow keys pan (with Shift, further)
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    expect(pan()).toBe("-40 0");
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", shiftKey: true, bubbles: true }));
+    expect(pan()).toBe("-40 240");
+    expect(fit.hidden).toBe(false);
     fit.click();
     // touch: a double tap zooms in on the spot, another goes back to fit
     const touch = (x: number, y: number, id = 0) => ({ identifier: id, clientX: x, clientY: y, target: canvas });
@@ -570,11 +587,18 @@ describe("<scxml-view>", () => {
     tap();
     tap();
     expect(el.zoom).toBe(1);
-    // one finger moving scrolls by hand
-    fire("TouchEvent", "touchstart", { touches: [touch(20, 20)] });
-    fire("TouchEvent", "touchmove", { touches: [touch(20, 60)] });
+    // one finger is the page's: it scrolls the page, the drawing stays
+    expect(fire("TouchEvent", "touchstart", { touches: [touch(20, 20)] })).toBe(true);
+    expect(fire("TouchEvent", "touchmove", { touches: [touch(20, 60)] })).toBe(true);
     fire("TouchEvent", "touchend", { touches: [], changedTouches: [touch(20, 60)] });
-    expect(fit.hidden).toBe(false);
+    expect(fit.hidden).toBe(true);
+    expect(pan()).toBe("0 0");
+    // two fingers moving together pan (the page doesn't scroll), the scale stays
+    fire("TouchEvent", "touchstart", { touches: [touch(10, 10, 1), touch(50, 10, 2)] });
+    expect(fire("TouchEvent", "touchmove", { touches: [touch(30, 40, 1), touch(70, 40, 2)] })).toBe(false);
+    fire("TouchEvent", "touchend", { touches: [] });
+    expect(el.zoom).toBe(1);
+    expect(pan()).toBe("20 30");
     fit.click();
     // two fingers pinch
     fire("TouchEvent", "touchstart", { touches: [touch(10, 10, 1), touch(50, 10, 2)] });
@@ -632,5 +656,18 @@ describe("<scxml-view>", () => {
     const clean = await mount({ trusted: "" }, LIGHT);
     expect((clean.root.querySelector(".warnings") as HTMLElement).hidden).toBe(true);
     clean.el.remove();
+  });
+});
+
+describe("reflow (the help popover's text)", () => {
+  test("joins a paragraph's lines, keeps blank lines between paragraphs and list items on their own lines", () => {
+    expect(reflow("A declined card sends it back; a service that cannot be\nreached is tried again.")).toEqual([
+      "A declined card sends it back; a service that cannot be reached is tried again.",
+    ]);
+    expect(reflow("First paragraph,\n  wrapped.\n\n  \nSecond one.")).toEqual(["First paragraph, wrapped.", "Second one."]);
+    expect(reflow("It waits for:\n- a payment\n- or a timeout,\n  whichever comes first\n1. then ships")).toEqual([
+      "It waits for:\n- a payment\n- or a timeout, whichever comes first\n1. then ships",
+    ]);
+    expect(reflow("\r\n  \r\n")).toEqual([]);
   });
 });

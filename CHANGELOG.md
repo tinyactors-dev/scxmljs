@@ -18,6 +18,25 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+### Changed
+
+- `<scxml-view>`: the diagram is a canvas instead of a scrolling box. It pans in every direction,
+  past its edges (some of it always stays in view), by dragging its background, with two fingers,
+  or with the arrow keys while it has focus; it shows no scrollbars. One finger and a plain scroll
+  wheel scroll the page past it, as on an embedded map; zooming is unchanged (Ctrl/⌘ + wheel, a
+  pinch, `+` `-` `0`). With two fingers, the spot between them stays under them as they pan and
+  pinch. A page that scrolled the canvas itself (`scrollLeft`, `scrollTop`) has nothing to
+  scroll now: the drawing's offset is the diagram's `data-pan`.
+
+### Fixed
+
+- `<scxml-view>`: a state's help popover reflows the XML comment it shows: the comment's line
+  breaks are where its source was wrapped, so the popover joins a paragraph's lines (a blank line
+  still starts a paragraph, a list item keeps its own line). Before, a sentence broke wherever the
+  source did.
+- `<scxml-view>`: a help popover taller than the room below its button opens on the side with
+  more room and scrolls inside, instead of running past the diagram's frame and being cut off.
+
 ## [0.3.1] - 2026-11-25
 
 ### Fixed

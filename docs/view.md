@@ -66,7 +66,7 @@ from the page, it disposes the session it created.
 | `data` | | JSON object of initial values; each key replaces the `<data>` element with that id |
 | `direction` | `down` | `down` (top to bottom), `right` (left to right), or `auto` (`down` when the element is 760 px wide or less, `right` otherwise) |
 | `max-states` | `150` | fold the largest compound states until at most this many boxes are drawn |
-| `fit` | absent | scale the diagram all the way down to the element's width instead of scrolling. Without it, a diagram wider than the element is still scaled down, but not below `--scxml-min-scale` (0.65), and the rest scrolls. Either way this is the automatic zoom; [zooming by hand](#zoom-pan-and-folding) overrides it |
+| `fit` | absent | scale the diagram all the way down to the element's width instead of panning. Without it, a diagram wider than the element is still scaled down, but not below `--scxml-min-scale` (0.65), and you pan to the rest. Either way this is the automatic zoom; [zooming by hand](#zoom-pan-and-folding) overrides it |
 | `event-data` | | JSON object from event names to the data a click on that event's label sends, e.g. `{"login": {"user": "ada"}}`. Host code can also set `detail.data` in an `scxml-send` listener |
 | `announce` | `all` | what the live region reads out: `all` (steps and sent events), `sends`, or `off` |
 | `warnings` | `show` | `off` hides the list of authoring warnings above the diagram |
@@ -153,18 +153,22 @@ what's useful at the moment.
   the pointer is over the diagram, keyboard focus is in it, or you're zooming. Zooming keeps the
   point under the pointer in place, and fixes the canvas at the height it had, so the page
   doesn't jump.
-- **Fit** sits in the corner once you've zoomed or scrolled away, and takes you back to the
+- **Fit** sits in the corner once you've zoomed or panned away, and takes you back to the
   automatic view.
-- **Pan** by dragging the diagram's background, or by scrolling.
-- **Touch:** one finger scrolls the diagram, two fingers pinch-zoom it (not the page). A double
-  tap zooms in on that spot, and when you're zoomed in, back to fit. Buttons are larger, and − and
-  + give way to the gestures.
+- **Pan** in any direction, past the drawing's edges (some of it always stays in view): drag the
+  diagram's background, or use the arrow keys while it has focus (with Shift, further). The
+  diagram is a canvas, not a scrolling box: a plain scroll wheel, or a trackpad's two-finger
+  swipe, scrolls the page past it, as on an embedded map.
+- **Touch:** one finger scrolls the page, two fingers move the diagram: they pan it and
+  pinch-zoom it, the spot between them staying under them. A double tap zooms in on that spot,
+  and when you're zoomed in, back to fit. Buttons are larger, and − and + give way to the
+  gestures.
 - **Playback** (with a `PlaybackClock`): play or pause, Step (only while paused), the speed (one
   button that cycles through ¼× to 4×) and the virtual time. While the chart plays and nobody
   touches it, the controls shrink to the play button after three seconds; moving the pointer over
   the diagram, a tap or keyboard focus brings them back.
-- **Following:** when the chart doesn't fit, the element scrolls to the active states, and keeps
-  them in view as the machine moves. It stops as soon as you scroll, drag or zoom; fit to width
+- **Following:** when the chart doesn't fit, the element moves the drawing to the active states,
+  and keeps them in view as the machine moves. It stops as soon as you pan or zoom; fit to width
   (`0`) turns it back on.
 - **Narrow elements:** parallel regions that wouldn't fit side by side at 65% stack instead, and
   the element lays the chart out again when its width changes a lot.
@@ -226,7 +230,7 @@ or everything with **Expand all** in the notice. See [large charts](large-charts
 ## Keyboard and screen readers
 
 - Transition labels are buttons: Tab to them, Enter or Space sends the event.
-- The diagram scrolls with the arrow keys once it has focus; `+`, `-` and `0` zoom.
+- The diagram pans with the arrow keys once it has focus (Shift: further); `+`, `-` and `0` zoom.
 - Fold toggles and help buttons are buttons too, named "Collapse pay" or "About cart". The help
   popover takes focus; Escape closes it and returns focus to its button.
 - With a `PlaybackClock`: Space plays and pauses, `.` steps to the next event.

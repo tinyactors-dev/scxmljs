@@ -128,14 +128,21 @@ test.describe("<scxml-view> layout", () => {
     for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -100);
     await page.keyboard.up("Control");
     await expect.poll(scale).toBeGreaterThan(start * 1.5);
-    // the canvas keeps its height; dragging the background pans
-    const before = await canvas.evaluate((c) => ({ left: c.scrollLeft, top: c.scrollTop }));
+    // the canvas keeps its height and never scrolls; dragging the background pans the drawing
+    const pan = () => view.evaluate((v) => v.shadowRoot!.querySelector<HTMLElement>(".diagram")!.dataset.pan!.split(" ").map(Number));
+    const before = await pan();
     await page.mouse.move(box.x + 6, box.y + 6);
     await page.mouse.down();
     await page.mouse.move(box.x + 60, box.y + 50, { steps: 5 });
     await page.mouse.up();
-    const after = await canvas.evaluate((c) => ({ left: c.scrollLeft, top: c.scrollTop }));
-    expect(after.left + after.top).toBeLessThan(before.left + before.top);
+    const after = await pan();
+    expect(after[0]! - before[0]!).toBeGreaterThan(30);
+    expect(after[1]! - before[1]!).toBeGreaterThan(30);
+    expect(await canvas.evaluate((c) => c.scrollLeft + c.scrollTop)).toBe(0);
+    // a plain wheel is the page's: it doesn't move the drawing
+    await page.mouse.move(box.x + box.width / 2, box.y + 40);
+    await page.mouse.wheel(0, 120);
+    expect(await pan()).toEqual(after);
     await view.locator(".zoom-reset").click();
     await expect.poll(scale).toBeLessThanOrEqual(1);
 

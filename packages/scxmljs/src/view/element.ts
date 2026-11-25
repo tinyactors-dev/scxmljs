@@ -34,8 +34,10 @@
  * about, shown by its help button; XML comments in the source otherwise),
  * `zoom`, and `reload()`.
  *
- * Navigation: the diagram zooms (the toolbar, Ctrl/⌘ + wheel, pinch, `+` `-`
- * `0` while the canvas is focused) and pans (drag, or scroll); every compound
+ * Navigation: the diagram is a canvas. It zooms (the toolbar, Ctrl/⌘ + wheel,
+ * a pinch, `+` `-` `0` while the canvas is focused) and pans in every direction,
+ * past its edges (a mouse drag, two fingers, the arrow keys); one finger and a
+ * plain wheel scroll the page, as on an embedded map. Every compound
  * and parallel state folds and unfolds with its chevron.
  *
  * Events (bubbling, composed): `scxml-load` { session, model },
@@ -59,7 +61,7 @@ import * as icons from "../ui/icons.ts";
 import { eventName, NOTATION_CSS } from "../ui/notation.ts";
 import { arrowMarker, icon } from "../ui/svg.ts";
 import { lazySheet, NARROW_WIDTH, themeSheet } from "../ui/theme.ts";
-import { sourceDescription } from "./describe.ts";
+import { reflow, sourceDescription } from "./describe.ts";
 import { autoCollapse, type ChartLayout, type Direction, layoutChart, portalTransitions, type Size } from "./layout.ts";
 import { defaultViewStrings, type ViewStateKind, type ViewStrings } from "./strings.ts";
 import { VIEW_CSS } from "./styles.ts";
@@ -116,6 +118,13 @@ const MAX_ZOOM = 4;
 const ZOOM_STEP = 1.25;
 /** The diagram's margin inside the canvas, px (see `.diagram` in styles.ts). */
 const MARGIN = 12;
+/** How much of the drawing stays in view however far it is panned (px each way). */
+const PAN_KEEP = 48;
+/** The arrow keys pan by this much (px), with Shift by PAN_PAGE. */
+const PAN_STEP = 40;
+const PAN_PAGE = 240;
+/** How long revealing the active states glides (ms). */
+const GLIDE_MS = 250;
 const FIRED_MS = 900;
 /** How long the playback controls stay in full while playing and untouched. */
 const IDLE_MS = 3000;
@@ -230,10 +239,12 @@ export class ScxmlView extends ElementBase {
   // navigation: an explicit zoom (null = automatic, see #applyFit) and the open help popover
   #zoom: number | null = null;
   #scale = 1;
+  /** How far the drawing is moved from where the automatic view puts it (px, on screen). */
+  #pan = { x: 0, y: 0 };
   #helpFor?: { state: StateNode; button: HTMLElement };
-  /** Keep the active states in view (until the user pans, scrolls or zooms; "fit to width" resumes). */
+  /** Keep the active states in view (until the user pans or zooms; "fit to width" resumes). */
   #follow = true;
-  /** The active states last revealed, so a step that changes nothing doesn't scroll. */
+  /** The active states last revealed, so a step that changes nothing doesn't move the drawing. */
   #revealed = "";
 
   constructor() {
@@ -716,7 +727,7 @@ export class ScxmlView extends ElementBase {
     const warnings = h("details", { class: "warnings", part: "warnings", hidden: "" }) as HTMLDetailsElement;
     const error = h("div", { class: "error", part: "error", role: "alert", hidden: "" });
     const diagram = h("div", { class: "diagram", role: "group" });
-    // focusable: a scroll container must be keyboard-scrollable, and it takes the playback and zoom shortcuts
+    // focusable: it takes the arrow keys (pan), and the playback and zoom shortcuts
     const canvas = h("div", { class: "canvas", part: "canvas", tabindex: "0" }, diagram);
     const fit = iconButton("zoom-reset", "fit", t.zoomReset, icon(icons.scan, 16), () => this.#zoomTo(null));
     fit.append(h("span", {}, t.fit));
@@ -780,10 +791,10 @@ export class ScxmlView extends ElementBase {
     canvas.addEventListener(
       "wheel",
       (e) => {
-        this.#takeOver();
-        // pinch-zoom on a trackpad arrives as a wheel event with ctrlKey
+        // a plain wheel scrolls the page; pinch-zoom on a trackpad arrives as a wheel event with ctrlKey
         if (!(e.ctrlKey || e.metaKey) || !this.#layout) return;
         e.preventDefault();
+        this.#takeOver();
         // a wheel notch (~100px) zooms by about a fifth; a pinch sends many small deltas
         const factor = Math.exp(-Math.max(-100, Math.min(100, e.deltaY * (e.deltaMode === 1 ? 20 : 1))) * 0.002);
         this.#zoomTo(this.#scale * factor, { x: e.clientX, y: e.clientY });
@@ -796,19 +807,22 @@ export class ScxmlView extends ElementBase {
       else if (e.key === "-" || e.key === "_") this.#zoomBy(1 / ZOOM_STEP);
       else if (e.key === "0") this.#zoomTo(null);
       else {
-        if (/^(Arrow|Page|Home$|End$)/.test(e.key) || e.key === " ") this.#takeOver();
-        return;
+        const step = e.shiftKey ? PAN_PAGE : PAN_STEP;
+        const by = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
+        if (!by || !this.#layout) return;
+        this.#takeOver();
+        this.#panTo(this.#pan.x + by[0]!, this.#pan.y + by[1]!);
       }
       e.preventDefault();
     });
     this.#wirePinch();
-    // drag to pan (mouse and pen; touch scrolls natively), starting anywhere but a control
+    // drag to pan (mouse and pen; one finger scrolls the page, two pan: #wirePinch), starting anywhere but a control
     let drag: { id: number; x: number; y: number; left: number; top: number; moved: boolean } | undefined;
     canvas.addEventListener("pointerdown", (e) => {
       if (e.button !== 0 || e.pointerType === "touch") return;
       const target = e.composedPath()[0] as Element;
       if (target?.closest?.("button, a, input, select, textarea, summary")) return;
-      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: canvas.scrollLeft, top: canvas.scrollTop, moved: false };
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: this.#pan.x, top: this.#pan.y, moved: false };
     });
     canvas.addEventListener("pointermove", (e) => {
       if (!drag || e.pointerId !== drag.id) return;
@@ -822,8 +836,7 @@ export class ScxmlView extends ElementBase {
         canvas.classList.add("panning");
       }
       e.preventDefault();
-      canvas.scrollLeft = drag.left - dx;
-      canvas.scrollTop = drag.top - dy;
+      this.#panTo(drag.left + dx, drag.top + dy);
     });
     const end = (e: PointerEvent) => {
       if (!drag || e.pointerId !== drag.id) return;
@@ -833,7 +846,6 @@ export class ScxmlView extends ElementBase {
     };
     canvas.addEventListener("pointerup", end);
     canvas.addEventListener("pointercancel", end);
-    canvas.addEventListener("scroll", () => this.#placeHelp());
     help.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
@@ -847,13 +859,14 @@ export class ScxmlView extends ElementBase {
   }
 
   /**
-   * Touch: one finger scrolls (natively), two pinch-zoom the diagram around their midpoint
-   * instead of the page (`touch-action: pan-x pan-y` on the canvas keeps the browser out of it).
+   * Touch: one finger scrolls the page (natively: the canvas doesn't scroll), two move the
+   * diagram: they pan it and pinch-zoom it, the point under their midpoint staying under it
+   * (`touch-action: pan-x pan-y` on the canvas keeps the browser's own pinch out of it).
    * A double tap zooms in on that spot, or, when already zoomed in, back to fit (like Photos).
    */
   #wirePinch() {
     const canvas = this.#el.canvas;
-    let pinch: { dist: number; scale: number } | undefined;
+    let pinch: { dist: number; scale: number; point: { x: number; y: number } } | undefined;
     /** the last single-finger tap (no movement): where and when */
     let tap: { x: number; y: number; at: number } | undefined;
     let start: { x: number; y: number; moved: boolean } | undefined;
@@ -864,7 +877,7 @@ export class ScxmlView extends ElementBase {
       (e) => {
         if (e.touches.length === 2 && this.#layout) {
           this.#takeOver();
-          pinch = { dist: dist(e.touches), scale: this.#scale };
+          pinch = { dist: dist(e.touches), scale: this.#scale, point: this.#pointAt(mid(e.touches)) };
           start = undefined;
           tap = undefined;
         } else if (e.touches.length === 1) start = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY, moved: false };
@@ -878,13 +891,13 @@ export class ScxmlView extends ElementBase {
           const t = e.touches[0]!;
           if (!start.moved && Math.abs(t.clientX - start.x) + Math.abs(t.clientY - start.y) > 8) {
             start.moved = true;
-            this.#takeOver(); // scrolling by hand
+            // one finger scrolls the page, not the diagram: nothing to take over
           }
         }
         if (!pinch || e.touches.length !== 2) return;
         e.preventDefault();
         const d = dist(e.touches);
-        if (pinch.dist > 0 && d > 0) this.#zoomTo(pinch.scale * (d / pinch.dist), mid(e.touches));
+        if (pinch.dist > 0 && d > 0) this.#zoomTo(pinch.scale * (d / pinch.dist), mid(e.touches), pinch.point);
       },
       { passive: false },
     );
@@ -947,22 +960,13 @@ export class ScxmlView extends ElementBase {
     const h = canvas.clientHeight;
     if (!(w > 0 && h > 0)) return;
     const pad = 16;
-    const inView =
-      x0 >= canvas.scrollLeft + pad &&
-      x1 <= canvas.scrollLeft + w - pad &&
-      y0 >= canvas.scrollTop + pad &&
-      y1 <= canvas.scrollTop + h - pad;
+    const { x: px, y: py } = this.#pan;
+    const inView = x0 + px >= pad && x1 + px <= w - pad && y0 + py >= pad && y1 + py <= h - pad;
     if (inView) return;
-    // centre them; if they don't fit, show their top-left corner
+    // centre them; if they don't fit, show their top-left corner (never past the drawing's own)
     const left = x1 - x0 + 2 * pad > w ? x0 - pad : (x0 + x1) / 2 - w / 2;
     const top = y1 - y0 + 2 * pad > h ? y0 - pad : (y0 + y1) / 2 - h / 2;
-    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const behavior: ScrollBehavior = smooth && !reduce ? "smooth" : "auto";
-    if (typeof canvas.scrollTo === "function") canvas.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior });
-    else {
-      canvas.scrollLeft = Math.max(0, left);
-      canvas.scrollTop = Math.max(0, top);
-    }
+    this.#panTo(-Math.max(0, left), -Math.max(0, top), smooth);
   }
 
   /** "Fit" shows once the view has left the default: zoomed by hand, or no longer following. */
@@ -993,9 +997,11 @@ export class ScxmlView extends ElementBase {
 
   /**
    * Set an explicit scale (`null`: back to automatic), keeping the diagram point under
-   * `anchor` (client coordinates; default: the middle of the canvas) where it is.
+   * `anchor` (client coordinates; default: the middle of the canvas) where it is, or, given
+   * `point` (diagram coordinates, from #pointAt), putting that point under `anchor` (a pinch:
+   * the point under the fingers follows them).
    */
-  #zoomTo(scale: number | null, anchor?: { x: number; y: number }) {
+  #zoomTo(scale: number | null, anchor?: { x: number; y: number }, point?: { x: number; y: number }) {
     const canvas = this.#el.canvas;
     const before = this.#scale;
     if (scale != null && !Number.isFinite(scale)) return;
@@ -1007,23 +1013,57 @@ export class ScxmlView extends ElementBase {
     }
     if (next == null) canvas.style.removeProperty("height");
     const r = canvas.getBoundingClientRect();
-    const ax = (anchor?.x ?? r.left + canvas.clientWidth / 2) - r.left;
-    const ay = (anchor?.y ?? r.top + canvas.clientHeight / 2) - r.top;
-    // the diagram point under the anchor
-    const px = (canvas.scrollLeft + ax - MARGIN) / before;
-    const py = (canvas.scrollTop + ay - MARGIN) / before;
+    const at = { x: anchor?.x ?? r.left + canvas.clientWidth / 2, y: anchor?.y ?? r.top + canvas.clientHeight / 2 };
+    // the diagram point that stays (or comes) under the anchor
+    const p = point ?? this.#pointAt(at, before);
     this.#zoom = next;
     this.#follow = next == null;
     this.#revealed = "";
     if (next != null) this.#flashZoomLevel();
+    if (next == null) this.#pan = { x: 0, y: 0 };
     this.#applyFit();
     if (next == null) {
       this.#revealActive(true);
       return;
     }
-    canvas.scrollLeft = px * this.#scale + MARGIN - ax;
-    canvas.scrollTop = py * this.#scale + MARGIN - ay;
+    this.#panTo(at.x - r.left - MARGIN - p.x * this.#scale, at.y - r.top - MARGIN - p.y * this.#scale);
   }
+
+  /** The diagram point (layout coordinates) under `at` (client coordinates), at `scale`. */
+  #pointAt(at: { x: number; y: number }, scale = this.#scale): { x: number; y: number } {
+    const r = this.#el.canvas.getBoundingClientRect();
+    return { x: (at.x - r.left - MARGIN - this.#pan.x) / scale, y: (at.y - r.top - MARGIN - this.#pan.y) / scale };
+  }
+
+  /**
+   * Move the drawing to `x`, `y` (its offset from the automatic view, px), anywhere as long as
+   * some of it stays in view (PAN_KEEP px each way). `smooth` glides there (not with reduced motion).
+   */
+  #panTo(x: number, y: number, smooth = false) {
+    const layout = this.#layout;
+    const canvas = this.#el.canvas;
+    if (!layout || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    const w = layout.width * this.#scale;
+    const h = layout.height * this.#scale;
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
+    const clamp = (v: number, size: number, room: number) =>
+      room > 0 ? Math.min(room - MARGIN - Math.min(PAN_KEEP, size), Math.max(Math.min(PAN_KEEP, size) - MARGIN - size, v)) : v;
+    const next = { x: clamp(x, w, cw), y: clamp(y, h, ch) };
+    if (next.x === this.#pan.x && next.y === this.#pan.y) return;
+    this.#pan = next;
+    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const d = this.#el.diagram;
+    if (smooth && !reduce) {
+      d.classList.add("gliding");
+      clearTimeout(this.#glideTimer);
+      this.#glideTimer = setTimeout(() => d.classList.remove("gliding"), GLIDE_MS);
+    } else d.classList.remove("gliding");
+    this.#transform();
+    this.#placeHelp();
+  }
+
+  #glideTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** Open the help popover of `state` next to its button. */
   #openHelp(state: StateNode, button: HTMLElement) {
@@ -1037,7 +1077,7 @@ export class ScxmlView extends ElementBase {
     const text = this.describe(state);
     const heading = h("div", { class: "help-head" }, h("strong", {}, name), h("span", { class: "help-kind" }, t.kinds[kind]));
     const body = text
-      ? h("div", { class: "help-text" }, ...text.split(/\n{2,}/).map((para) => h("p", {}, para)))
+      ? h("div", { class: "help-text" }, ...reflow(text).map((para) => h("p", {}, para)))
       : h("p", { class: "help-none" }, t.noDescription);
     const shown = state.transitions.filter((tr) => tr.element);
     const list = shown.length
@@ -1078,7 +1118,11 @@ export class ScxmlView extends ElementBase {
     if (refocus && open.button.isConnected) open.button.focus();
   }
 
-  /** Keep the open popover under its button (it follows panning and zooming), inside the viewport. */
+  /**
+   * Keep the open popover next to its button (it follows panning and zooming), inside the
+   * viewport: below the button, or above it when it fits only there, or else on the side with
+   * more room, as tall as that room (it scrolls inside), so the frame never cuts it off.
+   */
   #placeHelp() {
     const open = this.#helpFor;
     const pop = this.#el.help;
@@ -1087,13 +1131,19 @@ export class ScxmlView extends ElementBase {
     const vp = (pop.parentElement as HTMLElement).getBoundingClientRect();
     const b = open.button.getBoundingClientRect();
     const w = pop.offsetWidth;
-    const ph = pop.offsetHeight;
     const maxLeft = Math.max(4, vp.width - w - 4);
     pop.style.setProperty("left", `${Math.min(maxLeft, Math.max(4, b.left - vp.left + b.width / 2 - 20))}px`);
-    // below the button, or above it when there's no room below
-    const below = b.bottom - vp.top + 6;
-    const above = b.top - vp.top - 6 - ph;
-    pop.style.setProperty("top", `${below + ph > vp.height - 4 && above >= 4 ? above : Math.max(4, below)}px`);
+    pop.style.removeProperty("max-height");
+    const ph = pop.offsetHeight;
+    const top = Math.max(4, b.bottom - vp.top + 6); // where it starts below the button
+    const bottom = Math.min(vp.height - 4, b.top - vp.top - 6); // where it ends above it
+    const roomBelow = vp.height - 4 - top;
+    const roomAbove = bottom - 4;
+    const fitsBelow = ph <= roomBelow;
+    const upwards = !fitsBelow && (ph <= roomAbove || roomAbove > roomBelow);
+    const room = upwards ? roomAbove : roomBelow;
+    if (ph > room) pop.style.setProperty("max-height", `${Math.max(48, room)}px`);
+    pop.style.setProperty("top", `${upwards ? Math.max(4, bottom - Math.min(ph, room)) : top}px`);
   }
 
   #playback(): PlaybackClock | undefined {
@@ -1525,7 +1575,7 @@ export class ScxmlView extends ElementBase {
   /**
    * A diagram wider than the element is scaled down: with `fit` all the way to the element's
    * width, otherwise no further than `--scxml-min-scale` (default 0.65, so labels stay legible),
-   * and the rest scrolls. `--scxml-min-scale: 1` turns the automatic scaling off.
+   * and you pan to the rest. `--scxml-min-scale: 1` turns the automatic scaling off.
    */
   #applyFit() {
     const d = this.#el.diagram;
@@ -1548,17 +1598,30 @@ export class ScxmlView extends ElementBase {
     // narrow: Fit is its icon, so both clusters share the bottom edge
     this.#el.viewport.toggleAttribute("data-narrow", this.#el.canvas.clientWidth > 0 && this.#el.canvas.clientWidth < 420);
     // transform, not `zoom`: WebKit's zoom shrinks the boxes but not their text. A transform
-    // doesn't change the layout box, so margins give the scroll area the scaled size.
+    // doesn't change the layout box, so margins give the canvas the scaled size.
     d.dataset.scale = String(scale);
     if (!layout || scale === 1) {
-      for (const p of ["transform", "transform-origin", "margin-right", "margin-bottom"]) d.style.removeProperty(p);
+      for (const p of ["margin-right", "margin-bottom"]) d.style.removeProperty(p);
     } else {
-      d.style.setProperty("transform-origin", "0 0");
-      d.style.setProperty("transform", `scale(${scale})`);
       d.style.setProperty("margin-right", `${MARGIN - layout.width * (1 - scale)}px`);
       d.style.setProperty("margin-bottom", `${MARGIN - layout.height * (1 - scale)}px`);
     }
+    if (layout) this.#panTo(this.#pan.x, this.#pan.y); // the scale or the canvas changed: keep some in view
+    this.#transform();
     this.#placeHelp();
+  }
+
+  /** The drawing's transform: moved by the pan, then scaled from its top-left corner. */
+  #transform() {
+    const d = this.#el.diagram;
+    const { x, y } = this.#pan;
+    d.dataset.pan = `${Math.round(x)} ${Math.round(y)}`;
+    if (!this.#layout || (this.#scale === 1 && x === 0 && y === 0)) {
+      for (const p of ["transform", "transform-origin"]) d.style.removeProperty(p);
+      return;
+    }
+    d.style.setProperty("transform-origin", "0 0");
+    d.style.setProperty("transform", `translate(${x}px, ${y}px) scale(${this.#scale})`);
   }
 
   // ───────────────────────────── live state ─────────────────────────────

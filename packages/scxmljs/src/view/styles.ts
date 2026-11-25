@@ -14,13 +14,13 @@ export const VIEW_CSS = /* css */ `
 .frame { display: flex; flex-direction: column; max-height: var(--scxml-height, none); min-height: 0; }
 .canvas:focus-visible { outline: 2px solid var(--x-accent); outline-offset: -2px; }
 .viewport { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-.canvas { overflow: auto; min-height: 0; flex: 1 1 auto; overscroll-behavior: contain; cursor: grab; }
-/* one finger scrolls; two pinch-zoom the diagram (handled by the element), not the page */
+.canvas { overflow: hidden; min-height: 0; flex: 1 1 auto; cursor: grab; }
+/* one finger scrolls the page; two pan and pinch-zoom the diagram (handled by the element) */
 .canvas { touch-action: pan-x pan-y; }
 .canvas.panning { cursor: grabbing; user-select: none; -webkit-user-select: none; }
 .canvas.panning * { cursor: grabbing !important; }
 .diagram { position: relative; margin: 12px; }
-:host([fit]) .canvas:not(.zoomed) { overflow: hidden; }
+.diagram.gliding { transition: transform 250ms ease; }
 :host([fit]) .diagram { transform-origin: 0 0; }
 
 /* ── boxes ─────────────────────────────────────────────── */
@@ -111,7 +111,7 @@ button.label:disabled, button.chip:disabled { cursor: default; }
 
 /* ── help popover ──────────────────────────────────────── */
 .help-popover {
-  position: absolute; z-index: 3; box-sizing: border-box; width: max-content; max-width: min(340px, calc(100% - 8px));
+  position: absolute; z-index: 3; box-sizing: border-box; width: max-content; max-width: min(340px, calc(100% - 8px)); overflow-y: auto; overscroll-behavior: contain;
   padding: 10px 12px; border: 1px solid var(--x-b2); border-radius: calc(var(--x-r) + 2px);
   background: var(--x-bg); color: var(--x-fg1); font: 12.5px/1.45 var(--x-sans);
   box-shadow: 0 6px 24px -8px color-mix(in srgb, var(--x-fg1) 35%, transparent);

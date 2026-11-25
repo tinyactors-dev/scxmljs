@@ -188,7 +188,9 @@ export async function renderMarkdown(file: string, source: string, images: Set<s
       if (token.type === "link" || token.type === "image") token.href = rewriteHref(token.href, file, images);
     },
   });
-  let html = await marked.parse(source);
+  // the changelog's "Unreleased" heading is a place to write, not news: drop it while it's empty
+  const text = file === "CHANGELOG.md" ? source.replace(/^## \[Unreleased\]\s*\n(?=## )/m, "") : source;
+  let html = await marked.parse(text);
   // an empty header cell (a column of values without a heading) isn't a header
   html = html.replace(/<th( align="\w+")?>\s*<\/th>/g, "<td$1></td>");
   // raw HTML in the Markdown (e.g. <a href>, <img src>) gets the same rewriting

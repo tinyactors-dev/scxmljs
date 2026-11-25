@@ -120,10 +120,11 @@ The [getting-started guide](https://github.com/tinyactors-dev/scxmljs/blob/main/
 
 | Import | What | Size (min + gzip) |
 |---|---|---|
-| `@tinyactors/scxmljs` | the interpreter, **sandboxed**: chart code runs in QuickJS (WebAssembly) | 20 KB, then 290 KB loaded on demand |
-| `@tinyactors/scxmljs/trusted` | the same API, **trusted**: chart code runs in the host's own JavaScript engine | 17 KB |
-| `@tinyactors/scxmljs/view` | `<scxml-view>`: a whole chart, drawn and running, zero-JS | 33 KB, plus the engine it loads |
-| `@tinyactors/scxmljs/explorer` | `<scxml-explorer>` and its view-model: explore a running system | 26 KB |
+| `@tinyactors/scxmljs` | the interpreter, **sandboxed**: chart code runs in QuickJS (WebAssembly) | 25 KB, then 290 KB loaded on demand |
+| `@tinyactors/scxmljs/trusted` | the same API, **trusted**: chart code runs in the host's own JavaScript engine | 23 KB |
+| `@tinyactors/scxmljs/view` | `<scxml-view>`: a whole chart, drawn and running, zero-JS | 57 KB, plus the engine it loads |
+| `@tinyactors/scxmljs/explorer` | `<scxml-explorer>` and its view-model: explore a running system | 30 KB |
+| `@tinyactors/scxmljs/data` | `<scxml-data>`: show, edit and compose a value an XML Schema describes (the view's event forms) | 9 KB |
 | `@tinyactors/scxmljs/themes/tinyactors.css` | an optional theme stylesheet | 0.3 KB |
 
 Sizes are for a browser bundle of each entry on its own (`mise run size` in the repository).
@@ -145,7 +146,7 @@ Details: [sandboxed vs trusted](https://github.com/tinyactors-dev/scxmljs/blob/m
 ## Documentation
 
 - [Getting started](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/getting-started.md)
-- Elements: [`<scxml-view>`](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/view.md), [`<scxml-explorer>`](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/explorer.md), [theming](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/theming.md), [custom UI and translations](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/custom-ui.md), [large charts](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/large-charts.md), [frameworks](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/frameworks.md)
+- Elements: [`<scxml-view>`](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/view.md), [`<scxml-explorer>`](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/explorer.md), [event data and `<scxml-data>`](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/data.md), [theming](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/theming.md), [custom UI and translations](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/custom-ui.md), [large charts](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/large-charts.md), [frameworks](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/frameworks.md)
 - Interpreter: [sandboxed vs trusted](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/sandboxed-vs-trusted.md), [driving charts from the page](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/driving-charts.md), [custom I/O processors](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/io-processors.md), [custom invokers](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/invokers.md), [playback and stepping](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/playback.md), [testing](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/testing.md), [Node and servers](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/node-and-servers.md)
 - Shipping: [bundling, CDNs and classic scripts](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/bundling.md), [Content-Security-Policy](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/csp.md)
 - Reference: [conformance report](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/conformance.md), [deviations from the spec](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/deviations.md), [measurements](https://github.com/tinyactors-dev/scxmljs/blob/main/docs/measurements.md), [API reference](https://scxmljs.tinyactors.dev/api/)

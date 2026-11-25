@@ -261,6 +261,9 @@ service's answer, with the order's id the chart reads (`_event.data.id`).
 - **`variables`** lists the chart's variables (`session.snapshot()`) after each step.
 - **`sends`** puts a button for each preset event under the diagram: the same send as a label's
   click (`scxml-send` first, then the live region), with the data you gave.
+- **Event forms.** A label whose event takes data (`add …`: the chart describes it with an
+  `xs:schema`, or reads `_event.data.name` where it handles it) asks for the data with a form
+  before it sends the event, unless `event-data` gives some. See [event data](data.md).
 - **Restart** (the `rotate-ccw` glyph) sits at the end of that bar whenever it shows, and runs
   the chart again in a fresh session, as `reload()` does.
 
@@ -273,6 +276,8 @@ processors itself.
 - The diagram pans with the arrow keys once it has focus (Shift: further); `+`, `-` and `0` zoom.
 - Fold toggles and help buttons are buttons too, named "Collapse pay" or "About cart". The help
   popover takes focus; Escape closes it and returns focus to its button.
+- An event form ("Data for add") focuses its first field. Enter sends from any field but a
+  multi-line one; Escape closes it, sends nothing and returns focus to the label.
 - With a `PlaybackClock`: Space plays and pauses, `.` steps to the next event.
 - A polite live region announces each step ("go: now in busy") and each sent event.
 - Colour is never the only signal: active states also get a dot and a bolder border, and the
@@ -309,6 +314,8 @@ The element uses the shared `--scxml-*` tokens and exposes these parts:
 | `controls`, `play`, `step`, `speeds`, `clock` | | the playback controls at the bottom left (with a `PlaybackClock`); `speeds` is one button that cycles |
 | `zoom`, `zoom-out`, `zoom-level`, `zoom-in`, `fit` | | the zoom controls at the bottom right: −, the level (sets 100%), +, and back to the automatic view |
 | `hint` | | the short hint over the diagram after a plain wheel or a one-finger swipe |
+| `takes-data` | | the `…` after an event's name on a label: the event takes data, and a click asks for it |
+| `form-popover`, `form-data`, `form-send`, `form-cancel` | | an event's form: the popover, its `<scxml-data>` (style its own `form` part through it), Send and Cancel |
 | `run`, `preset-send`, `restart` | | the bar under the diagram: a button for each of `sends`, and restart |
 | `panels`, `panel` | `variables` `stand-in` | the panels under the bar: the variables, and what each stand-in received |
 

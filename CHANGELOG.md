@@ -20,87 +20,95 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [0.5.0] - 2026-11-25
 
+Charts say what data their events take, and the view asks for it with a form; outside browsers,
+SCXML needs nothing installed to parse.
+
 ### Added
 
-- Charts can say what data their events take, with an XML Schema inside the chart: each top-level
-  `<xs:element name>` of an `<xs:schema>` (XML Schema's namespace) describes the `_event.data` of
-  the event of that name. The interpreter ignores it. See [event data](docs/data.md).
-- `<scxml-view>` asks for an event's data before it sends it: a click on the label of an event that
-  takes data (`add …`) opens a form built from the chart's schema, or, without one, a field for each
-  name the chart reads as `_event.data.name`. Send or Enter sends it; Cancel or Escape doesn't; a
-  value the schema refuses shows its problems instead. The `event-forms` attribute (`auto`,
-  `always`, `off`) decides when, with `event-data` still the page's way to give data without asking.
-- A new entry point, `@tinyactors/scxmljs/data`: the `<scxml-data>` custom element, which shows,
-  edits and composes a value as a schema describes it (objects, lists to their bounds, choices,
-  enumerations, numbers with their bounds, booleans, dates, patterns, optional fields, types that
-  refer to themselves), and the schema reader behind it (`readSchemas`, `check`, `initialValue`).
-- Outside browsers, SCXML text is parsed with no `DOMParser` to install: the library has its own XML
-  parser and DOM (namespaces, entities, CDATA, comments, processing instructions, errors with
-  their line and column). It runs the W3C conformance suite 160/160 in both data models and reads
-  every chart of the repository as happy-dom does. A browser still uses its own `DOMParser`, and a
-  `domParser` option still overrides both.
+- **Event data in the chart.** An `<xs:schema>` (XML Schema's namespace) inside a chart describes
+  its events' data: each top-level `<xs:element name>` is the `_event.data` of the event of that
+  name. The interpreter ignores it. See [event data](docs/data.md).
+- **Event forms in `<scxml-view>`.** A label whose event takes data shows `add …`, and a click asks
+  for the data with a form before sending: built from the chart's schema, or, without one, a field
+  for each name the chart reads as `_event.data.name`. Send or Enter sends; Cancel or Escape
+  doesn't; a value the schema refuses shows its problems at their fields. The form opens above the
+  page, so a small diagram never squeezes it.
+  - The `event-forms` attribute decides when: `auto` (the default: unless `event-data` gives
+    data for the event), `always` (filled in from `event-data`), `off`.
+  - New parts: `takes-data`, `form-popover`, `form-data`, `form-send`, `form-cancel`.
+- **`<scxml-data>`** (new entry point `@tinyactors/scxmljs/data`, 9 KB gzipped) shows, edits and
+  composes a value as a schema describes it: objects, lists up to their bounds, choices,
+  enumerations, numbers within their bounds, booleans, dates, patterns, optional fields, types
+  that refer to themselves. Its schema reader is exported too (`readSchemas`, `check`,
+  `initialValue`).
+- **No `DOMParser` to install outside browsers.** The library parses SCXML text with its own XML
+  parser and DOM in Node, Bun and Deno (namespaces, entities, CDATA, errors with their line and
+  column). It runs the W3C conformance suite 160/160 in both data models, and was fuzzed
+  with 6000 mutated charts against Chromium's and Firefox's own parsers. Browsers still use their own `DOMParser`; a
+  `domParser` option still overrides both. See [Node, Bun and servers](docs/node-and-servers.md).
 
 ### Changed
 
-- The parser adds about 6 KB (gzip) to every entry point that parses SCXML, in browsers too:
-  `parseSCXML` is synchronous, so it can't be loaded only where it's needed.
+- **Bundle size.** The XML parser adds about 6 KB (gzipped) to each entry point that parses SCXML,
+  in browsers too: `parseSCXML` is synchronous, so it can't be loaded only where it's needed.
 
 ### Removed
 
-- The `SCXML_NO_DOMPARSER` code of `SCXMLParseError`: there is always a parser now.
+- **`SCXML_NO_DOMPARSER`**, a code of `SCXMLParseError`: there is always a parser now. Code that
+  checked for it can drop the check.
 
 ## [0.4.0] - 2026-11-25
 
+`<scxml-view>` becomes a place to try a chart: an infinite canvas with a smooth camera, a demo mode
+that needs no code, and help popovers you can follow from state to state.
+
 ### Added
 
-- `<scxml-view>` runs a chart as a demo with no code of the page's: a chart that sends to an I/O
-  processor nobody handles (`<send type="payments">`) gets a stand-in instead of failing the send,
-  and a "Sent" panel under the diagram lists what the stand-ins received, with each message's
-  processor, from the first one on; the reader answers by clicking the reply's label; the `variables` attribute lists the chart's variables after each step; the
-  `sends` attribute (`[{"event", "data", "label"}]`) puts a button under the diagram for each
-  preset event; and a restart button (the `rotate-ccw` glyph) runs the chart again in a fresh
-  session. A processor the page gives in `options.ioprocessors` replaces the stand-in. New parts:
-  `run`, `preset-send`, `restart`, `panels`, `panel` (`variables`, `stand-ins`).
-- `<scxml-view>`: `--scxml-max-scale` grows a diagram smaller than the element, up to that scale,
-  as far as the element's width allows and, with `--scxml-height`, its height: a small chart fills
-  its frame instead of sitting in a corner. The default, `1`, keeps actual size. Use it instead of
-  scaling the element with CSS `zoom`, which the canvas's panning does not follow.
-- `<scxml-view>`: a state's help popover shows its transitions in the diagram's notation, and each
-  target is a link that flies the view to that state (zooming out on the way when it's far), marks
-  it and opens its help: a flow can be followed from state to state. New part: `go`.
-- `<scxml-view>`: a short hint over the diagram says how to zoom or move it when a plain wheel or a
-  one-finger swipe meets it ("Ctrl + scroll to zoom", "Use two fingers to move the diagram"), and a
-  double click zooms in on the spot, or back to fit, as a double tap does. New part: `hint`.
+- **Run a chart as a demo, with no code** ([guide](docs/view.md#running-a-chart-as-a-demo)):
+  - **Stand-ins.** A chart that sends to an I/O processor nobody handles (`<send
+    type="payments">`) gets a stand-in instead of failing the send. A "Sent" panel under the
+    diagram lists what the stand-ins received; the reader answers by clicking the reply's label.
+    A processor the page gives in `options.ioprocessors` replaces the stand-in.
+  - **`variables`** lists the chart's variables after each step.
+  - **`sends`** (`[{"event", "data", "label"}]`) puts a button under the diagram for each preset
+    event.
+  - **Restart** (the `rotate-ccw` glyph) runs the chart again in a fresh session.
+  - New parts: `run`, `preset-send`, `restart`, `panels`, `panel` (`variables`, `stand-ins`).
+- **Small charts fill their frame.** `--scxml-max-scale` grows a diagram smaller than the element,
+  up to that scale, as far as the width and `--scxml-height` allow. The default, `1`, keeps actual
+  size. Use it instead of CSS `zoom`, which the canvas's panning doesn't follow.
+- **Follow a flow in the help popovers.** A state's help popover lists its transitions in the
+  diagram's notation, and each target is a link that flies the view to that state, marks it and
+  opens its help. New part: `go`.
+- **Gesture hints and double click.** A plain wheel or a one-finger swipe over the diagram shows how
+  to zoom or move it ("Ctrl + scroll to zoom", "Use two fingers to move the diagram"). A double
+  click zooms in on the spot, or back to fit, as a double tap does. New part: `hint`.
 
 ### Changed
 
-- `<scxml-view>`: when the view moves by itself (following a link, fit, the zoom buttons and `+`
-  `-` `0`, a double click or tap, following the active states) it moves smoothly instead of
-  jumping: along van Wijk and Nuij's smooth zoom path, zooming out on a long trip just enough to
-  pass through both ends, for a time that grows with the trip (a quarter to one second); a zoom
-  around the pointer keeps the point under it. A drag, a pinch or Ctrl/⌘ + wheel stays direct, and
-  stops a move under way. With reduced motion it jumps, as before. The help popover fades in and
-  out.
-- `<scxml-view>`: `--scxml-height` caps the diagram's height, not the whole element's: the run bar
-  and the panels under the diagram add their own, so asking for them never shrinks the diagram.
-- `<scxml-view>`: the diagram is a canvas instead of a scrolling box. It pans in every direction,
-  past its edges (some of it always stays in view), by dragging its background, with two fingers,
-  or with the arrow keys while it has focus; it shows no scrollbars. One finger and a plain scroll
-  wheel scroll the page past it, as on an embedded map; zooming is unchanged (Ctrl/⌘ + wheel, a
-  pinch, `+` `-` `0`). With two fingers, the spot between them stays under them as they pan and
-  pinch. A page that scrolled the canvas itself (`scrollLeft`, `scrollTop`) has nothing to
-  scroll now: the drawing's offset is the diagram's `data-pan`.
+- **The diagram is a canvas, not a scrolling box.** It pans in every direction, past its edges, by
+  dragging its background, with two fingers, or with the arrow keys; it shows no scrollbars. One
+  finger and a plain scroll wheel scroll the page past it, as on an embedded map. Zooming is
+  unchanged. **If your page scrolled the canvas** (`scrollLeft`, `scrollTop`), that has no effect
+  now: the drawing's offset is the diagram's `data-pan`.
+- **Smooth motion.** When the view moves by itself (a link, fit, the zoom buttons and `+` `-` `0`,
+  a double click or tap, following the active states) it moves along a smooth zoom path, zooming
+  out on a long trip just enough to keep both ends in view, in a quarter to one second. A drag, a
+  pinch or Ctrl/⌘ + wheel stays direct. With reduced motion it jumps, as before. Help popovers
+  fade in and out.
+- **`--scxml-height`** caps the diagram's height, not the whole element's: the run bar and the
+  panels add their own, so asking for them never shrinks the diagram.
 
 ### Fixed
 
-- `<scxml-view>`: a state's help popover reflows the XML comment it shows: the comment's line
-  breaks are where its source was wrapped, so the popover joins a paragraph's lines (a blank line
-  still starts a paragraph, a list item keeps its own line). Before, a sentence broke wherever the
-  source did.
-- `<scxml-view>`: a help popover taller than the room below its button opens on the side with
-  more room and scrolls inside, instead of running past the diagram's frame and being cut off.
+- A help popover reflows the XML comment it shows: a sentence no longer breaks wherever the source
+  was wrapped (a blank line still starts a paragraph, a list item keeps its own line).
+- A help popover taller than the room below its button opens on the side with more room and
+  scrolls inside, instead of being cut off by the diagram's frame.
 
 ## [0.3.1] - 2026-11-25
+
+A layout fix for charts whose initial state is part of a cycle.
 
 ### Fixed
 
@@ -110,6 +118,8 @@ private `--x-*` properties are not public API and can change in any release.
   so the diagram read backwards and its initial marker was lost.
 
 ## [0.3.0] - 2026-11-23
+
+Cleaner diagrams: self-transitions drawn as loops, edges that run straight into their target.
 
 ### Fixed
 
@@ -122,6 +132,9 @@ private `--x-*` properties are not public API and can change in any release.
   longer covers a state when the diagram is crowded.
 
 ## [0.2.0] - 2026-11-17
+
+Both elements grow up: zoom and pan, folding, help for every state, phones and narrow widths,
+one visual language, and clicked events that say what they did.
 
 ### Added
 
@@ -242,6 +255,9 @@ private `--x-*` properties are not public API and can change in any release.
   instead of "root element is `<undefined>`".
 
 ## [0.1.0] - 2026-09-28
+
+The first release: an SCXML 1.0 interpreter (sandboxed or trusted), `<scxml-view>` and
+`<scxml-explorer>`.
 
 The first release.
 

@@ -20,6 +20,8 @@ with [getting started](getting-started.md).
 
 - [`<scxml-view>`](view.md) and [`<scxml-explorer>`](explorer.md): attributes, properties,
   events, slots, keyboard, parts.
+- [Event data and `<scxml-data>`](data.md): describe the data an event takes with an XML Schema
+  in the chart, and the forms that ask for it.
 - [Theming](theming.md): tokens, light and dark, parts.
 - [Custom UI and translations](custom-ui.md): strings, slots, your own drawing, your own explorer.
 - [Frameworks](frameworks.md): React, Vue, Svelte, Angular, plain HTML.

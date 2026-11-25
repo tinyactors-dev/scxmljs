@@ -1,7 +1,7 @@
 # Bundling, CDNs and classic scripts
 
-The package is ESM only. It has four entry points (`@tinyactors/scxmljs`, `/trusted`, `/view`,
-`/explorer`) and a stylesheet (`/themes/tinyactors.css`). This page shows how to get them into a
+The package is ESM only. It has five entry points (`@tinyactors/scxmljs`, `/trusted`, `/view`,
+`/explorer`, `/data`) and a stylesheet (`/themes/tinyactors.css`). This page shows how to get them into a
 page: with a bundler, from a CDN with an import map, or as classic `<script>` files.
 
 ## With a bundler
@@ -13,6 +13,7 @@ Vite, esbuild, webpack, Rollup, Parcel and Bun need no configuration. Import wha
 import { createSession } from "@tinyactors/scxmljs"; // or "@tinyactors/scxmljs/trusted"
 import "@tinyactors/scxmljs/view"; // registers <scxml-view>
 import "@tinyactors/scxmljs/explorer"; // registers <scxml-explorer>
+import "@tinyactors/scxmljs/data"; // registers <scxml-data>
 ```
 
 Things to know:
@@ -32,10 +33,14 @@ Sizes, minified and gzipped, for a browser bundle of each entry point alone:
 
 | Import | Size |
 |---|---|
-| `@tinyactors/scxmljs` | 20 KB, plus 290 KB of QuickJS loaded on first use |
-| `@tinyactors/scxmljs/trusted` | 17 KB |
-| `@tinyactors/scxmljs/view` | 33 KB, plus the engine it loads |
-| `@tinyactors/scxmljs/explorer` | 26 KB |
+| `@tinyactors/scxmljs` | 25 KB, plus 290 KB of QuickJS loaded on first use |
+| `@tinyactors/scxmljs/trusted` | 23 KB |
+| `@tinyactors/scxmljs/view` | 57 KB, plus the engine it loads, and `/data` (9 KB) for a chart whose events take data |
+| `@tinyactors/scxmljs/explorer` | 30 KB |
+| `@tinyactors/scxmljs/data` | 9 KB |
+
+Each entry that parses SCXML includes the library's XML parser (about 6 KB of these), which a
+browser doesn't use: `parseSCXML` is synchronous, so it can't be loaded only where it's needed.
 
 ## From a CDN, with an import map
 
@@ -48,10 +53,11 @@ fetched when a sandboxed session is created).
 <script type="importmap">
   {
     "imports": {
-      "@tinyactors/scxmljs": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.1.0/dist/index.js",
-      "@tinyactors/scxmljs/trusted": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.1.0/dist/trusted.js",
-      "@tinyactors/scxmljs/view": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.1.0/dist/view.js",
-      "@tinyactors/scxmljs/explorer": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.1.0/dist/explorer.js",
+      "@tinyactors/scxmljs": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.5.0/dist/index.js",
+      "@tinyactors/scxmljs/trusted": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.5.0/dist/trusted.js",
+      "@tinyactors/scxmljs/view": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.5.0/dist/view.js",
+      "@tinyactors/scxmljs/explorer": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.5.0/dist/explorer.js",
+      "@tinyactors/scxmljs/data": "https://cdn.jsdelivr.net/npm/@tinyactors/scxmljs@0.5.0/dist/data.js",
       "quickjs-emscripten-core": "https://cdn.jsdelivr.net/npm/quickjs-emscripten-core@0.32.0/dist/index.mjs",
       "@jitl/quickjs-singlefile-browser-release-sync": "https://cdn.jsdelivr.net/npm/@jitl/quickjs-singlefile-browser-release-sync@0.32.0/dist/index.mjs",
       "@jitl/quickjs-ffi-types": "https://cdn.jsdelivr.net/npm/@jitl/quickjs-ffi-types@0.32.0/dist/index.mjs"
@@ -68,10 +74,10 @@ fetched when a sandboxed session is created).
   entries.
 - An import map is an inline script: under a Content-Security-Policy it needs a hash or nonce in
   `script-src` (see [CSP](csp.md)). To avoid that, host the files yourself.
-- CDNs that rewrite imports for you, such as `https://esm.sh/@tinyactors/scxmljs@0.1.0/view`,
+- CDNs that rewrite imports for you, such as `https://esm.sh/@tinyactors/scxmljs@0.5.0/view`,
   work without the dependency entries.
 
-Both CDNs were tried with the published 0.1.0 in Chrome: this import map against jsDelivr (a
+The map names the current version (`/data` came in 0.5.0). Both CDNs were tried with the published 0.1.0 in Chrome: this import map against jsDelivr (a
 sandboxed `<scxml-view>`, QuickJS fetched on demand), and esm.sh without an import map (a
 `trusted` `<scxml-view>`). The sandboxed engine is about 290 KB on first load, so give it a moment.
 

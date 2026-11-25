@@ -39,7 +39,8 @@ namespaces, so the schema changes nothing about how the chart runs.
 ```
 
 A click on `add` now opens a form with a select for `sku`, a number box for `quantity` (1 at least)
-and an optional `gift`. The label shows `add …`: the event takes data. Send (or Enter) sends the
+and an optional `gift`. The label shows `add …`: a click asks for the event's data (a label whose data the page gives
+with `event-data` doesn't, since its click sends at once). Send (or Enter) sends the
 event with the form's value; Cancel (or Escape) sends nothing. A value the schema refuses isn't
 sent: its problems show at their fields.
 

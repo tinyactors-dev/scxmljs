@@ -249,11 +249,20 @@ describe("<scxml-view>", () => {
 
     // event-data given: sent as before, unless event-forms="always" (then it fills the form)
     const b = await mount({ trusted: "", "event-data": JSON.stringify({ pay: { amount: 3 } }) }, SHOP);
+    // the page gives pay's data, so its label doesn't say a click asks for it; add's still does
+    expect(labelFor(b.root, "pay").querySelector(".takes")).toBeNull();
+    expect(labelFor(b.root, "add").querySelector(".takes")).not.toBeNull();
+    b.el.setAttribute("event-forms", "off");
+    await frame();
+    expect(labelFor(b.root, "add").querySelector(".takes")).toBeNull();
+    b.el.removeAttribute("event-forms");
+    await frame();
     (labelFor(b.root, "pay") as HTMLButtonElement).click();
     await frame();
     expect(b.el.session!.isActive("done")).toBe(true);
     b.el.remove();
     const c = await mount({ trusted: "", "event-forms": "always", "event-data": JSON.stringify({ pay: { amount: 3 } }) }, SHOP);
+    expect(labelFor(c.root, "pay").querySelector(".takes")).not.toBeNull();
     (labelFor(c.root, "pay") as HTMLButtonElement).click();
     await frame();
     const cdata = c.root.querySelector(".form-popover scxml-data") as unknown as { value: unknown };

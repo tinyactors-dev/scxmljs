@@ -195,6 +195,8 @@ export class ScxmlView extends ElementBase {
     "warnings",
     "variables",
     "sends",
+    "event-data",
+    "event-forms",
   ];
 
   #shadow!: ShadowRoot;
@@ -1807,7 +1809,7 @@ export class ScxmlView extends ElementBase {
       // the event's name as written: the namespace quieter, its kind in the state colours
       el.append(h("span", { part: "event" }, tr.events.length ? eventName(ev) : ev));
     });
-    if (interactive && name && this.#fields.has(name))
+    if (interactive && name && this.#asks(name))
       el.append(h("span", { class: "takes", part: "takes-data", title: t.takesData, "aria-hidden": "true" }, "…"));
     if (tr.cond) el.append(h("span", { class: "cond", part: "cond" }, `[${truncate(tr.cond, 22)}]`));
     const targets = tr.targets.map((s) => s.id).join(", ");
@@ -1826,10 +1828,9 @@ export class ScxmlView extends ElementBase {
    * or what the chart reads, forms.ts) and the page gave none (`event-forms`: `auto`, `always`, `off`).
    */
   #activate(name: string, button: HTMLElement) {
-    const mode = this.getAttribute("event-forms") ?? "auto";
     const field = this.#fields.get(name);
     const given = this.#eventData(name);
-    if (!field || mode === "off" || (mode !== "always" && given !== undefined)) return this.#sendEvent(name);
+    if (!field || !this.#asks(name)) return this.#sendEvent(name);
     if (this.#formFor?.button === button) return this.#closeForm(false);
     void this.#openForm(name, field, button, given);
   }
@@ -1864,6 +1865,13 @@ export class ScxmlView extends ElementBase {
       this.#placeHelp();
     });
     data.addEventListener("input", () => this.#placeHelp());
+  }
+
+  /** Whether a click on `name`'s label asks for its data with a form (its label shows `…`). */
+  #asks(name: string): boolean {
+    const mode = this.getAttribute("event-forms") ?? "auto";
+    if (!this.#fields.has(name) || mode === "off") return false;
+    return mode === "always" || this.#eventData(name) === undefined;
   }
 
   /** Load `<scxml-data>` (once) and make sure it is defined. */

@@ -18,6 +18,16 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-25
+
+A fix for event forms on pages that give an event's data themselves.
+
+### Fixed
+
+- `<scxml-view>` marks a label with `…` only when a click asks for its event's data: not when
+  `event-data` gives the data (the click sends it at once, with no form), nor with
+  `event-forms="off"`. The marks follow changes to both attributes.
+
 ## [0.5.0] - 2026-11-25
 
 Charts say what data their events take, and the view asks for it with a form; outside browsers,
@@ -292,7 +302,8 @@ The first release.
   violations), in Node, Bun and Deno from the packed tarball, and with React 19, Vue 3,
   Svelte 5 and Angular 22 apps; see [docs/bundling.md](docs/bundling.md#support).
 
-[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.5.1
 [0.5.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.5.0
 [0.4.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.4.0
 [0.3.1]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.3.1

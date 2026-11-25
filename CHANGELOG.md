@@ -21,13 +21,13 @@ private `--x-*` properties are not public API and can change in any release.
 ### Added
 
 - `<scxml-view>` runs a chart as a demo with no code of the page's: a chart that sends to an I/O
-  processor nobody handles (`<send type="payments">`) gets a stand-in, which lists what it
-  received under the diagram instead of failing the send, and the reader answers by clicking the
-  reply's label; the `variables` attribute lists the chart's variables after each step; the
+  processor nobody handles (`<send type="payments">`) gets a stand-in instead of failing the send,
+  and a "Sent" panel under the diagram lists what the stand-ins received, with each message's
+  processor, from the first one on; the reader answers by clicking the reply's label; the `variables` attribute lists the chart's variables after each step; the
   `sends` attribute (`[{"event", "data", "label"}]`) puts a button under the diagram for each
   preset event; and a restart button (the `rotate-ccw` glyph) runs the chart again in a fresh
   session. A processor the page gives in `options.ioprocessors` replaces the stand-in. New parts:
-  `run`, `preset-send`, `restart`, `panels`, `panel`.
+  `run`, `preset-send`, `restart`, `panels`, `panel` (`variables`, `stand-ins`).
 - `<scxml-view>`: `--scxml-max-scale` grows a diagram smaller than the element, up to that scale,
   as far as the element's width allows and, with `--scxml-height`, its height: a small chart fills
   its frame instead of sitting in a corner. The default, `1`, keeps actual size. Use it instead of
@@ -41,6 +41,15 @@ private `--x-*` properties are not public API and can change in any release.
 
 ### Changed
 
+- `<scxml-view>`: when the view moves by itself (following a link, fit, the zoom buttons and `+`
+  `-` `0`, a double click or tap, following the active states) it moves smoothly instead of
+  jumping: along van Wijk and Nuij's smooth zoom path, zooming out on a long trip just enough to
+  pass through both ends, for a time that grows with the trip (a quarter to one second); a zoom
+  around the pointer keeps the point under it. A drag, a pinch or Ctrl/⌘ + wheel stays direct, and
+  stops a move under way. With reduced motion it jumps, as before. The help popover fades in and
+  out.
+- `<scxml-view>`: `--scxml-height` caps the diagram's height, not the whole element's: the run bar
+  and the panels under the diagram add their own, so asking for them never shrinks the diagram.
 - `<scxml-view>`: the diagram is a canvas instead of a scrolling box. It pans in every direction,
   past its edges (some of it always stays in view), by dragging its background, with two fingers,
   or with the arrow keys while it has focus; it shows no scrollbars. One finger and a plain scroll

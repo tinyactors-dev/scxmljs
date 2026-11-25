@@ -5,9 +5,10 @@
  *   unhandledSendTypes(root, processors)  the I/O processor types a chart sends to (`<send
  *                                         type="payments">`) that neither SCXML nor the page
  *                                         handles: in the view each would fail its sends
- *   standIn(type, …)                      a processor for one of them that keeps what it receives,
- *                                         and the panel that lists it, newest first; the reader
- *                                         plays the service by clicking its reply's label
+ *   standIns(types, …)                    a processor for each of them that keeps what it receives,
+ *                                         and one panel that lists it all, newest first, shown from
+ *                                         the first message; the reader plays a service by clicking
+ *                                         its reply's label
  *   variablesPanel(…)                     the chart's variables (`session.snapshot()`), after
  *                                         each step: the `variables` attribute
  *
@@ -54,24 +55,30 @@ export function unhandledSendTypes(root: Element, processors: readonly IOProcess
   return types;
 }
 
-/** A stand-in processor and the panel that shows what it received. */
-export interface StandIn {
-  readonly processor: IOProcessor;
+/** Stand-ins for the processors nobody handles, and the one panel that lists what they received. */
+export interface StandIns {
+  /** One processor per type, each recording into the panel. */
+  readonly processors: IOProcessor[];
+  /** Hidden until the chart sends its first message: an empty list says nothing. */
   readonly panel: HTMLElement;
-  /** A new run of the chart: the list starts empty, its times from `now()`. */
+  /** A new run of the chart: the list starts empty (and hidden), its times from `now()`. */
   restart(): void;
 }
 
-/** A stand-in for the processor of `type`: it keeps each message, with the time it came (`now()`, ms). */
-export function standIn(type: string, strings: ViewStrings, now: () => number): StandIn {
-  const received: { at: number; message: OutboundSend }[] = [];
+/**
+ * Stand-ins for `types`: each keeps what it receives, with the time it came (`now()`, ms), in one
+ * panel, newest first, each message with its processor's type. `changed` runs when the panel shows
+ * or hides, so the element can show the panels' area.
+ */
+export function standIns(types: string[], strings: ViewStrings, now: () => number, changed: () => void): StandIns {
+  const received: { at: number; type: string; message: OutboundSend }[] = [];
   let started = now();
   const count = h("span", { class: "count" });
   const log = h("ol", { class: "log" });
   const panel = h(
     "section",
-    { class: "panel stand-in", part: "panel stand-in", "aria-label": strings.standInLabel(type) },
-    h("p", { class: "panel-head" }, h("code", { class: "name" }, type), count),
+    { class: "panel", part: "panel stand-ins", "aria-label": strings.standInsLabel, hidden: "" },
+    h("p", { class: "panel-head" }, h("span", {}, strings.standInsLabel), count),
     log,
   );
   const render = () => {
@@ -83,19 +90,24 @@ export function standIn(type: string, strings: ViewStrings, now: () => number): 
       ...received
         .slice(-KEEP)
         .reverse()
-        .map(({ at, message }) => {
+        .map(({ at, type, message }) => {
           const data = shown(message.data);
           return h(
             "li",
             {},
             h("span", { class: "at" }, clock(at - started)),
+            h("code", { class: "type" }, type),
             eventName(message.event),
             ...(message.target ? [h("span", { class: "target" }, `→ ${message.target}`)] : []),
             ...(data ? [h("code", { class: "value", title: data }, data)] : []),
           );
         }),
     );
-    if (!n) log.append(h("li", { class: "empty" }, strings.nothingReceived));
+    const hidden = n === 0;
+    if (panel.hidden !== hidden) {
+      panel.hidden = hidden;
+      changed();
+    }
   };
   render();
   return {
@@ -105,14 +117,14 @@ export function standIn(type: string, strings: ViewStrings, now: () => number): 
       started = now();
       render();
     },
-    processor: {
+    processors: types.map((type) => ({
       type,
       location: (session) => `${type}#${session.sessionId}`,
       send(message) {
-        received.push({ at: now(), message });
+        received.push({ at: now(), type, message });
         render();
       },
-    },
+    })),
   };
 }
 

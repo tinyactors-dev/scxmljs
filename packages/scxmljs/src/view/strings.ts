@@ -41,12 +41,10 @@ export interface ViewStrings {
   noDescription: string;
   /** Heading of the list of a state's transitions in its help popover. */
   helpTransitions: string;
-  /** Accessible name of the panel listing what the stand-in for an I/O processor `type` received. */
-  standInLabel: (type: string) => string;
+  /** Title of the panel listing what the stand-ins for unhandled I/O processors received. */
+  standInsLabel: string;
   /** How many messages a stand-in received (the count's accessible name and tooltip). */
   received: (n: number) => string;
-  /** A stand-in that has received nothing yet. */
-  nothingReceived: string;
   /** Title of the panel of the chart's variables (the `variables` attribute). */
   variablesLabel: string;
   /** Accessible name of the bar of preset sends (the `sends` attribute) and the restart button. */
@@ -142,9 +140,8 @@ export const defaultViewStrings: ViewStrings = {
   helpLabel: (name) => `About ${name}`,
   noDescription: "No description: document a state with an XML comment right before it, or set the view's descriptions property.",
   helpTransitions: "Transitions",
-  standInLabel: (type) => `What ${type} received`,
+  standInsLabel: "Sent",
   received: (n) => (n === 1 ? "1 message received" : `${n} messages received`),
-  nothingReceived: "Nothing yet",
   variablesLabel: "Variables",
   runLabel: "Run the chart",
   restart: "Restart (a fresh session)",

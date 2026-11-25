@@ -11,16 +11,16 @@ export const VIEW_CSS = /* css */ `
   background: var(--x-bg); border: 1px solid var(--x-b2); border-radius: var(--x-r);
 }
 :host([hidden]) { display: none; }
-.frame { display: flex; flex-direction: column; max-height: var(--scxml-height, none); min-height: 0; }
+/* --scxml-height caps the diagram's area; the run bar and the panels under it add their own height */
+.frame { display: flex; flex-direction: column; min-height: 0; }
 .canvas:focus-visible { outline: 2px solid var(--x-accent); outline-offset: -2px; }
-.viewport { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.viewport { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; max-height: var(--scxml-height, none); }
 .canvas { overflow: hidden; min-height: 0; flex: 1 1 auto; cursor: grab; }
 /* one finger scrolls the page; two pan and pinch-zoom the diagram (handled by the element) */
 .canvas { touch-action: pan-x pan-y; }
 .canvas.panning { cursor: grabbing; user-select: none; -webkit-user-select: none; }
 .canvas.panning * { cursor: grabbing !important; }
 .diagram { position: relative; margin: 12px; }
-.diagram.gliding { transition: transform 250ms ease; }
 /* a gesture hint over the diagram: solid, centred, it takes no pointer */
 .hint { position: absolute; left: 50%; top: 50%; z-index: 2; transform: translate(-50%, -50%); pointer-events: none;
   max-width: calc(100% - 32px); box-sizing: border-box; padding: 8px 14px; border: 1px solid var(--x-b2); border-radius: 999px;
@@ -50,7 +50,8 @@ export const VIEW_CSS = /* css */ `
 .panel .log li { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
 .panel .log .at { color: var(--x-fg3); min-width: 3.2em; font-variant-numeric: tabular-nums; }
 .panel .log .target { color: var(--x-fg3); white-space: nowrap; }
-.panel .log .empty { color: var(--x-fg3); font-family: var(--x-sans); }
+.panel .log .type { color: var(--x-fg3); }
+.panel[hidden] { display: none; }
 .panel .value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--x-fg2); }
 .panel .variables { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; font: 12px var(--x-mono); }
 .panel .variables dt { color: var(--x-fg1); }
@@ -152,6 +153,12 @@ button.label:disabled, button.chip:disabled { cursor: default; }
   box-shadow: 0 6px 24px -8px color-mix(in srgb, var(--x-fg1) 35%, transparent);
 }
 .help-popover[hidden] { display: none; }
+/* it comes in from its button, and fades out when the view flies away (HELP_FADE_MS) */
+.help-popover:not([hidden]) { animation: help-in 160ms cubic-bezier(.2, .8, .2, 1); }
+.help-popover.leaving { animation: help-out 140ms ease-in forwards; pointer-events: none; }
+@keyframes help-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+@keyframes help-out { to { opacity: 0; transform: scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .help-popover:not([hidden]), .help-popover.leaving { animation: none; } }
 .help-popover:focus { outline: none; }
 .help-popover:focus-visible { outline: 2px solid var(--x-accent); outline-offset: 1px; }
 .help-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }

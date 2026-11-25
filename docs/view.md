@@ -312,7 +312,7 @@ The element uses the shared `--scxml-*` tokens and exposes these parts:
 | `panels`, `panel` | `variables` `stand-in` | the panels under the bar: the variables, and what each stand-in received |
 
 `live` marks transitions whose source state is active, `fired` those that fired within the last
-second. `--scxml-height` caps the element's height (default: none). Details and examples are in
+second. `--scxml-height` caps the diagram's height (default: none); the run bar and the panels under it add theirs. Details and examples are in
 [theming](theming.md).
 
 ## Drawing charts yourself

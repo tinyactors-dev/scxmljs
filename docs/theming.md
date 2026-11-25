@@ -60,7 +60,7 @@ The defaults are light / dark.
 | `--scxml-row-height` | `30px` | explorer tree rows |
 | `--scxml-min-scale` | `0.65` | how far `<scxml-view>` scales a too-wide diagram down before you pan to the rest instead (`1`: never; the `fit` attribute ignores it) |
 | `--scxml-max-scale` | `1` | how far `<scxml-view>` grows a diagram smaller than the element, so a small chart fills its frame instead of sitting in a corner: up to this scale, as far as the element's width allows, and its height when `--scxml-height` sets one (`1.5`: half again its size at most). Zooming by hand ignores it |
-| `--scxml-height` | view: none; explorer: `min(860px, 100dvh - 32px)` | the element's height (the view's diagram pans inside it) |
+| `--scxml-height` | view: none; explorer: `min(860px, 100dvh - 32px)` | the explorer's height; the view's diagram's height (it pans inside it), to which the view's run bar and panels add their own |
 
 The elements don't load fonts. If a token names a web font, load it in your page.
 

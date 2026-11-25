@@ -88,6 +88,13 @@ async function mount(attrs: Record<string, string> = {}, inline?: string, setup?
   await frame();
   return { el, event, root: el.shadowRoot! };
 }
+/** The reader's motion preference: with `reduce`, the view jumps where it would move (tests that check where it ends up). */
+const reducedMotion = (reduce: boolean) =>
+  Object.defineProperty(globalThis, "matchMedia", {
+    value: (query: string) => ({ matches: reduce && query.includes("reduce"), media: query }),
+    configurable: true,
+    writable: true,
+  });
 const box = (root: ShadowRoot, id: string) => root.querySelector(`[data-state="${id}"]`) as HTMLElement;
 const labels = (root: ShadowRoot) => [...root.querySelectorAll<HTMLElement>(".label, .chip")];
 const labelFor = (root: ShadowRoot, event: string) => labels(root).find((l) => l.textContent?.startsWith(event))!;
@@ -514,6 +521,7 @@ describe("<scxml-view>", () => {
   });
 
   test("zoom: toolbar, keys, and back to automatic", async () => {
+    reducedMotion(true);
     const { el, root } = await mount({ trusted: "" }, LIGHT);
     const diagram = root.querySelector<HTMLElement>(".diagram")!;
     const fit = root.querySelector<HTMLButtonElement>(".zoom-reset")!;
@@ -538,9 +546,38 @@ describe("<scxml-view>", () => {
     expect(diagram.style.transform).toBe("");
     expect(fit.hidden).toBe(true);
     el.remove();
+    reducedMotion(false);
+  });
+
+  test("the view moves itself smoothly: a zoom button eases to its scale, frame by frame, and the hand stops it", async () => {
+    reducedMotion(false);
+    const { el, root } = await mount({ trusted: "" }, LIGHT);
+    const seen: number[] = [];
+    root.querySelector<HTMLButtonElement>(".zoom-in")!.click();
+    expect(el.zoom).toBe(1); // it starts on the next frame
+    for (let i = 0; i < 40 && el.zoom !== 1.25; i++) {
+      await new Promise((r) => setTimeout(r, 16));
+      seen.push(el.zoom);
+    }
+    expect(el.zoom).toBe(1.25);
+    // it went through scales in between, each larger than the last
+    const between = seen.filter((z) => z > 1 && z < 1.25);
+    expect(between.length).toBeGreaterThan(2);
+    for (let i = 1; i < seen.length; i++) expect(seen[i]!).toBeGreaterThanOrEqual(seen[i - 1]!);
+    // a move under way stops where it is when the hand takes over (here: an arrow key)
+    root.querySelector<HTMLButtonElement>(".zoom-in")!.click();
+    await new Promise((r) => setTimeout(r, 50));
+    const canvas = root.querySelector<HTMLElement>(".canvas")!;
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    const stopped = el.zoom;
+    await new Promise((r) => setTimeout(r, 300));
+    expect(el.zoom).toBe(stopped);
+    expect(stopped).toBeLessThan(1.25 * 1.25);
+    el.remove();
   });
 
   test("input: the page keeps one finger and a plain wheel; drag, two fingers, keys and Ctrl + wheel move the canvas", async () => {
+    reducedMotion(true);
     const { el, root } = await mount({ trusted: "" }, LIGHT);
     const w = window as unknown as Record<string, new (type: string, init?: object) => Event>;
     const canvas = root.querySelector<HTMLElement>(".canvas")!;
@@ -621,6 +658,7 @@ describe("<scxml-view>", () => {
     fire("TouchEvent", "touchend", { touches: [] });
     expect(el.zoom).toBe(2);
     el.remove();
+    reducedMotion(false);
   });
 
   test("a help popover's targets fly the view to that state, mark it and open its help", async () => {
@@ -633,8 +671,8 @@ describe("<scxml-view>", () => {
     const pop = root.querySelector<HTMLElement>(".help-popover")!;
     const go = [...pop.querySelectorAll<HTMLButtonElement>("button.go")].find((b) => b.textContent === to.id)!;
     go.click();
-    expect(pop.hidden).toBe(true); // it closes while the view flies
-    await new Promise((r) => setTimeout(r, 900));
+    expect(pop.classList.contains("leaving")).toBe(true); // it fades out as the view flies
+    await new Promise((r) => setTimeout(r, 1200));
     await frame();
     expect(box(root, to.id).classList.contains("visited")).toBe(true);
     expect(pop.hidden).toBe(false);
@@ -676,14 +714,16 @@ describe("<scxml-view>", () => {
     presets[1]!.click();
     await frame();
     expect(variables()).toEqual(["42"]);
-    // a send to "payments", which nobody handles: its stand-in keeps it, instead of error.communication
-    const standIn = root.querySelector<HTMLElement>(".stand-in")!;
-    expect(standIn.getAttribute("aria-label")).toBe("What payments received");
-    expect(standIn.querySelector(".log")?.textContent).toBe("Nothing yet");
+    // a send to "payments", which nobody handles: a stand-in keeps it, instead of error.communication;
+    // its panel shows from the first message
+    const sent = root.querySelector<HTMLElement>('[part~="stand-ins"]')!;
+    expect(sent.hidden).toBe(true);
     labelFor(root, "checkout").click();
     await frame();
-    expect(standIn.querySelector(".count")?.getAttribute("aria-label")).toBe("1 message received");
-    expect(standIn.querySelector(".log li")?.textContent).toContain('{"amount":42}');
+    expect(sent.hidden).toBe(false);
+    expect(sent.querySelector(".count")?.getAttribute("aria-label")).toBe("1 message received");
+    expect(sent.querySelector(".log li .type")?.textContent).toBe("payments");
+    expect(sent.querySelector(".log li")?.textContent).toContain('{"amount":42}');
     expect(el.session!.isActive("paying")).toBe(true);
     // the reader plays the service: its reply's label
     labelFor(root, "charged").click();
@@ -697,12 +737,13 @@ describe("<scxml-view>", () => {
     await frame();
     expect(el.session).not.toBe(first);
     expect(variables()).toEqual(["0"]);
-    expect(root.querySelector(".stand-in .log")?.textContent).toBe("Nothing yet");
+    expect(root.querySelector<HTMLElement>('[part~="stand-ins"]')!.hidden).toBe(true);
     // turned off: the bar and the panel go; a processor the page gives takes the stand-in's place
     el.removeAttribute("sends");
     el.removeAttribute("variables");
     expect(run.querySelector(".preset")).toBeNull();
-    expect(root.querySelectorAll(".panel").length).toBe(1);
+    expect(root.querySelectorAll(".panel").length).toBe(1); // the stand-ins' (still empty, so hidden)
+    expect(panels.hidden).toBe(true);
     el.remove();
     const handled = await mount({ trusted: "" }, ORDER, (v) => {
       v.options = { ioprocessors: [{ type: "payments", location: () => "payments", send() {} }] };

@@ -266,10 +266,11 @@ test.describe("<scxml-view> layout", () => {
           );
         }
       });
+    // (the view moves there smoothly: wait for it to land)
     await doubleTap();
-    expect(await zoom()).toBeCloseTo(before, 2);
+    await expect.poll(zoom).toBeCloseTo(before, 2);
     await doubleTap();
-    expect(await zoom()).toBeGreaterThanOrEqual(Math.max(1, before * 2) - 0.01);
+    await expect.poll(zoom).toBeGreaterThanOrEqual(Math.max(1, before * 2) - 0.01);
   });
 
   test("an inline-block element sizes to its diagram (nothing in it zeroes its intrinsic width)", async ({ page }) => {

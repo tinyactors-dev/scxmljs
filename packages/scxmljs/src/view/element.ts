@@ -65,9 +65,10 @@ import * as icons from "../ui/icons.ts";
 import { eventName, glyph, NOTATION_CSS } from "../ui/notation.ts";
 import { arrowMarker, icon } from "../ui/svg.ts";
 import { lazySheet, NARROW_WIDTH, themeSheet } from "../ui/theme.ts";
+import { anchoredZoom, easeInOut, glide, type Move, smoothPath, type View } from "./camera.ts";
 import { reflow, sourceDescription } from "./describe.ts";
 import { autoCollapse, type ChartLayout, type Direction, layoutChart, portalTransitions, type Size } from "./layout.ts";
-import { type StandIn, standIn, unhandledSendTypes, variablesPanel } from "./panels.ts";
+import { type StandIns, standIns, unhandledSendTypes, variablesPanel } from "./panels.ts";
 import { defaultViewStrings, type ViewStateKind, type ViewStrings } from "./strings.ts";
 import { VIEW_CSS } from "./styles.ts";
 
@@ -128,15 +129,14 @@ const PAN_KEEP = 48;
 /** The arrow keys pan by this much (px), with Shift by PAN_PAGE. */
 const PAN_STEP = 40;
 const PAN_PAGE = 240;
-/** How long flying to a state takes (ms), and how long it stays marked after (ms). */
-const JOURNEY_MS = 650;
+/** How long a state the view flew to stays marked (ms; the ring's animation in styles.ts). */
 const VISITED_MS = 1400;
 /** How long a gesture hint stays after the gesture stops (ms). */
 const HINT_MS = 1400;
 /** Apple's keyboards zoom with ⌘, the others with Ctrl. */
 const MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-/** How long revealing the active states glides (ms). */
-const GLIDE_MS = 250;
+/** How long a help popover takes to fade out when the view flies away from it (ms; styles.ts). */
+const HELP_FADE_MS = 140;
 const FIRED_MS = 900;
 /** How long the playback controls stay in full while playing and untouched. */
 const IDLE_MS = 3000;
@@ -228,7 +228,7 @@ export class ScxmlView extends ElementBase {
   #source?: string;
   #options: ViewOptions = {};
   /** Stand-ins for the I/O processors the chart sends to and nobody handles (sessions the element creates). */
-  #standIns: StandIn[] = [];
+  #standIns?: StandIns;
   #variables?: ReturnType<typeof variablesPanel>;
   #clock?: Clock;
   #strings: ViewStrings = defaultViewStrings;
@@ -541,10 +541,11 @@ export class ScxmlView extends ElementBase {
       // a send to a processor nobody handles would fail in the view: a stand-in keeps it, and the panel shows it
       let session: SCXMLSession | undefined;
       const now = () => session?.clock.now() ?? 0;
-      const standIns = unhandledSendTypes(root, opts.ioprocessors ?? []).map((type) => standIn(type, this.#strings, now));
-      const ioprocessors = [...(opts.ioprocessors ?? []), ...standIns.map((s) => s.processor)];
+      const types = unhandledSendTypes(root, opts.ioprocessors ?? []);
+      const stand = types.length ? standIns(types, this.#strings, now, () => this.#renderPanels()) : undefined;
+      const ioprocessors = [...(opts.ioprocessors ?? []), ...(stand?.processors ?? [])];
       session = new SCXMLSession(model, { ...opts, ioprocessors, loader, datamodel, data, clock: this.#clock });
-      this.#standIns = standIns;
+      this.#standIns = stand;
       this.#attach(session, true);
       this.#emit<ViewLoadDetail>("scxml-load", { session, model });
       if (this.autostart) session.start();
@@ -589,8 +590,8 @@ export class ScxmlView extends ElementBase {
   #attach(session: SCXMLSession, owned: boolean) {
     this.#session = session;
     this.#owned = owned;
-    if (!owned) this.#standIns = []; // a host's session: the host handles its processors
-    for (const s of this.#standIns) s.restart();
+    if (!owned) this.#standIns = undefined; // a host's session: the host handles its processors
+    this.#standIns?.restart();
     this.#renderPanels();
     this.#model = session.model;
     this.#fired.clear();
@@ -774,15 +775,15 @@ export class ScxmlView extends ElementBase {
     const diagram = h("div", { class: "diagram", role: "group" });
     // focusable: it takes the arrow keys (pan), and the playback and zoom shortcuts
     const canvas = h("div", { class: "canvas", part: "canvas", tabindex: "0" }, diagram);
-    const fit = iconButton("zoom-reset", "fit", t.zoomReset, icon(icons.scan, 16), () => this.#zoomTo(null));
+    const fit = iconButton("zoom-reset", "fit", t.zoomReset, icon(icons.scan, 16), () => this.#fitSmooth());
     fit.append(h("span", {}, t.fit));
-    const zoomLevel = iconButton("zoom-level", "zoom-level", t.zoomActual, document.createTextNode("100%"), () => this.#zoomTo(1));
+    const zoomLevel = iconButton("zoom-level", "zoom-level", t.zoomActual, document.createTextNode("100%"), () => this.#zoomSmooth(1));
     const zoom = h(
       "div",
       { class: "zoom", part: "zoom", role: "group", "aria-label": t.zoomToolbar },
-      iconButton("zoom-out", "zoom-out", t.zoomOut, icon(icons.minus, 16), () => this.#zoomBy(1 / ZOOM_STEP)),
+      iconButton("zoom-out", "zoom-out", t.zoomOut, icon(icons.minus, 16), () => this.#zoomSmooth(this.#scale / ZOOM_STEP)),
       zoomLevel,
-      iconButton("zoom-in", "zoom-in", t.zoomIn, icon(icons.plus, 16), () => this.#zoomBy(ZOOM_STEP)),
+      iconButton("zoom-in", "zoom-in", t.zoomIn, icon(icons.plus, 16), () => this.#zoomSmooth(this.#scale * ZOOM_STEP)),
     );
     const nav = h("div", { class: "nav", hidden: "" }, zoom, fit);
     const help = h("div", { class: "help-popover", part: "help-popover", role: "dialog", tabindex: "-1", id: "help-popover", hidden: "" });
@@ -849,6 +850,7 @@ export class ScxmlView extends ElementBase {
         if (!this.#layout) return;
         if (!(e.ctrlKey || e.metaKey)) return this.#hint(this.#strings.hintWheel(MAC ? "⌘" : "Ctrl"));
         e.preventDefault();
+        this.#stopMotion();
         this.#takeOver();
         // a wheel notch (~100px) zooms by about a fifth; a pinch sends many small deltas
         const factor = Math.exp(-Math.max(-100, Math.min(100, e.deltaY * (e.deltaMode === 1 ? 20 : 1))) * 0.002);
@@ -858,13 +860,14 @@ export class ScxmlView extends ElementBase {
     );
     canvas.addEventListener("keydown", (e) => {
       if (e.composedPath()[0] !== canvas || e.altKey || e.ctrlKey || e.metaKey) return;
-      if (e.key === "+" || e.key === "=") this.#zoomBy(ZOOM_STEP);
-      else if (e.key === "-" || e.key === "_") this.#zoomBy(1 / ZOOM_STEP);
-      else if (e.key === "0") this.#zoomTo(null);
+      if (e.key === "+" || e.key === "=") this.#zoomSmooth(this.#scale * ZOOM_STEP);
+      else if (e.key === "-" || e.key === "_") this.#zoomSmooth(this.#scale / ZOOM_STEP);
+      else if (e.key === "0") this.#fitSmooth();
       else {
         const step = e.shiftKey ? PAN_PAGE : PAN_STEP;
         const by = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
         if (!by || !this.#layout) return;
+        this.#stopMotion();
         this.#takeOver();
         this.#panTo(this.#pan.x + by[0]!, this.#pan.y + by[1]!);
       }
@@ -886,6 +889,7 @@ export class ScxmlView extends ElementBase {
       if (!drag.moved) {
         if (Math.abs(dx) + Math.abs(dy) < 4) return;
         drag.moved = true;
+        this.#stopMotion();
         this.#takeOver();
         canvas.setPointerCapture?.(e.pointerId);
         canvas.classList.add("panning");
@@ -938,6 +942,7 @@ export class ScxmlView extends ElementBase {
       "touchstart",
       (e) => {
         if (e.touches.length === 2 && this.#layout) {
+          this.#stopMotion();
           this.#takeOver();
           pinch = { dist: dist(e.touches), scale: this.#scale, point: this.#pointAt(mid(e.touches)) };
           start = undefined;
@@ -990,8 +995,8 @@ export class ScxmlView extends ElementBase {
 
   /** A double tap or click: zoom in on `anchor`, or, when zoomed in already, back to fit (like Photos). */
   #zoomToggle(anchor: { x: number; y: number }) {
-    if (this.#zoom != null && this.#zoom > this.#fitScale() + 0.01) this.#zoomTo(null);
-    else this.#zoomTo(Math.max(1, this.#scale * 2), anchor);
+    if (this.#zoom != null && this.#zoom > this.#fitScale() + 0.01) this.#fitSmooth();
+    else this.#zoomSmooth(Math.max(1, this.#scale * 2), anchor);
   }
 
   #hintTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1039,12 +1044,11 @@ export class ScxmlView extends ElementBase {
     const ceiling = Number.isFinite(raw) ? Math.min(MAX_ZOOM, Math.max(1, raw)) : 1;
     if (ceiling <= 1) return 1;
     let scale = Math.min(ceiling, available / layout.width);
-    // a frame of a set height (--scxml-height): grow no taller than the room it leaves the drawing
-    const limit = Number.parseFloat(getComputedStyle(this.#el.frame).maxHeight);
+    // a diagram of a set height (--scxml-height): grow no taller than the room it leaves the drawing
+    const limit = Number.parseFloat(getComputedStyle(this.#el.viewport).maxHeight);
     if (Number.isFinite(limit) && layout.height > 0) {
-      const chrome = this.#el.frame.getBoundingClientRect().height - canvas.clientHeight;
       const padding = Number.parseFloat(getComputedStyle(canvas).paddingBottom) || 0;
-      const room = limit - Math.max(0, chrome) - padding - 2 * MARGIN;
+      const room = limit - padding - 2 * MARGIN;
       if (room > 0) scale = Math.min(scale, room / layout.height);
     }
     return Math.max(1, scale);
@@ -1077,10 +1081,36 @@ export class ScxmlView extends ElementBase {
     const { x: px, y: py } = this.#pan;
     const inView = x0 + px >= pad && x1 + px <= w - pad && y0 + py >= pad && y1 + py <= h - pad;
     if (inView) return;
-    // centre them; if they don't fit, show their top-left corner (never past the drawing's own)
-    const left = x1 - x0 + 2 * pad > w ? x0 - pad : (x0 + x1) / 2 - w / 2;
-    const top = y1 - y0 + 2 * pad > h ? y0 - pad : (y0 + y1) / 2 - h / 2;
-    this.#panTo(-Math.max(0, left), -Math.max(0, top), smooth);
+    // centre them; if they don't fit, show their top-left corner. Following stays within the drawing,
+    // as a scrolled box did: it never shows empty canvas past the drawing's edges (only a hand does)
+    const within = (v: number, size: number, room: number) => Math.min(Math.max(0, v), Math.max(0, size + 2 * MARGIN - room));
+    const left = within(x1 - x0 + 2 * pad > w ? x0 - pad : (x0 + x1) / 2 - w / 2, layout.width * s, w);
+    const top = within(y1 - y0 + 2 * pad > h ? y0 - pad : (y0 + y1) / 2 - h / 2, layout.height * s, h);
+    const c = this.#el.canvas;
+    const s1 = this.#scale;
+    const end: View = {
+      x: (c.clientWidth / 2 + Math.max(0, left) - MARGIN) / s1,
+      y: (c.clientHeight / 2 + Math.max(0, top) - MARGIN) / s1,
+      scale: s1,
+    };
+    if (!smooth) {
+      this.#stopMotion();
+      this.#panTo(-Math.max(0, left), -Math.max(0, top));
+      return;
+    }
+    // a glide at the same scale; it keeps the automatic zoom (no explicit scale, no frozen height)
+    const move = glide(this.#view(), end);
+    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this.#stopMotion();
+    if (reduce || typeof requestAnimationFrame === "undefined") return this.#panTo(-Math.max(0, left), -Math.max(0, top));
+    const t0 = performance.now();
+    const frame = (now: number) => {
+      const t = Math.min(1, (now - t0) / move.duration);
+      const v = move.at(easeInOut(t));
+      this.#panTo(c.clientWidth / 2 - MARGIN - v.x * this.#scale, c.clientHeight / 2 - MARGIN - v.y * this.#scale);
+      this.#motion = t < 1 ? requestAnimationFrame(frame) : 0;
+    };
+    this.#motion = requestAnimationFrame(frame);
   }
 
   /** "Fit" shows once the view has left the default: zoomed by hand, or no longer following. */
@@ -1103,10 +1133,6 @@ export class ScxmlView extends ElementBase {
     if (!this.#follow) return;
     this.#follow = false;
     this.#syncFit();
-  }
-
-  #zoomBy(factor: number) {
-    this.#zoomTo(this.#scale * factor);
   }
 
   /**
@@ -1153,7 +1179,7 @@ export class ScxmlView extends ElementBase {
    * Move the drawing to `x`, `y` (its offset from the automatic view, px), anywhere as long as
    * some of it stays in view (PAN_KEEP px each way). `smooth` glides there (not with reduced motion).
    */
-  #panTo(x: number, y: number, smooth = false) {
+  #panTo(x: number, y: number) {
     const layout = this.#layout;
     const canvas = this.#el.canvas;
     if (!layout || !Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -1166,28 +1192,96 @@ export class ScxmlView extends ElementBase {
     const next = { x: clamp(x, w, cw), y: clamp(y, h, ch) };
     if (next.x === this.#pan.x && next.y === this.#pan.y) return;
     this.#pan = next;
-    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const d = this.#el.diagram;
-    if (smooth && !reduce) {
-      d.classList.add("gliding");
-      clearTimeout(this.#glideTimer);
-      this.#glideTimer = setTimeout(() => d.classList.remove("gliding"), GLIDE_MS);
-    } else d.classList.remove("gliding");
     this.#transform();
     this.#placeHelp();
   }
 
-  #glideTimer: ReturnType<typeof setTimeout> | undefined;
+  // ───────────────────────────── the camera ─────────────────────────────
+  // When the view moves by itself (a link in a help popover, fit, the zoom buttons and keys, a
+  // double click or tap, following the active states) it moves along ./camera.ts's paths, frame by
+  // frame. The hand's own moves (a drag, a pinch, Ctrl + wheel, the arrow keys) stay direct, and
+  // stop a move under way.
 
-  #journeyRaf = 0;
+  #motion = 0;
+
+  /** The view now: the diagram point at the canvas's middle, and the scale. */
+  #view(): View {
+    const c = this.#el.canvas;
+    const s = this.#scale;
+    return { x: (c.clientWidth / 2 - MARGIN - this.#pan.x) / s, y: (c.clientHeight / 2 - MARGIN - this.#pan.y) / s, scale: s };
+  }
+
+  /** Show `v`: an explicit scale (the canvas keeps its height, as when zooming by hand), the point in the middle. */
+  #setView(v: View) {
+    const c = this.#el.canvas;
+    const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.scale));
+    if (scale !== this.#scale || this.#zoom == null) {
+      if (this.#zoom == null && c.clientHeight > 0) c.style.setProperty("height", `${c.clientHeight}px`);
+      this.#zoom = scale;
+      this.#applyFit();
+    }
+    this.#panTo(c.clientWidth / 2 - MARGIN - v.x * this.#scale, c.clientHeight / 2 - MARGIN - v.y * this.#scale);
+  }
+
+  /** Run `move`, eased; then `done`. With reduced motion, or without frames, it jumps to the end. */
+  #animate(move: Move, done?: () => void) {
+    this.#stopMotion();
+    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || typeof requestAnimationFrame === "undefined" || move.duration <= 0) {
+      this.#setView(move.at(1));
+      done?.();
+      return;
+    }
+    const start = performance.now();
+    const frame = (now: number) => {
+      const t = Math.min(1, (now - start) / move.duration);
+      this.#setView(move.at(easeInOut(t)));
+      if (t < 1) this.#motion = requestAnimationFrame(frame);
+      else {
+        this.#motion = 0;
+        done?.();
+      }
+    };
+    this.#motion = requestAnimationFrame(frame);
+  }
+
+  /** Stop a move under way where it is (the hand takes over). */
+  #stopMotion() {
+    if (!this.#motion) return;
+    cancelAnimationFrame(this.#motion);
+    this.#motion = 0;
+  }
+
+  /** Zoom to `scale` around `anchor` (client coordinates; default: the canvas's middle), smoothly. */
+  #zoomSmooth(scale: number, anchor?: { x: number; y: number }) {
+    if (!this.#layout || !Number.isFinite(scale)) return;
+    const c = this.#el.canvas;
+    const r = c.getBoundingClientRect();
+    const at = anchor ?? { x: r.left + c.clientWidth / 2, y: r.top + c.clientHeight / 2 };
+    const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
+    this.#takeOver();
+    this.#flashZoomLevel();
+    const offset = { x: at.x - r.left - c.clientWidth / 2, y: at.y - r.top - c.clientHeight / 2 };
+    this.#animate(anchoredZoom(this.#view(), next, this.#pointAt(at), offset));
+  }
+
+  /** Back to the automatic view (fit), smoothly: the scale "fit" chooses, the drawing at its start. */
+  #fitSmooth() {
+    if (!this.#layout) return this.#zoomTo(null);
+    const c = this.#el.canvas;
+    const s = this.#autoScale();
+    const end: View = { x: (c.clientWidth / 2 - MARGIN) / s, y: (c.clientHeight / 2 - MARGIN) / s, scale: s };
+    this.#animate(smoothPath(this.#view(), end, c.clientWidth), () => this.#zoomTo(null));
+  }
 
   /**
-   * Fly the view to `state` (a target in a help popover): the diagram point at the canvas's middle
-   * travels to the state's centre while the scale dips when the trip is long, so both ends pass
-   * through view (a map's "fly to"), then the state is marked for a moment and its help opens.
-   * With reduced motion, or no layout yet, it jumps. A state inside a folded container flies to
-   * the folded box. The view is the user's from then on ("fit" goes back).
+   * Fly the view to `state` (a target in a help popover) along the camera's smooth path, then mark
+   * the state for a moment and open its help: a flow is followed from state to state. The popover
+   * fades out as the view leaves. A state inside a folded container flies to the folded box. The
+   * view is the user's from then on ("fit" goes back). With reduced motion it jumps.
    */
+  #helpFade: ReturnType<typeof setTimeout> | undefined;
+
   #journey(state: StateNode) {
     const layout = this.#layout;
     const canvas = this.#el.canvas;
@@ -1199,72 +1293,26 @@ export class ScxmlView extends ElementBase {
     }
     if (!layout || !target || !node) return;
     const arrive = node;
-    this.#closeHelp(false);
+    this.#closeHelp(false, true);
     this.#takeOver();
-    cancelAnimationFrame(this.#journeyRaf);
     const cw = canvas.clientWidth;
     const ch = canvas.clientHeight;
     const s0 = this.#scale;
-    // the end: the state at the same scale, unless it's larger than the canvas, then as large as fits
+    // the end: the state at the scale it has now, unless it's larger than the canvas, then as large as fits
     const room = Math.min((cw - 2 * MARGIN) / target.rect.w, (ch - 2 * MARGIN) / target.rect.h);
     const s1 = Math.max(MIN_ZOOM, Math.min(s0, room > 0 ? room : s0));
-    const middle = (s: number) => ({ x: (cw / 2 - MARGIN - this.#pan.x) / s, y: (ch / 2 - MARGIN - this.#pan.y) / s });
-    const c0 = middle(s0);
-    const c1 = { x: target.rect.x + target.rect.w / 2, y: target.rect.y + target.rect.h / 2 };
-    // the longer the trip (in screens), the further the scale dips halfway, so both ends pass through view
-    const trip = Math.hypot((c1.x - c0.x) * s0, (c1.y - c0.y) * s0) / Math.max(1, Math.hypot(cw, ch));
-    const dip = Math.min(0.6, Math.max(0, (trip - 0.4) * 0.5));
-    const at = (c: { x: number; y: number }, s: number) => ({ x: cw / 2 - MARGIN - c.x * s, y: ch / 2 - MARGIN - c.y * s });
-    const wasZoom = this.#zoom;
-    const freeze = () => {
-      // like zooming by hand: the canvas keeps its height while the drawing moves inside it
-      if (this.#zoom == null && ch > 0) canvas.style.setProperty("height", `${ch}px`);
-    };
-    const place = (c: { x: number; y: number }, s: number) => {
-      if (Math.abs(s - this.#scale) > 1e-6) {
-        freeze();
-        this.#zoom = s;
-        this.#applyFit();
-      }
-      const p = at(c, this.#scale);
-      this.#panTo(p.x, p.y);
-    };
-    const done = () => {
-      // back to the automatic scale when the trip ended at it
-      if (wasZoom == null && Math.abs(s1 - this.#autoScale()) < 1e-6 && this.#zoom != null) {
-        this.#zoom = null;
-        canvas.style.removeProperty("height");
-        this.#applyFit();
-        const p = at(c1, this.#scale);
-        this.#panTo(p.x, p.y);
-      }
+    const end: View = { x: target.rect.x + target.rect.w / 2, y: target.rect.y + target.rect.h / 2, scale: s1 };
+    this.#animate(smoothPath(this.#view(), end, cw), () => {
       this.#syncFit();
       const box = this.#boxes.get(arrive);
-      if (box) {
-        box.classList.remove("visited");
-        void box.offsetWidth; // restart the animation
-        box.classList.add("visited");
-        setTimeout(() => box.classList.remove("visited"), VISITED_MS);
-        const help = box.querySelector<HTMLElement>("button.help");
-        if (help) this.#openHelp(arrive, help);
-      }
-    };
-    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce || typeof requestAnimationFrame === "undefined") {
-      place(c1, s1);
-      return done();
-    }
-    const start = performance.now();
-    const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
-    const frame = (time: number) => {
-      const t = Math.min(1, (time - start) / JOURNEY_MS);
-      const e = ease(t);
-      const s = (s0 + (s1 - s0) * e) * (1 - dip * Math.sin(Math.PI * t));
-      place({ x: c0.x + (c1.x - c0.x) * e, y: c0.y + (c1.y - c0.y) * e }, s);
-      if (t < 1) this.#journeyRaf = requestAnimationFrame(frame);
-      else done();
-    };
-    this.#journeyRaf = requestAnimationFrame(frame);
+      if (!box) return;
+      box.classList.remove("visited");
+      void box.offsetWidth; // restart the animation
+      box.classList.add("visited");
+      setTimeout(() => box.classList.remove("visited"), VISITED_MS);
+      const help = box.querySelector<HTMLElement>("button.help");
+      if (help) this.#openHelp(arrive, help);
+    });
   }
 
   /** Open the help popover of `state` next to its button. */
@@ -1315,6 +1363,8 @@ export class ScxmlView extends ElementBase {
     const list = shown.length
       ? [h("div", { class: "help-sub" }, t.helpTransitions), h("ul", { class: "help-transitions" }, ...shown.map(row))]
       : [];
+    clearTimeout(this.#helpFade);
+    pop.classList.remove("leaving");
     pop.replaceChildren(heading, body, ...list);
     pop.setAttribute("aria-label", t.helpLabel(name));
     pop.hidden = false;
@@ -1322,10 +1372,20 @@ export class ScxmlView extends ElementBase {
     pop.focus({ preventScroll: true });
   }
 
-  #closeHelp(refocus: boolean) {
+  #closeHelp(refocus: boolean, fade = false) {
     const open = this.#helpFor;
     this.#helpFor = undefined;
-    this.#el.help.hidden = true;
+    const pop = this.#el.help;
+    clearTimeout(this.#helpFade);
+    pop.classList.remove("leaving");
+    if (fade && !pop.hidden) {
+      // it fades out where it is (it no longer follows the view)
+      pop.classList.add("leaving");
+      this.#helpFade = setTimeout(() => {
+        pop.classList.remove("leaving");
+        if (!this.#helpFor) pop.hidden = true;
+      }, HELP_FADE_MS);
+    } else pop.hidden = true;
     if (!open) return;
     open.button.setAttribute("aria-expanded", "false");
     if (refocus && open.button.isConnected) open.button.focus();
@@ -1747,9 +1807,13 @@ export class ScxmlView extends ElementBase {
     const showVariables = this.hasAttribute("variables") && this.getAttribute("variables") !== "false";
     if (showVariables) this.#variables ??= variablesPanel(t);
     this.#variables?.watch(showVariables ? session : undefined);
-    const panels = [...(showVariables && this.#variables ? [this.#variables.panel] : []), ...this.#standIns.map((s) => s.panel)];
+    const panels = [
+      ...(showVariables && this.#variables ? [this.#variables.panel] : []),
+      ...(this.#standIns ? [this.#standIns.panel] : []),
+    ];
     e.panels.replaceChildren(...panels);
-    e.panels.hidden = !panels.length;
+    // the stand-ins' panel shows from the chart's first message
+    e.panels.hidden = !panels.some((p) => !p.hidden);
     const sends = this.#presetSends().map(({ event, data, label }) => {
       const b = h(
         "button",
@@ -1759,7 +1823,7 @@ export class ScxmlView extends ElementBase {
       b.addEventListener("click", () => this.#sendEvent(event, data === undefined ? this.#eventData(event) : data));
       return b;
     });
-    const restart = this.#owned && session && (sends.length || panels.length);
+    const restart = this.#owned && session && (sends.length || showVariables || this.#standIns);
     e.run.replaceChildren(...sends, ...(restart ? [e.restart] : []));
     e.run.hidden = !sends.length && !restart;
   }

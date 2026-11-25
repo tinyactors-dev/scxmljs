@@ -69,7 +69,7 @@ bundler, or an [import map](https://github.com/tinyactors-dev/scxmljs/blob/main/
 The element loads, validates, runs and draws the chart. Active states are highlighted, and each
 transition label is a button that sends its event.
 
-![A media player chart drawn by <scxml-view>: the "playing" and "audible" states are active](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-light-41c0f90f.webp)
+![A media player chart drawn by <scxml-view>: the "playing" and "audible" states are active](https://raw.githubusercontent.com/tinyactors-dev/scxmljs/readme-media/view-light-94fea0d3.webp)
 
 **Explore a running system** with `<scxml-explorer>`: a tree of states, a focus on one level of
 the chart (each state with what it does, how it leaves, and buttons to send its events while

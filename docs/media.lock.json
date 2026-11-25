@@ -26,19 +26,19 @@
     ]
   },
   "view-light": {
-    "hash": "41c0f90f",
+    "hash": "94fea0d3",
     "recipe": "cde9b38a",
     "files": [
-      "view-light-41c0f90f.webp",
-      "view-light-41c0f90f.png"
+      "view-light-94fea0d3.webp",
+      "view-light-94fea0d3.png"
     ]
   },
   "view-dark": {
-    "hash": "7dc85403",
+    "hash": "2d05e1fe",
     "recipe": "f507a262",
     "files": [
-      "view-dark-7dc85403.webp",
-      "view-dark-7dc85403.png"
+      "view-dark-2d05e1fe.webp",
+      "view-dark-2d05e1fe.png"
     ]
   }
 }

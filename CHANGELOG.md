@@ -18,6 +18,8 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-25
+
 ### Added
 
 - Charts can say what data their events take, with an XML Schema inside the chart: each top-level
@@ -274,7 +276,8 @@ The first release.
   violations), in Node, Bun and Deno from the packed tarball, and with React 19, Vue 3,
   Svelte 5 and Angular 22 apps; see [docs/bundling.md](docs/bundling.md#support).
 
-[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.5.0
 [0.4.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.4.0
 [0.3.1]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.3.1
 [0.3.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.3.0

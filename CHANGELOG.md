@@ -18,6 +18,15 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-25
+
+### Fixed
+
+- `<scxml-view>`: a chart whose initial state is part of a cycle is drawn from its initial state.
+  Before, when more transitions ran back into the initial state than out of it (a retry loop:
+  `paying` back to `cart` twice, `cart` to `paying` once), the state it leads to was drawn first,
+  so the diagram read backwards and its initial marker was lost.
+
 ## [0.3.0] - 2026-11-23
 
 ### Fixed
@@ -185,7 +194,8 @@ The first release.
   violations), in Node, Bun and Deno from the packed tarball, and with React 19, Vue 3,
   Svelte 5 and Angular 22 apps; see [docs/bundling.md](docs/bundling.md#support).
 
-[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.3.1
 [0.3.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.3.0
 [0.2.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.2.0
 [0.1.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.1.0

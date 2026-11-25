@@ -116,6 +116,12 @@ describe("well-formed documents", () => {
     expect(r.getAttribute("été")).toBe("ça");
     expect(r.textContent).toBe("𝄞");
   });
+
+  test("a lone surrogate in the string reads as U+FFFD, as browsers read it", () => {
+    const r = root(`<a x="\uD800">b\uDC00c</a>`);
+    expect(r.getAttribute("x")).toBe("\uFFFD");
+    expect(r.textContent).toBe("b\uFFFDc");
+  });
 });
 
 describe("namespaces", () => {

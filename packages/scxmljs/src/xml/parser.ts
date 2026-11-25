@@ -35,7 +35,9 @@ const START =
   ":A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\u{10000}-\\u{EFFFF}";
 const NAME = new RegExp(`[${START}][${START}\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*`, "uy");
 const SPACE = /[ \t\n]*/y;
-/** A character outside §2.2 Char (lone surrogates included). */
+/** A surrogate that isn't half of a pair. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+/** A character outside §2.2 Char. */
 const NOT_CHAR = /[^\t\n\r\x20-\u{D7FF}\u{E000}-\u{FFFD}\u{10000}-\u{10FFFF}]/u;
 const PREDEFINED: Record<string, string> = { lt: "<", gt: ">", amp: "&", apos: "'", quot: '"' };
 
@@ -82,10 +84,11 @@ class Parser {
   private pos = 0;
   private readonly doc: Document;
 
-  constructor(
-    private readonly src: string,
-    contentType: string,
-  ) {
+  private readonly src: string;
+
+  constructor(src: string, contentType: string) {
+    // a lone surrogate becomes U+FFFD, as browsers do when they encode the string for their parser
+    this.src = src.replace(LONE_SURROGATE, "\uFFFD");
     this.doc = new Document(contentType);
   }
 

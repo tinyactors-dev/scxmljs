@@ -18,6 +18,8 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-25
+
 ### Added
 
 - `<scxml-view>` runs a chart as a demo with no code of the page's: a chart that sends to an I/O
@@ -243,7 +245,8 @@ The first release.
   violations), in Node, Bun and Deno from the packed tarball, and with React 19, Vue 3,
   Svelte 5 and Angular 22 apps; see [docs/bundling.md](docs/bundling.md#support).
 
-[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/tinyactors-dev/scxmljs/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.4.0
 [0.3.1]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.3.1
 [0.3.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.3.0
 [0.2.0]: https://github.com/tinyactors-dev/scxmljs/releases/tag/v0.2.0

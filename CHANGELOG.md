@@ -20,13 +20,17 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [0.5.1] - 2026-11-25
 
-A fix for event forms on pages that give an event's data themselves.
+Two fixes seen on the tinyactors website: labels that promised a form and opened none, and the
+"Sent" panel on phones.
 
 ### Fixed
 
 - `<scxml-view>` marks a label with `…` only when a click asks for its event's data: not when
   `event-data` gives the data (the click sends it at once, with no form), nor with
   `event-forms="off"`. The marks follow changes to both attributes.
+- `<scxml-view>`'s "Sent" panel keeps each message's time, processor and event whole on a narrow
+  element, and shortens only its data (`charge {"amount":42,…`); before, the event's name was
+  squeezed under its data.
 
 ## [0.5.0] - 2026-11-25
 

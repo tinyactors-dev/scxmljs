@@ -48,6 +48,8 @@ export const VIEW_CSS = /* css */ `
 .panel .log { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; max-height: 168px; overflow-y: auto;
   font: 12px var(--x-mono); color: var(--x-fg2); }
 .panel .log li { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+/* the time, processor and event keep their width; only the data shrinks (to an ellipsis) */
+.panel .log li > :not(.value) { flex: none; }
 .panel .log .at { color: var(--x-fg3); min-width: 3.2em; font-variant-numeric: tabular-nums; }
 .panel .log .target { color: var(--x-fg3); white-space: nowrap; }
 .panel .log .type { color: var(--x-fg3); }

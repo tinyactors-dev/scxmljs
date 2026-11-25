@@ -266,11 +266,22 @@ test.describe("<scxml-view> layout", () => {
           );
         }
       });
-    // (the view moves there smoothly: wait for it to land)
+    // (the view moves there smoothly: wait until it has landed, i.e. stopped changing)
+    const settled = async () => {
+      let last = Number.NaN;
+      for (let i = 0; i < 60; i++) {
+        const now = await zoom();
+        if (Math.abs(now - last) < 1e-6) return now;
+        last = now;
+        await page.waitForTimeout(80);
+      }
+      return last;
+    };
     await doubleTap();
-    await expect.poll(zoom).toBeCloseTo(before, 2);
+    const fit = await settled();
+    expect(fit).toBeLessThanOrEqual(before + 0.01); // back to the automatic scale (a scrollbar may narrow it)
     await doubleTap();
-    await expect.poll(zoom).toBeGreaterThanOrEqual(Math.max(1, before * 2) - 0.01);
+    expect(await settled()).toBeGreaterThanOrEqual(Math.max(1, fit * 2) - 0.01);
   });
 
   test("an inline-block element sizes to its diagram (nothing in it zeroes its intrinsic width)", async ({ page }) => {

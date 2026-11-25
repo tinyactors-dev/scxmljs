@@ -280,6 +280,8 @@ export class ScxmlView extends ElementBase {
   /** The data each event takes (forms.ts), and the open form: the event and the label it opened from. */
   #fields = new Map<string, Field>();
   #formFor?: { name: string; button: HTMLElement };
+  /** `<scxml-data>`'s module once loaded (it is loaded when a chart has an event that takes data). */
+  #dataModule?: Promise<typeof import("../data/element.ts")>;
   /** Keep the active states in view (until the user pans or zooms; "fit to width" resumes). */
   #follow = true;
   /** The active states last revealed, so a step that changes nothing doesn't move the drawing. */
@@ -602,6 +604,7 @@ export class ScxmlView extends ElementBase {
     this.#renderPanels();
     this.#model = session.model;
     this.#fields = eventFields(session.model);
+    if (this.#fields.size) this.#loadData();
     this.#fired.clear();
     this.#steps = 0;
     this.#last = new Set(session.configuration);
@@ -636,6 +639,7 @@ export class ScxmlView extends ElementBase {
 
   #teardownSession() {
     for (const f of this.#unwire.splice(0)) f();
+    if (this.#formFor) this.#closeForm(false);
     this.#variables?.watch(undefined);
     cancelAnimationFrame(this.#decayRaf);
     if (this.#owned) this.#session?.dispose();
@@ -795,8 +799,11 @@ export class ScxmlView extends ElementBase {
     );
     const nav = h("div", { class: "nav", hidden: "" }, zoom, fit);
     const help = h("div", { class: "help-popover", part: "help-popover", role: "dialog", tabindex: "-1", id: "help-popover", hidden: "" });
+    // the form is in the top layer (a manual popover), placed against the window: it may be taller
+    // than the diagram, and nothing of the page clips it
     const form = h("form", {
-      class: "help-popover form-popover",
+      popover: "manual",
+      class: "form-popover",
       part: "form-popover",
       role: "dialog",
       tabindex: "-1",
@@ -1445,7 +1452,10 @@ export class ScxmlView extends ElementBase {
 
   /** Place a popover next to its button: below it, or above when it fits only there, else on the side with more room. */
   #place(pop: HTMLElement, button: HTMLElement) {
-    const vp = (pop.parentElement as HTMLElement).getBoundingClientRect();
+    const fixed = pop === this.#el.form;
+    const vp = fixed
+      ? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight }
+      : (pop.parentElement as HTMLElement).getBoundingClientRect();
     const b = button.getBoundingClientRect();
     const w = pop.offsetWidth;
     const maxLeft = Math.max(4, vp.width - w - 4);
@@ -1831,8 +1841,7 @@ export class ScxmlView extends ElementBase {
     if (this.#formFor) this.#formFor.button.setAttribute("aria-expanded", "false");
     this.#formFor = { name, button };
     button.setAttribute("aria-expanded", "true");
-    const { ScxmlData } = await import("../data/element.ts");
-    if (!customElements.get("scxml-data")) customElements.define("scxml-data", ScxmlData);
+    await this.#loadData();
     if (this.#formFor?.button !== button) return; // closed, or another opened, while it loaded
     const data = document.createElement("scxml-data") as ScxmlData;
     data.setAttribute("part", "form-data");
@@ -1846,7 +1855,7 @@ export class ScxmlView extends ElementBase {
     const pop = this.#el.form;
     pop.replaceChildren(head, ...doc, data, h("div", { class: "form-actions" }, cancel, send));
     pop.setAttribute("aria-label", t.formLabel(name));
-    pop.hidden = false;
+    this.#formShown(true);
     this.#place(pop, button);
     // what needs typing first: the form's first box, else Send
     requestAnimationFrame(() => {
@@ -1856,6 +1865,43 @@ export class ScxmlView extends ElementBase {
     });
     data.addEventListener("input", () => this.#placeHelp());
   }
+
+  /** Load `<scxml-data>` (once) and make sure it is defined. */
+  #loadData() {
+    this.#dataModule ??= import("../data/element.ts").then((m) => {
+      if (!customElements.get("scxml-data")) customElements.define("scxml-data", m.ScxmlData);
+      return m;
+    });
+    return this.#dataModule;
+  }
+
+  /** Show or hide the form: its `hidden` and its popover state together, whatever they were. */
+  #formShown(on: boolean) {
+    const pop = this.#el.form;
+    pop.hidden = !on;
+    try {
+      const open = pop.matches(":popover-open");
+      if (on && !open) pop.showPopover?.();
+      if (!on && open) pop.hidePopover?.();
+    } catch {
+      // a DOM without popovers: `hidden` alone shows and hides it
+    }
+    this.#formWatch(on);
+  }
+
+  /** While a form is open: it follows the page's scrolling and resizing, and a press outside it closes it. */
+  #formWatch(on: boolean) {
+    const op = on ? "addEventListener" : "removeEventListener";
+    window[op]("scroll", this.#formFollow, { capture: true, passive: true } as AddEventListenerOptions);
+    window[op]("resize", this.#formFollow);
+    document[op]("pointerdown", this.#formOutside, true);
+  }
+  #formFollow = () => this.#placeHelp();
+  #formOutside = (e: Event) => {
+    const open = this.#formFor;
+    const path = e.composedPath();
+    if (open && !path.includes(this.#el.form) && !path.includes(open.button)) this.#closeForm(false);
+  };
 
   #submitForm() {
     const open = this.#formFor;
@@ -1870,7 +1916,7 @@ export class ScxmlView extends ElementBase {
   #closeForm(refocus: boolean) {
     const open = this.#formFor;
     this.#formFor = undefined;
-    this.#el.form.hidden = true;
+    this.#formShown(false);
     this.#el.form.replaceChildren();
     if (!open) return;
     open.button.setAttribute("aria-expanded", "false");

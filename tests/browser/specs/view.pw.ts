@@ -121,6 +121,40 @@ test.describe("<scxml-view> event forms", () => {
   });
 });
 
+test.describe("<scxml-view> event forms in a short view", () => {
+  test("a form taller than the diagram isn't clipped by it, and fast clicks leave one form open", async ({ page }) => {
+    await page.goto("/fixtures/view.html");
+    await page.evaluate(() => {
+      const fields = Array.from({ length: 12 }, (_, i) => `<xs:element name="f${i}" type="xs:string"/>`).join("");
+      const v = document.createElement("scxml-view");
+      v.id = "short";
+      v.setAttribute("trusted", "");
+      (v as unknown as { source: string }).source =
+        `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="1.0" datamodel="ecmascript" initial="a">
+        <xs:schema><xs:element name="big"><xs:complexType><xs:sequence>${fields}</xs:sequence></xs:complexType></xs:element></xs:schema>
+        <state id="a"><transition event="big"/><transition event="small" cond="_event.data.x"/></state>
+      </scxml>`;
+      document.body.replaceChildren(v);
+    });
+    const view = page.locator("#short");
+    const label = (name: string) => view.locator("button.label, button.chip", { hasText: new RegExp(`^${name}`) }).first();
+    const form = view.locator(".form-popover");
+    await label("big").click();
+    await expect(form).toBeVisible();
+    const viewport = (await view.locator(".viewport").boundingBox())!;
+    const box = (await form.boundingBox())!;
+    expect(box.height).toBeGreaterThan(viewport.height);
+    // the last field and Send are on screen, not cut off with the diagram
+    await expect(form.locator("scxml-data").locator("input").last()).toBeInViewport();
+    await expect(form.locator('[part="form-send"]')).toBeInViewport();
+    for (let i = 0; i < 9; i++) await label(i % 2 ? "small" : "big").click();
+    await expect(form).toBeVisible();
+    await expect(form).toHaveAttribute("aria-label", "Data for big");
+    await page.keyboard.press("Escape");
+    await expect(form).toBeHidden();
+  });
+});
+
 test.describe("<scxml-view> layout", () => {
   const zoom = (page: import("@playwright/test").Page) =>
     page.evaluate(() => {

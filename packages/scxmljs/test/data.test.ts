@@ -117,6 +117,14 @@ describe("check and initialValue", () => {
     expect(initialValue(add)).toEqual({ sku: "tea", quantity: 1 });
     expect(check(add, initialValue(add), W)).toEqual([]);
     expect(initialValue(s.elements.get("pay")!)).toEqual({ card: { number: "" } });
+    const n = (facets: object, integer = true) =>
+      initialValue({ name: "n", type: { kind: "number", base: "int", integer, facets }, min: 1, max: 1 });
+    expect([
+      n({ minInclusive: -2147483648, maxInclusive: 2147483647 }),
+      n({ maxInclusive: -1 }),
+      n({ maxExclusive: 0 }, false),
+      n({ minExclusive: 0 }),
+    ]).toEqual([0, -1, -0.5, 1]);
   });
 
   test("each problem at its path", () => {

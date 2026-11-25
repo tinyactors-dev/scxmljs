@@ -154,7 +154,7 @@ button.label:disabled, button.chip:disabled { cursor: default; }
 }
 .help-popover[hidden], .form-popover[hidden] { display: none; }
 /* ── event form: the data an event takes, asked for before it is sent ── */
-.form-popover { width: min(340px, calc(100% - 8px)); display: grid; gap: 10px; }
+.form-popover { position: fixed; inset: auto; margin: 0; width: min(340px, calc(100vw - 8px)); display: grid; gap: 10px; }
 .form-popover .help-head { margin: 0; }
 .form-doc { margin: 0; color: var(--x-fg2); font-size: 12.5px; text-wrap: pretty; }
 /* the actions stay in sight when the form scrolls inside a short popover */

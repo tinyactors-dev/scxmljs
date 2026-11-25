@@ -520,7 +520,11 @@ function initialOf(type: DataType, given: string | undefined): unknown {
       if (Number.isFinite(n)) return n;
       const e = type.facets.enumeration?.[0];
       if (e != null) return Number(e);
-      return type.facets.minInclusive ?? (type.facets.minExclusive != null ? type.facets.minExclusive + (type.integer ? 1 : 0.5) : 0);
+      // 0 when the bounds allow it, else the nearest bound
+      const fa = type.facets;
+      const lo = fa.minInclusive ?? (fa.minExclusive != null ? fa.minExclusive + (type.integer ? 1 : 0.5) : Number.NEGATIVE_INFINITY);
+      const hi = fa.maxInclusive ?? (fa.maxExclusive != null ? fa.maxExclusive - (type.integer ? 1 : 0.5) : Number.POSITIVE_INFINITY);
+      return lo > 0 ? lo : hi < 0 ? hi : 0;
     }
     case "boolean":
       return given === "true" || given === "1";

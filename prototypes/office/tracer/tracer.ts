@@ -3,27 +3,37 @@
  * into the Office's trace format (../SCHEMA.md, v1–v3), with no code for any one system.
  *
  *   const tracer = createTracer({ system: "orders", clock });
- *   tracer.captureAll();                 // or: const engine = tracer.wrapEngine(createSession)
+ *   const engine = tracer.wrapEngine(createSession);   // or: tracer.observe(session) before start()
  *   …boot the system, drive it on the VirtualClock…
  *   const trace = tracer.finish();
  *
- * What it hooks (all from public events, plus a few private fields listed in README.md):
- *   - every session it observes (created through `wrapEngine`, started anywhere after
- *     `captureAll()`, or invoked as an SCXML child of an observed session): spawn, end (with the
- *     reason), microsteps (→ transition, with the triggering event and its cause), macrosteps
- *     (→ config, data, snapshot), `<send>`s (→ message), `<invoke>`s;
- *   - each session's I/O processor handles (`IOSession.deliver`, patched in place): inbound events;
- *   - each session's custom invokers (patched in place): what a service sends back to its parent;
- *   - `session.send()` (patched on the instance): what application code sends;
- *   - the session's clock (replaced on the instance by a thin wrapper): delayed sends, so a timer
- *     is seen when it is set (by which step) and when it fires.
+ * It uses the library's public API only: every session it observes (created through
+ * `wrapEngine`, passed to `observe`, or invoked as an SCXML child of an observed session) is
+ * followed through its session events:
+ *   - `enqueue`: every event that reaches the session, from every source (application
+ *     `session.send()`, an I/O processor's `deliver`, another session's `<send>`, an invoked child
+ *     or service), with an id the `microstep` that processes it repeats (→ the step's exact cause);
+ *   - `microstep`, `macrostep` (→ transition, config, data, snapshot), `done` (→ end and its reason);
+ *   - `send` (→ message; its `processor`), `sendscheduled` and `sendcancelled` (→ timers: a delayed
+ *     send is seen when it is set, by which step, and when it fires or is cancelled);
+ *   - `invoke`, `child` (→ invoked services and children; a service no longer in
+ *     `session.invocations` was cancelled);
+ *   - `session.processing` (whether a step is running), `session.options`, `model.source` (the
+ *     comment that introduces a chart).
  *
  * Events are emitted as they happen (`onEvent`), with two exceptions, documented in README.md:
  * what a session sends during a step is held until the step's transition is recorded (so it can
  * point at it), and a `<send>` to an I/O processor that nobody received at once is emitted when the
  * clock moves on (as a message to the processor itself). `finish()` sorts by time.
  */
-import { SCXMLSession } from "@tinyactors/scxmljs";
+import {
+  type EnqueueEvent,
+  type MacrostepEvent,
+  type MicrostepEvent,
+  SCXML_IOPROCESSOR,
+  type SCXMLSession,
+  type SendEvent,
+} from "@tinyactors/scxmljs";
 
 // ───────────────────────────── trace types ─────────────────────────────
 
@@ -556,8 +566,10 @@ export function analyzeModel(model: SCXMLSession["model"], purposeText?: string)
 
 // ───────────────────────────── the tracer ─────────────────────────────
 
-interface InboxEntry {
+/** A message recorded by a sender (`<send>`), waiting for the recipient's `enqueue` event. */
+interface Expected {
   name: string;
+  data: unknown;
   msg: Ev;
 }
 interface TimerRec {
@@ -583,24 +595,26 @@ interface Sess {
   session: SCXMLSession;
   chart: string;
   actor: Actor;
-  inbox: InboxEntry[];
+  /** What observed sessions sent to this one that has not reached its queue yet. */
+  expected: Expected[];
+  /** The message that queued each event (by the library's event id), for exact step causes. */
+  inbound: Map<number, Ev | undefined>;
   outbox: (Ev | { __pending: Pending })[];
   lastStep?: Ev;
-  macroTrigger?: InboxEntry;
   lastCfgKey?: string;
   microCfg?: string[];
   lastSnap?: string;
   lastValues: Map<string, string>;
   ended: boolean;
-  disposing: boolean;
-  firing?: TimerRec;
+  /** Delayed sends waiting for their timer, by their message (the same object on the three events). */
+  timers: Map<object, TimerRec>;
   invokeExt: Map<string, string>; // invokeid → endpoint (child actor or external)
+  /** Invocations of custom invokers still running: invokeid → their external (to see them cancelled). */
+  services: Map<string, string>;
   procExt: Map<object, string>; // processor → external id
 }
 
 const RECORDER = "prototypes/office/tracer";
-const OBSERVED = Symbol("tracer.observed");
-const WRAPPED = Symbol("tracer.wrapped");
 
 export type Tracer = ReturnType<typeof createTracer>;
 
@@ -620,14 +634,12 @@ export function createTracer(opts: TracerOptions) {
   const sessBySessionId = new Map<string, Sess>();
   const identities = new Map<string, number>();
   const pendings: Pending[] = [];
-  const loaded = new Map<string, string>(); // src → chart text, through patched loaders
   const lastInto = new Map<string, Ev>(); // external → newest message into it
   const lastFromTo = new Map<string, Ev>(); // `${actor}|${external}` → newest
   const procInstances = new Map<string, object[]>(); // alias → processor instances, in order seen
   const procOwners = new Map<object, Set<string>>(); // processor → actor ids that use it
   let seq = 0;
   let appCtx: string[] = [];
-  let invoking: Sess | undefined;
   let finished = false;
   const app = opts.app ?? { id: "app", label: "the application", kind: "app" };
 
@@ -675,7 +687,7 @@ export function createTracer(opts: TracerOptions) {
     ev.id = `e${seq++}`;
     emitRaw(ev);
   };
-  const busy = (s: Sess) => !!(s.session as unknown as { busy?: boolean }).busy;
+  const busy = (s: Sess) => s.session.processing;
   /** Emit what a session sent during its step, pointing at the step. */
   const flushOutbox = (s: Sess, step?: Ev) => {
     if (!s.outbox.length) return;
@@ -771,18 +783,14 @@ export function createTracer(opts: TracerOptions) {
   function observe(session: SCXMLSession, hint: { parent?: Sess; invokeid?: string; src?: string } = {}): string {
     const existing = sessBySession.get(session);
     if (existing) return existing.id;
-    const priv = session as unknown as {
-      opts?: { data?: Record<string, unknown>; invokers?: Record<string, (ctx: Record<string, unknown>) => unknown>; loader?: (src: string) => unknown };
-      ioSessions?: Map<{ type: string; aliases?: readonly string[] }, { sessionId: string; deliver: (n: string, d?: unknown, o?: string) => void }>;
-      clock: { now(): number; setTimeout(fn: () => void, ms: number): unknown; clearTimeout(h: unknown): void; defer(fn: () => void): void };
-    };
-    const info: SessionInfo = { name: session.model.name, sessionId: session.sessionId, data: priv.opts?.data ?? {} };
+    const info: SessionInfo = { name: session.model.name, sessionId: session.sessionId, data: { ...session.options.data } };
     if (hint.parent) info.parent = hint.parent.id;
     if (hint.invokeid) info.invokeid = hint.invokeid;
     if (hint.src) info.src = hint.src;
     const ident: Identity = { ...pendingHints.get(session), ...opts.identify?.(session, info) };
     if (!ident.source && hint.src && !hint.src.startsWith("{")) ident.source = hint.src;
-    if (!ident.purpose && hint.src && loaded.has(hint.src)) ident.purpose = leadingComment(loaded.get(hint.src)!);
+    // the comment that introduces the chart, from the text it was compiled from (a DOMParser may drop it)
+    if (!ident.purpose && hint.parent && session.model.source) ident.purpose = leadingComment(session.model.source);
     const chart = chartFor(session.model, ident);
     const nameLabel = session.model.name.includes(" · ") ? session.model.name.split(" · ").slice(1).join(" · ").trim() : "";
     const label =
@@ -808,15 +816,16 @@ export function createTracer(opts: TracerOptions) {
       session,
       chart,
       actor,
-      inbox: [],
+      expected: [],
+      inbound: new Map(),
       outbox: [],
       lastValues: new Map(),
       ended: false,
-      disposing: false,
+      timers: new Map(),
       invokeExt: new Map(),
+      services: new Map(),
       procExt: new Map(),
     };
-    (session as unknown as Record<symbol, boolean>)[OBSERVED] = true;
     sessBySession.set(session, s);
     sessById.set(id, s);
     sessBySessionId.set(session.sessionId, s);
@@ -831,101 +840,30 @@ export function createTracer(opts: TracerOptions) {
       hint.parent.invokeExt.set(hint.invokeid, id);
       record({ type: "message", from: hint.parent.id, to: id, name: "invoke", summary: hint.src ?? hint.invokeid, invoke: hint.invokeid }, hint.parent);
     }
+    for (const p of session.options.ioprocessors ?? []) (procOwners.get(p) ?? procOwners.set(p, new Set()).get(p)!).add(id);
 
-    // inbound through I/O processors: patch each handle's deliver in place
-    for (const [p, io] of priv.ioSessions ?? []) {
-      (procOwners.get(p) ?? procOwners.set(p, new Set()).get(p)!).add(id);
-      const orig = io.deliver;
-      io.deliver = (name, data, origin) => {
-        onDeliver(s, p, name, data, origin);
-        orig(name, data, origin);
-      };
-    }
-    // custom invokers: patch in place (shared with children through the options)
-    const invs = priv.opts?.invokers;
-    if (invs)
-      for (const [type, fn] of Object.entries(invs)) {
-        if ((fn as unknown as Record<symbol, boolean>)[WRAPPED]) continue;
-        const wrapped = (ctx: Record<string, unknown>) => wrapInvoke(type, fn, ctx);
-        (wrapped as unknown as Record<symbol, boolean>)[WRAPPED] = true;
-        invs[type] = wrapped;
-      }
-    // the loader: remember invoked charts' text (for their purpose comment)
-    const o = priv.opts;
-    if (o?.loader && !(o.loader as unknown as Record<symbol, boolean>)[WRAPPED]) {
-      const load = o.loader;
-      const wrappedLoader = (src: string) => {
-        const r = load(src);
-        if (typeof r === "string") loaded.set(src, r);
-        else if (r instanceof Promise) return r.then((t: unknown) => (typeof t === "string" && loaded.set(src, t), t));
-        return r;
-      };
-      (wrappedLoader as unknown as Record<symbol, boolean>)[WRAPPED] = true;
-      o.loader = wrappedLoader;
-    }
-    // application sends
-    const origSend = session.send.bind(session);
-    session.send = (name: string, data?: unknown) => {
-      flushPendings();
-      const from = appCtx.at(-1) ?? external(app.id, app.label, app.kind ?? "app");
-      const cause = sessById.has(from) ? sessById.get(from)!.lastStep : currentAppCause();
-      const m = record({ type: "message", from, to: id, name, ...sum(data), ...(cause ? { cause: cause.id, ...(appCtx.length ? {} : { inferred: true }) } : {}) });
-      if (!s.ended && session.status !== "done") s.inbox.push({ name, msg: m });
-      origSend(name, data);
-    };
-    const origDispose = session.dispose.bind(session);
-    session.dispose = () => {
-      s.disposing = true;
-      origDispose();
-      if (!s.ended) end(s, "disposed");
-    };
-    // the clock: see delayed sends being set, cancelled and fired
-    const clock = priv.clock;
-    const timers = new Map<unknown, TimerRec>();
-    priv.clock = {
-      now: () => clock.now(),
-      defer: (fn) => clock.defer(fn),
-      setTimeout: (fn, ms) => {
-        if (!busy(s) || s.ended) return clock.setTimeout(fn, ms);
-        const rec: TimerRec = { delay: ms, sess: s };
-        rec.ev = record({ type: "timer", actor: id, action: "set", delay: ms, due: now() + ms }, s);
-        let h: unknown;
-        // biome-ignore lint/suspicious/noAssignInExpressions: handle used inside the callback
-        h = clock.setTimeout(() => {
-          timers.delete(h);
-          const prev = s.firing;
-          s.firing = rec;
-          try {
-            fn();
-          } finally {
-            s.firing = prev;
-          }
-        }, ms);
-        timers.set(h, rec);
-        return h;
-      },
-      clearTimeout: (h) => {
-        const rec = timers.get(h);
-        if (rec) {
-          timers.delete(h);
-          if (!s.ended) record({ type: "timer", actor: id, action: "cancel", timer: rec.ev?.id || undefined }, s);
-        }
-        clock.clearTimeout(h);
-      },
-    };
-
+    session.addEventListener("enqueue", (e) => onEnqueue(s, e));
     session.addEventListener("microstep", (e) => onMicrostep(s, e));
     session.addEventListener("macrostep", (e) => onMacrostep(s, e));
-    session.addEventListener("send", (e) => onSend(s, e.message));
+    session.addEventListener("send", (e) => onSend(s, e));
+    session.addEventListener("sendscheduled", (e) => {
+      if (finished || s.ended) return;
+      const rec: TimerRec = { delay: e.delay, sess: s };
+      rec.ev = record({ type: "timer", actor: id, action: "set", delay: e.delay, due: now() + e.delay }, s);
+      s.timers.set(e.message, rec);
+    });
+    session.addEventListener("sendcancelled", (e) => {
+      const rec = s.timers.get(e.message);
+      s.timers.delete(e.message);
+      if (rec && !finished && !s.ended) record({ type: "timer", actor: id, action: "cancel", timer: rec.ev?.id || undefined }, s);
+    });
     session.addEventListener("invoke", (e) => onInvoke(s, e));
     session.addEventListener("child", (e) => {
-      const node = e.child.model;
-      void node;
       const inv = session.invocations.find((i) => i.invokeid === e.invokeid);
       const src = inv?.node.element.getAttribute("src") ?? undefined;
       observe(e.child, { parent: s, invokeid: e.invokeid, ...(src ? { src } : {}) });
     });
-    session.addEventListener("done", () => onDone(s));
+    session.addEventListener("done", (e) => onDone(s, e.disposed));
     session.addEventListener("error", (e) => {
       if (!s.ended) record({ type: "error", actor: id, kind: e.kind, message: clip(e.message, 160) }, s);
     });
@@ -953,12 +891,77 @@ export function createTracer(opts: TracerOptions) {
     return best;
   };
 
-  // ── inbound ──
-  function onDeliver(s: Sess, p: { type: string; aliases?: readonly string[] }, name: string, data: unknown, origin?: string) {
-    if (finished) return;
+  // ── inbound: every event that reaches a session's external queue ──
+  function onEnqueue(s: Sess, e: EnqueueEvent) {
+    if (finished || e.queue !== "external") return; // internal events follow the step that raised them
+    const ev = e.event;
+    if (e.processor) return onDeliver(s, e);
+    // what an observed session sent with <send>: it recorded the message already
+    if (ev.origintype === SCXML_IOPROCESSOR) {
+      const i = s.expected.findIndex((x) => x.name === ev.name && (x.data === ev.data || (isNil(x.data) && isNil(ev.data))));
+      if (i >= 0) {
+        const [x] = s.expected.splice(i, 1);
+        if (!e.dropped) s.inbound.set(e.id, x!.msg);
+      }
+      return; // else: autoforwarded, or from a session nobody observes
+    }
+    if (ev.invokeid !== undefined) return onFromInvoked(s, e);
+    if (s.actor.parent && sessById.get(s.actor.parent)?.session.processing) return; // autoforwarded by the parent
+    onAppSend(s, e);
+  }
+
+  /** `session.send()` from application code. */
+  function onAppSend(s: Sess, e: EnqueueEvent) {
     flushPendings();
+    const from = appCtx.at(-1) ?? external(app.id, app.label, app.kind ?? "app");
+    const cause = sessById.has(from) ? sessById.get(from)!.lastStep : currentAppCause();
+    const m = record({
+      type: "message",
+      from,
+      to: s.id,
+      name: e.event.name,
+      ...sum(e.event.data),
+      ...(cause ? { cause: cause.id, ...(appCtx.length ? {} : { inferred: true }) } : {}),
+      ...(e.dropped ? { dropped: true } : {}),
+    });
+    if (!e.dropped) s.inbound.set(e.id, m);
+  }
+
+  /** What an invoked child or service sends its parent (`done.invoke.<id>` included). */
+  function onFromInvoked(s: Sess, e: EnqueueEvent) {
+    if (s.ended) return;
+    const invokeid = e.event.invokeid!;
+    const ep = s.invokeExt.get(invokeid);
+    const child = ep ? sessById.get(ep) : undefined;
+    if (child) {
+      // an SCXML child's done.invoke (its <send target="#_parent">s came as SCXML events)
+      if (e.dropped) return;
+      const m = record({ type: "message", from: child.id, to: s.id, name: e.event.name, ...(child.lastStep ? { cause: child.lastStep.id } : {}) });
+      s.inbound.set(e.id, m);
+      return;
+    }
+    const ext = ep ?? external(extName(String(e.event.invokeid)), `${invokeid} (invoked service)`, "service");
+    const cause = lastFromTo.get(`${s.id}|${ext}`);
+    const m = record({
+      type: "message",
+      from: ext,
+      to: s.id,
+      name: e.event.name,
+      ...sum(e.event.data),
+      invoke: invokeid,
+      ...(cause ? { cause: cause.id, inferred: true } : {}),
+      ...(e.dropped ? { dropped: true } : {}),
+    });
+    if (!e.dropped) s.inbound.set(e.id, m);
+  }
+
+  /** An I/O processor's `deliver`. */
+  function onDeliver(s: Sess, e: EnqueueEvent) {
+    flushPendings();
+    const p = e.processor!;
+    const { name, data, origin } = e.event;
     const alias = aliasOf(p);
-    const accepting = !s.ended && s.session.status !== "done";
+    const accepting = !e.dropped && !s.ended;
     // a <send> through the same processor that this delivery completes?
     const match = pendings.find(
       (x) => x.alias === alias && x.name === name && (x.data === data || (isNil(x.data) && isNil(data))) && now() <= x.t + window,
@@ -971,7 +974,7 @@ export function createTracer(opts: TracerOptions) {
       if (match.ev.via) m.via = match.ev.via;
       if (busy(match.sess) && !match.ev.cause) match.sess.outbox.push(m);
       else commit(m);
-      if (accepting) s.inbox.push({ name, msg: m });
+      if (accepting) s.inbound.set(e.id, m);
       return;
     }
     let procSide = false;
@@ -1007,14 +1010,16 @@ export function createTracer(opts: TracerOptions) {
       ...(accepting ? {} : { dropped: true }),
     });
     if (procSide) tagProc(m, p, "from");
-    if (accepting) s.inbox.push({ name, msg: m });
+    if (accepting) s.inbound.set(e.id, m);
   }
   const isNil = (v: unknown) => v === undefined || v === null;
 
   // ── outbound ──
-  function onSend(s: Sess, m: { event: string; target: string; type: string; data: unknown; sendid?: string }) {
+  function onSend(s: Sess, e: SendEvent) {
     if (finished || s.ended) return;
-    const timer = s.firing;
+    const m = e.message;
+    const timer = e.delay > 0 ? s.timers.get(m) : undefined;
+    if (timer) s.timers.delete(m);
     const extra: Record<string, unknown> = {};
     if (timer) {
       extra.delay = timer.delay;
@@ -1022,7 +1027,7 @@ export function createTracer(opts: TracerOptions) {
     }
     if (m.sendid && !/^session/.test(m.sendid)) extra.sendid = m.sendid;
     const causeFromTimer = timer?.ev?.cause ? { cause: timer.ev.cause } : {};
-    if (isScxmlType(m.type)) {
+    if (!e.processor) {
       const t = m.target;
       let to: Sess | undefined;
       let toExt: string | undefined;
@@ -1051,13 +1056,13 @@ export function createTracer(opts: TracerOptions) {
         },
         timer ? undefined : s,
       );
-      if (to && t !== "#_internal" && !to.ended && to.session.status !== "done") to.inbox.push({ name: m.event, msg: ev });
+      if (to && t !== "#_internal" && !to.ended) to.expected.push({ name: m.event, data: m.data, msg: ev });
       return;
     }
     // a custom I/O processor: who receives it is decided by the deliveries that follow
-    const p = (s.session as unknown as { processors?: Map<string, { type: string; aliases?: readonly string[] }> }).processors?.get(m.type);
-    const alias = p ? aliasOf(p) : m.type;
-    const procExt = p ? procExternal(s, p) : external(alias, alias, "processor");
+    const p = e.processor;
+    const alias = aliasOf(p);
+    const procExt = procExternal(s, p);
     const ev: Ev = {
       id: "",
       t: now(),
@@ -1079,81 +1084,42 @@ export function createTracer(opts: TracerOptions) {
 
   // ── invokes ──
   function onInvoke(s: Sess, e: { invokeid: string; invokeType: string; state: { id: string } }) {
-    invoking = s;
     if (SCXML_TYPES.has(e.invokeType) || e.invokeType === "scxml") return; // the child event does the rest
     const ext = external(extName(e.invokeType), `${e.invokeType} (invoked service)`, "service");
     s.invokeExt.set(e.invokeid, ext);
+    s.services.set(e.invokeid, ext);
     record({ type: "message", from: s.id, to: ext, name: "invoke", summary: e.invokeid, invoke: e.invokeid }, s);
   }
-  function wrapInvoke(type: string, fn: (ctx: Record<string, unknown>) => unknown, ctx: Record<string, unknown>) {
-    const parent = invoking;
-    const invokeid = String(ctx.invokeid);
-    const ext = external(extName(type), `${type} (invoked service)`, "service");
-    if (parent) {
-      const toParent = (name: string, data: unknown) => {
-        if (finished || parent.ended) return;
-        const active = parent.session.invocations.some((i) => i.invokeid === invokeid);
-        const cause = lastFromTo.get(`${parent.id}|${ext}`);
-        const m = record({
-          type: "message",
-          from: ext,
-          to: parent.id,
-          name,
-          ...sum(data),
-          invoke: invokeid,
-          ...(cause ? { cause: cause.id, inferred: true } : {}),
-          ...(active ? {} : { dropped: true }),
-        });
-        if (active) parent.inbox.push({ name, msg: m });
-      };
-      const send = ctx.sendToParent as (n: string, d?: unknown) => void;
-      const done = ctx.done as (d?: unknown) => void;
-      ctx.sendToParent = (name: string, data?: unknown) => {
-        toParent(name, data);
-        send(name, data);
-      };
-      ctx.done = (data?: unknown) => {
-        toParent(`done.invoke.${invokeid}`, data);
-        done(data);
-      };
+  /** Invoked services that are no longer running were cancelled (their state was left, or the session ended). */
+  function cancelledServices(s: Sess, all = false): Ev[] {
+    if (!s.services.size) return [];
+    const running = all ? new Set<string>() : new Set(s.session.invocations.map((i) => i.invokeid));
+    const out: Ev[] = [];
+    for (const [invokeid, ext] of s.services) {
+      if (running.has(invokeid)) continue;
+      s.services.delete(invokeid);
+      out.push({ id: "", t: now(), type: "message", from: s.id, to: ext, name: "cancel", invoke: invokeid } as Ev);
     }
-    const r = fn(ctx);
-    const wrapService = (svc: { send(ev: unknown): void; cancel(): void }) => {
-      if (!parent || !svc) return svc;
-      const cancel = svc.cancel.bind(svc);
-      svc.cancel = () => {
-        if (!parent.ended) record({ type: "message", from: parent.id, to: ext, name: "cancel", invoke: invokeid }, parent);
-        cancel();
-      };
-      return svc;
-    };
-    return r instanceof Promise ? r.then(wrapService) : wrapService(r as { send(ev: unknown): void; cancel(): void });
+    return out;
   }
 
   // ── steps ──
-  function takeInbox(s: Sess, name: string, consume: boolean): InboxEntry | undefined {
-    const i = s.inbox.findIndex((x) => x.name === name);
-    if (i < 0) return undefined;
-    const entry = s.inbox[i]!;
-    if (consume) s.inbox.splice(0, i + 1);
-    return entry;
-  }
-  function onMicrostep(s: Sess, e: { event?: { name: string; type: string }; exited: { id: string }[]; entered: { id: string }[]; transitions: { source: unknown; targets: unknown[] }[] }) {
+  function onMicrostep(s: Sess, e: MicrostepEvent) {
     if (finished || s.ended) return;
     const ev = e.event;
     let trigger: Ev | undefined;
     let inferred = false;
-    if (!ev) trigger = s.lastStep;
-    else if (ev.type === "external") {
-      if (!s.macroTrigger || s.macroTrigger.name !== ev.name) s.macroTrigger = takeInbox(s, ev.name, false);
-      trigger = s.macroTrigger?.msg;
+    if (ev?.type === "external") {
+      trigger = e.eventId === undefined ? undefined : s.inbound.get(e.eventId);
       if (!trigger) {
         trigger = s.lastStep;
         inferred = true;
       }
     } else trigger = s.lastStep;
+    // the services this step's exits cancelled come first, as the exits did
+    s.outbox.unshift(...cancelledServices(s));
     const root = s.session.model.root;
-    const src = e.transitions[0]?.source as { id: string } | undefined;
+    const src = e.transitions[0]?.source;
     const step: Ev = {
       id: "",
       t: now(),
@@ -1162,7 +1128,7 @@ export function createTracer(opts: TracerOptions) {
       event: ev?.name ?? "",
       from: e.exited.map((x) => x.id),
       to: e.entered.map((x) => x.id),
-      ...(src ? { source: src === (root as unknown) ? "__root__" : src.id } : {}),
+      ...(src ? { source: src === root ? "__root__" : src.id } : {}),
       ...(ev ? { eventType: ev.type } : {}),
       ...(trigger?.id ? { cause: trigger.id } : {}),
       ...(inferred && trigger ? { inferred: true } : {}),
@@ -1173,12 +1139,9 @@ export function createTracer(opts: TracerOptions) {
     s.microCfg = s.session.activeStateIds();
     flushOutbox(s, step);
   }
-  function onMacrostep(s: Sess, e: { event?: { name: string; type: string } }) {
+  function onMacrostep(s: Sess, e: MacrostepEvent) {
     if (finished || s.ended) return;
-    if (e.event && e.event.type === "external") {
-      takeInbox(s, e.event.name, true);
-      s.macroTrigger = undefined;
-    }
+    if (e.eventId !== undefined) s.inbound.delete(e.eventId);
     flushOutbox(s);
     const active = s.session.activeStateIds();
     const key = active.join(" ");
@@ -1218,25 +1181,16 @@ export function createTracer(opts: TracerOptions) {
     const decls = charts[s.chart]?.datamodel ?? [];
     for (const d of decls) if ((d.type === "unknown" || d.type === "null") && raw[d.id] !== undefined && raw[d.id] !== null) d.type = typeOfValue(raw[d.id]);
   }
-  function onDone(s: Sess) {
+  function onDone(s: Sess, disposed: boolean) {
     if (s.ended) return;
+    for (const c of cancelledServices(s, true)) record(c, s);
     flushOutbox(s);
     const cfg = s.microCfg;
     if (cfg && cfg.join(" ") !== s.lastCfgKey) {
       record({ type: "config", actor: s.id, active: cfg, ...(s.lastStep ? { cause: s.lastStep.id } : {}) });
       s.lastCfgKey = cfg.join(" ");
     }
-    const reason = s.session.cancelled ? (s.disposing ? "disposed" : "cancelled") : "done";
-    // the parent hears done.invoke.<id> when its child reached a final state
-    const parent = s.actor.parent ? sessById.get(s.actor.parent) : undefined;
-    if (reason === "done" && parent && s.actor.invokeid && !parent.ended) {
-      const active = parent.session.invocations.some((i) => i.invokeid === s.actor.invokeid);
-      if (active) {
-        const m = record({ type: "message", from: s.id, to: parent.id, name: `done.invoke.${s.actor.invokeid}`, ...(s.lastStep ? { cause: s.lastStep.id } : {}) });
-        parent.inbox.push({ name: String(m.name), msg: m });
-      }
-    }
-    end(s, reason);
+    end(s, s.session.cancelled ? (disposed ? "disposed" : "cancelled") : "done");
   }
   function end(s: Sess, reason: string) {
     if (s.ended) return;
@@ -1423,18 +1377,6 @@ export function createTracer(opts: TracerOptions) {
         pendingHints.set(s, h);
         observe(s);
         return s;
-      };
-    },
-    /** Observe every session started from now on (patches `SCXMLSession.prototype.start`). Returns an undo. */
-    captureAll() {
-      const proto = SCXMLSession.prototype as unknown as { start(this: SCXMLSession): SCXMLSession };
-      const orig = proto.start;
-      proto.start = function (this: SCXMLSession) {
-        if (!finished && !(this as unknown as Record<symbol, boolean>)[OBSERVED]) observe(this);
-        return orig.call(this);
-      };
-      return () => {
-        proto.start = orig;
       };
     },
     /** Observe a session made elsewhere (before `start()`, to see its first step). */

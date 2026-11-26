@@ -10,6 +10,7 @@ bun prototypes/office/tracer/drivers/pi-durable.ts      # one system (see the he
 for d in llm-chat-dynamic pi-durable pi-durable-tour fulfillment github-issues singles samples many; do
   bun prototypes/office/tracer/drivers/$d.ts; done       # everything (~2 min; the runs are deterministic)
 bun prototypes/office/tracer/check.ts                   # every data/*/trace.json, or name files
+bun prototypes/office/tracer/diff.ts --git fulfillment  # HEAD's trace against the new one: same actors, transitions, messages?
 ```
 
 ## API
@@ -18,7 +19,6 @@ bun prototypes/office/tracer/check.ts                   # every data/*/trace.jso
 import { createTracer } from "./tracer.ts";
 const tracer = createTracer({ system: "orders", scenario: "six-orders", clock });
 const engine = tracer.wrapEngine(createSession, (source, options) => ({ id: "order-1" })); // observes what it makes
-tracer.captureAll();                       // or: observe every session started anywhere (patches SCXMLSession.prototype.start)
 tracer.observe(session);                   // or: one session made elsewhere, before start()
 tracer.external("shop", { label: "the web shop", kind: "user" });   // name an endpoint before it appears
 tracer.as("shop", () => session.send("order.placed", order));     // attribute application input to an endpoint
@@ -43,10 +43,9 @@ sends still waiting for a recipient (a live view calls it when the clock moves).
 
 ## How it records (generic, per session)
 
-- **Spawn/end.** A session is an actor from `observe` (or its `start()` under `captureAll`) to its
-  `done` event; invoked SCXML children come from the parent's `child` event. `end.reason` is `done`
+- **Spawn/end.** A session is an actor from `observe` (or `wrapEngine`) to its `done` event; invoked SCXML children come from the parent's `child` event. `end.reason` is `done`
   (a top-level final state), `cancelled` (its invoking state was left, or `cancel()`) or `disposed`
-  (the application disposed it: a client leaving, a process killed). Actors still running at
+  (the application disposed it: a client leaving, a process killed; `DoneEvent.disposed`). Actors still running at
   `finish()` have no `end`.
 - **Charts** come from the compiled model (`session.model`), not from parsing text: state tree with
   kinds, initial, history type, transitions (event, cond, targets, `internal`), executable content,
@@ -54,24 +53,27 @@ sends still waiting for a recipient (a live view calls it when the clock moves).
   before a state (else the first comment in it, else a short inference). Charts are deduplicated by
   structure, so clients with different names share one chart. The root is `__root__`; generated ids
   (`__state1`) are the engine's. `purpose` is the comment that introduces the chart in its source
-  text (known through `wrapEngine`, a patched `loader`, or `identify`).
+  text (`model.source`, the text given to `wrapEngine`, or `identify`).
 - **Transitions** are every microstep, including targetless ones (`targetless: true`, empty
   `from`/`to`), with `event`, `eventType` (`external`/`internal`/`platform`), `source` (the state
-  whose transition fired) and `cause`: the message whose delivery the step processed (matched in
-  the actor's inbox, which mirrors the engine's FIFO external queue), else the actor's previous
-  step (raised, internal, platform and eventless steps), else its spawn.
+  whose transition fired) and `cause`: the message whose delivery the step processed (exact: the
+  step's `MicrostepEvent.eventId` is the id of the `enqueue` event the message was recorded at),
+  else the actor's previous step (raised, internal, platform and eventless steps), else its spawn.
 - **Config** after each macrostep when it changed, and the last configuration before an `end`.
-- **Messages**, from `<send>` (the `send` event), I/O deliveries (each session's
-  `IOSession.deliver`, patched in place), custom invokers (`sendToParent`/`done`, patched),
-  application `session.send()` (patched on the instance) and invokes (`invoke`, `cancel`,
-  `done.invoke.<id>`). A `<send>` through a processor becomes a message to the session that
+- **Messages**, from `<send>` (the `send` event, with the processor it resolved to), and every
+  event reaching a session (its `enqueue` events): I/O deliveries (`EnqueueEvent.processor`),
+  custom invokers' `sendToParent`/`done` and children's `done.invoke.<id>` (`event.invokeid`),
+  application `session.send()` (none of those), and invokes (`invoke`; `cancel` when a custom
+  invocation leaves `session.invocations`). A `<send>` between observed sessions is recorded by the
+  sender and claimed by the recipient's `enqueue` (same name, same data object). A `<send>` through a processor becomes a message to the session that
   received the same event (same name, same data object) at once (`channel: <alias>`), several for
   a broadcast, or else a message to the processor's external. What a session sends during a step
   points at the step (`cause` and `via` = the transition). Replies from externals point at the
   request they answer (`inferred: true`). Delayed sends carry `delay` and `timer` (the `timer`
   event that set them) and are caused by the step that set them.
 - **Timers**: `timer` events (`action: "set"` with `delay`/`due`, `"cancel"`) from the session's
-  clock, which the tracer wraps per session; the firing appears as the delayed message.
+  `sendscheduled` and `sendcancelled` events; the firing (the `send` event with the same message
+  object) appears as the delayed message.
 - **Data**: `snapshot` (every `<data>`, values truncated: strings ≤ 200, arrays ≤ 20, depth ≤ 3,
   and made shallower until each value fits 700 characters) at the first stable point and whenever
   anything changed; a `data` event per changed variable after the first snapshot.
@@ -101,27 +103,25 @@ event types `timer` and `error`.
 the old one's (`task t17`, `harness`) with `incarnation` 2, 3…; their ids get `~2`, `~3`. A world
 can seat an incarnation where its predecessor sat.
 
-## What the tracer reads that is not public API (requests for the library)
+## Public API it relies on
 
-1. `session.busy` (private): whether a step is running, to hold its sends and to tell a delayed
-   send set during a step from other timers. Request: a `macrostepstart`/`step` event, or a public
-   `session.processing`.
-2. `session.ioSessions` (private Map): every processor handle, to patch `deliver`. Request: an
-   inbound event (`deliver`/`enqueue` on the session, with origin, origintype, invokeid), which
-   would also cover invokers' `sendToParent`/`done` and `#_parent`/`#_scxml_` deliveries.
-3. `session.opts` (private): the `data`, `invokers` and `loader` it was made with. Request:
-   `session.options` (read-only).
-4. `session.processors` (private): the processor a `<send type>` resolved to. Request: the
-   processor (or its alias) on `SendEvent`.
-5. `session.clock` replaced on the instance, to see `<send delay>` being scheduled and cancelled
-   (`SendEvent` fires only when a delayed send is dispatched). Request: a `send` event at
-   scheduling time with `delay` and the send's id, and a `cancel` event.
-6. Event identity is lost between enqueue and `MicrostepEvent.event` (it is a copy), so the
-   tracer mirrors each session's external queue to know which delivery a step processed. Request:
-   a stable event id on `SCXMLEvent` (or the queued object itself) so a step's trigger is exact.
-7. `dispose()` of a session that never started emits no `done`. The tracer patches `dispose`.
-8. A `MacrostepEvent` fires after a session's `done` (the final macrostep), with an empty
-   configuration; the tracer drops it. (It also caused a config-after-end in the one-off
-   llm-chat trace: `check.ts` flags `e488` in `data/llm-chat/trace.json`.)
-9. happy-dom's `DOMParser` drops comments before the root element, so a chart's introduction is
-   only found from its text. Request: keep the source text (or the leading comment) on `Model`.
+The tracer reads no private field and patches nothing: no instance or prototype method, no clock,
+no processor, invoker or loader. It started out doing all of that; each need became a public API of
+the library (CHANGELOG, "Observation"):
+
+| what it needs | how it gets it |
+|---|---|
+| whether a step is running (to hold a step's sends until its transition) | `session.processing` |
+| every inbound event, from every source | the `enqueue` event (`processor`, `event.origin`/`origintype`/`invokeid`, `dropped`) |
+| the options a session was made with | `session.options` (read-only) |
+| the processor a `<send type>` resolved to | `SendEvent.processor` |
+| delayed sends when set and cancelled | `sendscheduled` / `sendcancelled` (the `send` carries the same `message`) |
+| which delivery a step processed | `MicrostepEvent.eventId` = `EnqueueEvent.id` |
+| an end by `dispose()` (also before `start()`) | `DoneEvent.disposed`; `done` comes for a session that never started |
+| the last configuration before an end | the last `macrostep` comes before `done` |
+| the comment that introduces a chart | `model.source` |
+| `<send>`s inside executable content | `getElementsByTagNameNS`, or walking `children` (any DOM) |
+
+Sessions a system creates inside its own code are observed where they are made: a driver uses the
+system's factory (`wrapEngine`) or assembles the system from its public parts and calls
+`observe(session)` before `start()` (github-issues does that with the playground's gatekeeper).

@@ -4,14 +4,16 @@
  * A realistic stream: maintainers' issues kept, others commented, labelled and closed, a close
  * that fails once (backoff, retry), one that fails three times (gives up), reopened issues closed
  * again, a burst of three at once, an allowlist edit.
+ * The system is assembled here from the playground's parts exactly as its `Gatekeeper` assembles
+ * it (one compiled model, one GitHubIOProcessor whose `route` spawns a session per issue), so the
+ * tracer observes each session before it starts, through public API only.
  * Run: bun prototypes/office/tracer/drivers/github-issues.ts
  */
 import { readFile } from "node:fs/promises";
-import { VirtualClock } from "@tinyactors/scxmljs";
+import { compile, loadQuickJS, parseSCXML, Session, VirtualClock } from "@tinyactors/scxmljs";
 import { Window } from "happy-dom";
 import { FakeGitHub } from "../../../../examples/playground/src/scxml/fake-github.ts";
-import { Gatekeeper } from "../../../../examples/playground/src/scxml/gatekeeper.ts";
-import { issuesWebhook } from "../../../../examples/playground/src/scxml/github-ioprocessor.ts";
+import { GitHubIOProcessor, issuesWebhook } from "../../../../examples/playground/src/scxml/github-ioprocessor.ts";
 import { createTracer, leadingComment } from "../tracer.ts";
 import { clockDriver, writeTrace } from "./support.ts";
 
@@ -35,9 +37,25 @@ const tracer = createTracer({
 });
 tracer.external("webhooks", { label: "GitHub webhooks (issue events)", kind: "network" });
 tracer.external("maintainers", { label: "the maintainers (allowlist edits)", kind: "user" });
-tracer.captureAll();
 const gh = new FakeGitHub();
-const gk = await Gatekeeper.create({ chart, backend: gh, domParser: new (new Window().DOMParser)() as never, clock, data: { backoffMs: 800 }, log: () => {} });
+// examples/playground/src/scxml/gatekeeper.ts, with the tracer observing each session before start()
+const domParser = new (new Window().DOMParser)() as never;
+await loadQuickJS();
+const model = await compile(parseSCXML(chart, domParser));
+const sessions = new Map<string, Session>();
+const github: GitHubIOProcessor = new GitHubIOProcessor(gh, {
+  route: (_event, issue) => {
+    const key = `${issue.repo}#${issue.number}`;
+    let s = sessions.get(key);
+    if (!s) {
+      s = new Session(model, { data: { backoffMs: 800 }, ioprocessors: [github], clock, domParser, sessionId: key });
+      tracer.observe(s);
+      sessions.set(key, s.start());
+    }
+    return s.ioSession(github);
+  },
+});
+const gk = { sessions, webhook: (event: string, payload: unknown) => github.receiveWebhook(event, payload) };
 const REPO = "acme/widgets";
 const { wait } = clockDriver(clock, 20);
 const open = (author: string, title: string) => {

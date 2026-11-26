@@ -1,9 +1,10 @@
-// node tools/replay.mjs <log> [--out dir] [--fps 10] [--from s --to s] [--video] [--sheet-every n]
+// node tools/replay.mjs <log> [--out dir] [--fps 10] [--from s --to s] [--video] [--sheet-every n] [--third]
 // Watch what a visitor did and saw: replays a flight-recorder log (engine/log.js) in headless
 // Chromium (software GL) at the log's viewport. The page runs with ?replay=1: it keeps no clock or
 // camera of its own; this script steps it by the log's app time, sets the playhead and the camera
 // pose from the camera channel, and performs the visitor's actions (the act channel) at the moments
-// they happened. Each frame gets a strip BELOW the 3D view (a tool output, not the app): time, mode,
+// they happened (the visitor walks in first person: their eye is the logged pose; --third puts the camera behind
+// and above them and draws them as a whole block person where they stood). Each frame gets a strip BELOW the 3D view (a tool output, not the app): time, mode,
 // what was picked, fps, what is in view; pointer marks (trail, taps) are drawn on the frame.
 // Writes <out>/frames/NNNNN.png, <out>/sheet-K.png contact sheets, and with --video <out>/replay.mp4.
 import { createRequire } from "node:module"; import http from "node:http"; import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"; import path from "node:path"; import { execFileSync, spawnSync } from "node:child_process";
@@ -25,7 +26,7 @@ rmSync(path.join(OUT, "frames"), { recursive: true, force: true }); mkdirSync(pa
 const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json", ".css": "text/css", ".scxml": "application/xml" };
 const srv = http.createServer((q, r) => { const f = path.join(root, decodeURIComponent(q.url.split("?")[0])); if (!existsSync(f) || !f.startsWith(root)) { r.writeHead(404); return r.end(); } r.writeHead(200, { "content-type": types[path.extname(f)] || "application/octet-stream" }); r.end(readFileSync(f)); });
 await new Promise((r) => srv.listen(0, r));
-const qs = new URLSearchParams(L.session.params || ""); for (const k of ["log", "noloop", "replay"]) qs.delete(k); qs.set("replay", "1");
+const qs = new URLSearchParams(L.session.params || ""); for (const k of ["log", "noloop", "replay"]) qs.delete(k); qs.set("replay", "1"); if (args.includes("--third")) qs.set("third", "1");
 const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: W, height: H } });
 const errors = [];

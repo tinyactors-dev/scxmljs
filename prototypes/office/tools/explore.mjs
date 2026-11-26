@@ -1,21 +1,32 @@
 // node tools/explore.mjs [--system <name> | --live <name>] [--persona clicker|orbiter|impatient|phone|lost]
 //                        [--seconds N (app seconds)] [--seed n] [--out dir] [--replay-fps 2] [--no-replay] [--no-analyse] [--arm]
+//                        [--lock] [--script file.json]
+// NOTE: it has no --help: any run starts a visit (a browser, minutes of software rendering).
 // A first-time visitor, simulated: drives the real page (its animation loop running, as a visitor
 // sees it) with real pointer, wheel, key and touch events through Playwright, choosing what to touch
 // from what is on screen (the recorder's own view sample: window.officeLog.lastView, the same
 // rectangles a visitor sees). Then it saves the session's flight-recorder log, runs
 // tools/analyse.mjs on it and tools/replay.mjs for contact sheets.
 //
+// The visitor is on foot in first person (main.js, engine/player.js): to touch something out of reach a persona
+// walks up to it the way a visitor would: the page's autopilot (window.api.fp.approachTo) steers the real walker
+// round the furniture and turns it to face the thing, then the persona clicks. By default the page runs with
+// ?nolock=1 (no pointer lock: a drag looks, a click lands where it points); --lock captures the pointer as a
+// visitor's first click does, and then the persona turns the view with real mouse movements to aim and clicks at
+// the crosshair.
+//
 // Personas:
-//   clicker    taps what looks interesting: big things in view, weighted by size; enters heads, taps machines, backs out
-//   orbiter    drags and zooms a lot, then taps something
+//   clicker    taps what looks interesting: big things in view, weighted by size (walking up to them first);
+//              enters people's machine rooms, taps machines, walks out through the room's door or backs out
+//   orbiter    looks around a lot (drags) and walks with the keys, then taps something
 //   impatient  taps fast, double-taps, presses Escape
 //   phone      touch at 390 x 800: taps, one-finger drags, pinches
 //   lost       taps empty floor and walls, drags a little, presses keys at random
 //   script     --script <file.json>: a list of steps done in order with real input (a visit to reproduce, e.g. the
 //              owner's own from a log): {do: "key", key, ms} holds a key for ms of app time; {do: "tap", control: id}
-//              | {actor: id} | {headEvent: event} | {headState: id} | {exit: true} (the machine room's exit control)
-//              | {cardClose: true} (the opened card's close stamp); {do: "wait", ms}; {do: "esc"}; {do: "export"}
+//              | {actor: id} | {headEvent: event} | {headState: id} | {board: true} | {ticker: true} | {recorder: true}
+//              (each walks up to it first, faces it and clicks) | {exit: true} (walks out through the machine room's
+//              door) | {cardClose: true} (the opened card's close stamp); {do: "wait", ms}; {do: "esc"}; {do: "export"}
 // Software rendering makes frame rates meaningless here; the log says it ran on SwiftShader and the
 // analyser excludes feel findings and scales app-paced thresholds by the measured slowdown.
 import { createRequire } from "node:module"; import http from "node:http"; import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs"; import path from "node:path"; import { gzipSync } from "node:zlib"; import { spawnSync } from "node:child_process";
@@ -28,7 +39,8 @@ const SYS = opt("--system", null), LIVE = opt("--live", null), PERSONA = opt("--
 const SCRIPT = opt("--script", null) ? JSON.parse(readFileSync(opt("--script"), "utf8")) : null;
 const name = `${LIVE ? "live-" + LIVE : SYS || "llm-chat"}--${SCRIPT ? "script" : PERSONA}`;
 const OUT = opt("--out", path.join(here, "../out/explore", name)); mkdirSync(OUT, { recursive: true });
-const query = (LIVE ? `live=${LIVE}` : `system=${SYS || "llm-chat"}`) + (args.includes("--arm") ? "&log=1" : "");
+const LOCK = args.includes("--lock");
+const query = (LIVE ? `live=${LIVE}` : `system=${SYS || "llm-chat"}`) + (args.includes("--arm") ? "&log=1" : "") + (LOCK ? "" : "&nolock=1");
 
 const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json", ".css": "text/css", ".scxml": "application/xml" };
 const srv = http.createServer((q, r) => { const f = path.join(root, decodeURIComponent(q.url.split("?")[0])); if (!existsSync(f) || !f.startsWith(root)) { r.writeHead(404); return r.end(); } r.writeHead(200, { "content-type": types[path.extname(f)] || "application/octet-stream" }); r.end(readFileSync(f)); });
@@ -55,11 +67,27 @@ const NEVER = new Set(["directory", "recorder"]); // navigating away or download
 const things = (v, kinds) => (v?.in || []).filter((x) => !NEVER.has(x[0]) && (!kinds || kinds.includes(x[0]))).map(([kind, id, x0, y0, x1, y1, pct]) => ({ kind, id, x0, y0, x1, y1, pct, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 }));
 const jit = (r) => (rnd() - 0.5) * 2 * r;
 
+const isLocked = () => page.evaluate(() => window.api.fp.locked());
+// with the pointer captured, aim by turning: a real mouse movement of the pixels that turn the view onto (x, y)
+async function aimAt(x, y) {
+  const d = await page.evaluate(([x, y]) => { const c = window.api.camera, f = (innerHeight / 2) / Math.tan((c.fov * Math.PI) / 360); return [Math.atan((x - innerWidth / 2) / f), Math.atan((y - innerHeight / 2) / f)]; }, [x, y]);
+  const k = 1 / 0.0023; mouseAt.x += d[0] * k; mouseAt.y += d[1] * k; await page.mouse.move(mouseAt.x, mouseAt.y, { steps: 4 }); // movement is relative: never move back
+}
+const mouseAt = { x: vw / 2, y: vh / 2 };
 async function tap(x, y) {
   x = Math.max(2, Math.min(vw - 2, Math.round(x))); y = Math.max(2, Math.min(vh - 2, Math.round(y)));
-  if (phone) await page.touchscreen.tap(x, y); else await page.mouse.click(x, y);
+  if (phone) return page.touchscreen.tap(x, y);
+  if (LOCK && (await isLocked())) { if (Math.hypot(x - vw / 2, y - vh / 2) > 3) await aimAt(x, y); await page.mouse.down(); await page.mouse.up(); return; } // a click at the crosshair, wherever the mouse is
+  await page.mouse.click(x, y); mouseAt.x = x; mouseAt.y = y;
 }
-async function hover(x, y) { if (!phone) await page.mouse.move(Math.round(x), Math.round(y), { steps: 3 }); }
+async function hover(x, y) { if (!phone && !(LOCK && (await isLocked()))) await page.mouse.move(Math.round(x), Math.round(y), { steps: 3 }); }
+// walk up to something (the page's autopilot drives the walker; see the header), and wait in app time until there
+async function walkUp(spec) {
+  const ok = await page.evaluate((s) => window.api.fp.approachTo(s), spec).catch(() => false); if (!ok) return false;
+  const w0 = Date.now(); while (Date.now() - w0 < 90000 && (await page.evaluate(() => window.api.fp.busy()))) await sleep(150);
+  return (await page.evaluate(() => window.api.fp.last()))?.ok;
+}
+const specOf = (t) => (t.kind === "control" ? { control: t.id } : t.kind === "actor" || t.kind === "model" || t.kind === "station" ? { actor: t.id } : t.kind === "board" ? { board: true } : t.kind === "ticker" ? { ticker: true } : t.kind === "recorder" ? { recorder: true } : t.kind === "exit" ? { exit: true } : null);
 async function drag(x0, y0, dx, dy, steps = 8, button = "left") {
   if (phone) {
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: x0, y: y0, id: 1 }] });
@@ -85,21 +113,23 @@ const inHead = (m) => m && /entering|inside/.test(m.stage);
 const personas = {
   async clicker() {
     const { v, mode } = await view();
-    if (inHead(mode)) { // in a machine room: tap the middle of what is there, now and then go back out (Escape or its exit)
-      if (rnd() < 0.15) { await key("Escape"); return 1800; }
-      const ex = things(v, ["exit"])[0]; if (ex && rnd() < 0.2) { await hover(ex.cx, ex.cy); await tap(ex.cx, ex.cy); return 1800; }
+    if (inHead(mode)) { // in a machine room: tap the middle of what is there, now and then go back out (Escape, or through its door)
+      if (rnd() < 0.12) { await key("Escape"); return 1800; }
+      if (rnd() < 0.15) { await walkUp({ exit: true }); return 1800; }
       await tap(vw / 2 + jit(vw * 0.25), vh / 2 + jit(vh * 0.2)); return 1800;
     }
-    if (mode && mode.stage === "approach" && rnd() < 0.6) { const me = things(v, ["actor"]).find((t) => t.id === mode.id); if (me) { await hover(me.cx, me.cy); await tap(me.cx + jit(4), me.cy - (me.y1 - me.y0) * 0.25); return 3500; } }
-    const xs = things(v); if (!xs.length) { await key("Escape"); return 2000; }
+    const xs = things(v); if (!xs.length) { await key("h"); return 2000; } // looking at nothing: back to the door
     const t = pickW(xs, (x) => Math.sqrt(x.pct + 0.05) * (x.kind === "control" ? 2.5 : x.kind === "actor" ? 2 : 1));
+    // out of reach: walk up to it first, then tap it where it is now
+    const far = await page.evaluate(([x, y]) => { const p = window.api.pickAt(x, y); return !!p && p.kind === "far"; }, [t.cx, t.cy]);
+    if (far && specOf(t)) { await walkUp(specOf(t)); const s = await page.evaluate(() => window.api.fp.aim()); await tap(s.x, s.y); return 1500 + rnd() * 1000; }
     await hover(t.cx, t.cy); await sleep(150); await tap(t.cx + jit((t.x1 - t.x0) * 0.15), t.cy + jit((t.y1 - t.y0) * 0.15)); return 1500 + rnd() * 1000;
   },
   async orbiter() {
     const r = rnd();
-    if (r < 0.45) { await drag(vw / 2 + jit(200), vh / 2 + jit(120), jit(320), jit(140), 10); return 900; }
-    if (r < 0.75) { const dy = (rnd() < 0.5 ? -1 : 1) * (100 + rnd() * 300); for (let i = 0; i < 3; i++) await wheel(vw / 2 + jit(150), vh / 2 + jit(100), dy); return 900; }
-    if (r < 0.82) { await drag(vw / 2, vh / 2, jit(200), jit(100), 8, "right"); return 900; }
+    if (r < 0.4) { await drag(vw / 2 + jit(200), vh / 2 + jit(120), jit(320), jit(80), 10); return 900; } // look around
+    if (r < 0.75) { const k = ["w", "w", "a", "d", "s"][Math.floor(rnd() * 5)]; await page.keyboard.down(k); await think(300 + rnd() * 900); await page.keyboard.up(k); return 600; } // walk
+    if (r < 0.82) { const dy = (rnd() < 0.5 ? -1 : 1) * (100 + rnd() * 300); await wheel(vw / 2, vh / 2, dy); return 900; } // the wheel (scrolls the board when it is under the crosshair)
     return personas.clicker();
   },
   async impatient() {
@@ -111,8 +141,9 @@ const personas = {
   },
   async phone() {
     const r = rnd();
-    if (r < 0.2) { await drag(vw / 2 + jit(80), vh / 2 + jit(150), jit(180), jit(120), 8); return 1000; }
-    if (r < 0.32) { const zin = rnd() < 0.5; await pinch(vw / 2, vh / 2, zin ? 80 : 240, zin ? 240 : 80); return 1000; }
+    if (r < 0.2) { await drag(vw * 0.7 + jit(60), vh / 2 + jit(150), jit(180), jit(60), 8); return 1000; } // look (right of the stick)
+    if (r < 0.35) { await drag(70, vh - 140, jit(20), -50 - rnd() * 20, 14); return 1000; } // the left thumb's stick: walk ahead a little
+    if (r < 0.4) { const zin = rnd() < 0.5; await pinch(vw / 2, vh / 2, zin ? 80 : 240, zin ? 240 : 80); return 1000; }
     return personas.clicker();
   },
   async lost() {
@@ -133,6 +164,7 @@ async function where(step) {
     if (st.control) { const c = window.live.screen().find((x) => x.id === st.control); return c && c.x != null ? { x: c.x, y: c.y } : null; }
     const r = api.overlay.rects(); if (st.exit) return r.exit ? { x: (r.exit[0] + r.exit[2]) / 2, y: (r.exit[1] + r.exit[3]) / 2 } : null;
     if (st.cardClose) return r.card ? { x: r.card[2] - 30, y: r.card[1] + 28 } : null;
+    if (st.board || st.ticker || st.recorder) return window.api.fp.aim();
     if (st.actor) { const c = api.people.headCenter(st.actor, api.getPlay()); return c ? V(c.clone().add({ x: 0, y: -0.05, z: 0 })) : null; }
     const h = window.state().sel && api.heads.get(window.state().sel.id); if (!h) return null;
     if (st.headEvent) { const a = h.affordances().find((x) => x.event === st.headEvent && x.object); if (!a) return null; const p = a.object.getWorldPosition(cam.position.clone()); return V(p); }
@@ -147,20 +179,24 @@ async function scripted() {
   if (st.do === "esc") { await key("Escape"); return st.after ?? 1500; }
   if (st.do === "export") { await page.evaluate(() => window.api.perform({ do: "export" })).catch(() => {}); return 300; }
   if (st.do === "key") { const k = st.key.length === 1 ? st.key.toLowerCase() : st.key; await page.keyboard.down(k); await think(st.ms); await page.keyboard.up(k); return st.after ?? 400; }
-  if (st.do === "tap") { let p = await where(st);
-    // a person walked out of view: the visitor looks for them the way a visitor can, with H (back to the start view)
-    if (!p && st.actor) { await key("h"); await think(1800); p = await where(st); }
+  if (st.do === "tap") {
+    // on foot: walk up to it and face it first (out through the door for an exit), as a visitor would
+    if (st.exit) { const ok = await walkUp({ exit: true }); if (!ok) pageErrors.push("script: could not walk out " + label); return st.after ?? 1500; }
+    // (a person who walked out of view: back to the door with H, as a visitor would, and try again; in a machine room
+    // a button that is not shown now is the script's business: its tap reports "nothing on screen")
+    if (!st.cardClose) { const spec = { ...st }; delete spec.do; delete spec.after; if (!(await walkUp(spec)) && st.actor) { await key("h"); await think(1800); await walkUp(spec); } }
+    let p = await where(st);
     if (!p) { pageErrors.push("script: nothing on screen for " + label); return 500; } await hover(p.x, p.y); await sleep(80); await tap(p.x, p.y); return st.after ?? 1500; }
   pageErrors.push("script: unknown step " + label); return 100;
 }
 if (SCRIPT) personas.script = scripted;
 const act = personas[SCRIPT ? "script" : PERSONA]; if (!act) { console.error("unknown persona", PERSONA); process.exit(2); }
 // think time is APP time (the app's own clock, which a software renderer slows down: a visitor reacts
-// to what they see move), and every persona but the impatient one waits for a camera flight to end
+// to what they see move), and every persona but the impatient one waits for a walk or a flight to end
 const appNow = () => page.evaluate(() => window.officeLog.appNow());
 async function think(ms) {
   const a0 = await appNow(), w0 = Date.now();
-  while (Date.now() - w0 < 30000) { const busy = PERSONA !== "impatient" && (await page.evaluate(() => !!window.api.rig.flight)); if ((await appNow()) - a0 >= ms && !busy) return; await sleep(100); }
+  while (Date.now() - w0 < 30000) { const busy = PERSONA !== "impatient" && (await page.evaluate(() => !!window.api.rig.flight || window.api.fp.busy())); if ((await appNow()) - a0 >= ms && !busy) return; await sleep(100); }
 }
 // --seconds is APP seconds: the visit lasts as long for the app whatever the renderer's speed
 let steps = 0; const appStart = await appNow();

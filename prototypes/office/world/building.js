@@ -1,7 +1,8 @@
-// world/building.js: the room the plan asks for: floor, walls, door, windows, the wall clock (the
+// world/building.js: the room the plan asks for: floor, walls, the door (world/door.js, in a real opening), windows, the wall clock (the
 // play control), the board's frame, the directory of systems by the door (switch systems in-world).
 import * as THREE from "three";
 import { box, block, cyl, mat, plate, canvasTex, patternTex, BoxBatch } from "./kit.js";
+import { buildDoor } from "./door.js";
 
 const WOOD = "#a8743f", WOOD_D = "#7d5330", WOOD_L = "#c99a62", BRASS = "#c9a14a";
 export const WALL_H = 4.6;
@@ -17,22 +18,26 @@ export function buildBuilding(scene, plan, { systems = [], current = "" } = {}) 
   const floorTex = patternTex((g, w, h) => { g.fillStyle = "#c79a64"; g.fillRect(0, 0, w, h); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? "#bf915a" : "#cfa36c"; g.fillRect(0, i * 16, w, 15); g.fillStyle = "rgba(90,60,30,.25)"; g.fillRect((i * 53) % w, i * 16, 2, 15); g.fillRect((i * 53 + 70) % w, i * 16, 2, 15); } }, 128, [W / 1.9, D / 1.9]);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshLambertMaterial({ map: floorTex })); floor.rotation.x = -Math.PI / 2; floor.position.set(cx, 0, cz); floor.receiveShadow = true; root.add(floor);
   pick.push({ object: floor, kind: "floor" });
-  // walls: tall north and west (with the door), low south and east (cut away for the visitor)
+  // walls: tall north and west, low south and east (their upper parts are `inside`, below, so a high overview sees
+  // in); the door is a framed opening in the south wall (plan.door), with no wall across it: the pieces stop at
+  // its frame, and a lintel piece closes the wall above it
   const wallTex = patternTex((g, w, h) => { g.fillStyle = "#e9dcc2"; g.fillRect(0, 0, w, h); g.fillStyle = "#e2d2b4"; for (let x = 0; x < w; x += 16) g.fillRect(x, 0, 7, h); }, 64, [W, 3]);
   const wallM = new THREE.MeshLambertMaterial({ map: wallTex });
   const wall = (w, h, d, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallM); b.position.set(x, y + h / 2, z); b.receiveShadow = true; b.castShadow = true; root.add(b); return b; };
-  const dz = plan.door.z;
+  const dr = plan.door, DW = dr.w || 1.3, DH = dr.h || 2.45, hx0 = dr.x - DW / 2 - 0.1, hx1 = dr.x + DW / 2 + 0.1; // the hole: the opening and its jambs
   wall(W + 0.3, WALL_H, 0.3, cx, 0, R.z0);
-  wall(0.3, WALL_H, dz - 0.9 - R.z0, R.x0, 0, (R.z0 + dz - 0.9) / 2);
-  wall(0.3, WALL_H, R.z1 - (dz + 0.9), R.x0, 0, (R.z1 + dz + 0.9) / 2);
-  wall(0.3, WALL_H - 2.8, 1.8, R.x0, 2.8, dz);
+  wall(0.3, WALL_H, D + 0.3, R.x0, 0, cz);
   const trim = new BoxBatch();
   trim.add(W, 1.0, 0.06, WOOD_D, cx, 0, R.z0 + 0.18).add(0.06, 1.0, D, WOOD_D, R.x0 + 0.18, 0, cz);
-  trim.add(W + 0.3, 0.9, 0.3, "#e2d2b4", cx, 0, R.z1).add(0.3, 0.9, D, "#e2d2b4", R.x1, 0, cz);
-  trim.add(W + 0.6, 0.08, 0.42, WOOD, cx, 0.9, R.z1).add(0.42, 0.08, D + 0.3, WOOD, R.x1, 0.9, cz);
-  trim.add(1.2, 0.02, 1.6, "#3a4a6a", R.x0 + 0.75, 0, dz);
+  // the south wall's low part and its cap, either side of the door; the east wall's
+  const southL = [R.x0 - 0.15, hx0], southR = [hx1, R.x1 + 0.15];
+  for (const [a, b] of [southL, southR]) if (b - a > 0.01) trim.add(b - a, 0.9, 0.3, "#e2d2b4", (a + b) / 2, 0, R.z1).add(b - a + (a < R.x0 ? 0.15 : 0) + (b > R.x1 ? 0.15 : 0), 0.08, 0.42, WOOD, (a + b) / 2, 0.9, R.z1);
+  trim.add(0.3, 0.9, D, "#e2d2b4", R.x1, 0, cz).add(0.42, 0.08, D + 0.3, WOOD, R.x1, 0.9, cz);
+  trim.add(DW + 0.3, 0.02, 0.95, "#3a4a6a", dr.x, 0, R.z1 - 0.72); // the doormat inside
+  trim.add(DW + 0.8, 0.06, 1.1, "#9a8f80", dr.x, -0.03, R.z1 + 0.7); // a stone step outside
   root.add(trim.mesh());
-  const door = block(root, 0.08, 2.75, 1.6, "#6b4a2b", R.x0 + 0.5, 0, dz - 1.25); door.rotation.y = 1.25;
+  // the door itself (world/door.js): closed until someone goes through
+  const door = buildDoor({ w: DW, h: DH, wallT: 0.3 }); door.group.position.set(dr.x, 0, R.z1); root.add(door.group);
   const occluders = root.children.filter((o) => o.isMesh && o.geometry.type === "BoxGeometry" && o.material === wallM);
   // the ceiling, its beams and lamps, and the upper parts of the south and east walls: shown when the
   // camera is inside the room below the ceiling (eye level), hidden for the high overview
@@ -42,15 +47,17 @@ export function buildBuilding(scene, plan, { systems = [], current = "" } = {}) 
     const bm = beams.mesh({ cast: false }); bm.receiveShadow = false; inside.add(bm);
     const lampM = new THREE.MeshLambertMaterial({ color: "#fff6dc", emissive: "#fff0c8", emissiveIntensity: 0.9 });
     for (let x = R.x0 + 4.1; x < R.x1 - 1.5; x += 6.4) for (let z = R.z0 + 3; z < R.z1 - 1.5; z += 5) { const l = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 0.4), lampM); l.position.set(x, WALL_H - 0.36, z); inside.add(l); }
-    const upM = new THREE.MeshLambertMaterial({ map: wallTex }); const up = (w, h, d, x, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), upM); b.position.set(x, 0.9 + h / 2, z); inside.add(b); occluders.push(b); };
-    up(W + 0.3, WALL_H - 0.9, 0.3, cx, R.z1); up(0.3, WALL_H - 0.9, D, R.x1, cz);
+    const upM = new THREE.MeshLambertMaterial({ map: wallTex }); const up = (w, h, d, x, z, y0 = 0.9) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), upM); b.position.set(x, y0 + h / 2, z); inside.add(b); occluders.push(b); };
+    for (const [a, b] of [southL, southR]) if (b - a > 0.01) up(b - a, WALL_H - 0.9, 0.3, (a + b) / 2, R.z1);
+    up(hx1 - hx0, WALL_H - DH - 0.1, 0.3, dr.x, R.z1, DH + 0.1); // over the door: from its lintel to the ceiling
+    up(0.3, WALL_H - 0.9, D, R.x1, cz);
     inside.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } }); }
   // windows high on the north wall, where no station stands below
   const taken = [...plan.stations.filter((s) => s.wall === "north").map((s) => s.x), plan.clock.x, ...(plan.board.wall === "north" ? [plan.board.x - plan.board.w / 2 + 1.3, plan.board.x, plan.board.x + plan.board.w / 2 - 1.3] : [])]; // no window behind a board
   for (let x = R.x0 + 3; x < R.x1 - 2; x += 5.5) { if (taken.some((t) => Math.abs(t - x) < 2.6)) continue; block(root, 2.6, 1.6, 0.1, WOOD_D, x, 2.2, R.z0 + 0.16); const g = block(root, 2.3, 1.3, 0.12, "#bfe3ff", x, 2.35, R.z0 + 0.18, { mat: { emissive: "#6fa6d6", emissiveIntensity: 0.55 } }); g.castShadow = false; }
   // plants in the corners
   const plant = (x, z, s = 1) => { block(root, 0.5 * s, 0.5 * s, 0.5 * s, "#b5643a", x, 0, z); for (let i = 0; i < 5; i++) { const l = box(0.18 * s, 0.6 * s, 0.18 * s, i % 2 ? "#3f8a3e" : "#4fa04a"); l.position.set(x + Math.sin(i * 2.4) * 0.15 * s, 0.75 * s + (i % 3) * 0.12, z + Math.cos(i * 2.4) * 0.15 * s); l.rotation.z = Math.sin(i * 2.4) * 0.5; l.rotation.x = Math.cos(i * 2.4) * 0.5; root.add(l); } };
-  plant(R.x1 - 0.8, R.z1 - 0.8, 1.2); plant(R.x1 - 0.8, R.z0 + 0.8, 1.3);
+  plant(R.x0 + 0.8, R.z1 - 0.8, 1.2); plant(R.x1 - 0.8, R.z0 + 0.8, 1.3); // not by the door: it stays clear
 
   // ---- the wall clock: the run's time, and the play control (face = pause, lever = speed) ----
   const clk = new THREE.Group(); clk.position.set(plan.clock.x, 3.2, R.z0 + 0.18); root.add(clk);
@@ -74,7 +81,7 @@ export function buildBuilding(scene, plan, { systems = [], current = "" } = {}) 
   { const fr = box(0.12, plan.board.h + 0.3, plan.board.w + 0.3, "#2a2a2a"); fr.position.x = 0.02; bf.add(fr); block(bf, 0.4, 0.06, plan.board.w, "#555", 0.2, -plan.board.h / 2 - 0.2, 0); }
 
   // ---- the directory: one brass plate per system, by the door; the lit one is this floor ----
-  const dir = new THREE.Group(); dir.position.set(plan.directory.x + 0.08, 1.15, plan.directory.z); dir.rotation.y = Math.PI / 2; root.add(dir);
+  const dir = new THREE.Group(); if (plan.directory.wall === "east") { dir.position.set(plan.directory.x - 0.08, 1.15, plan.directory.z); dir.rotation.y = -Math.PI / 2; } else { dir.position.set(plan.directory.x + 0.08, 1.15, plan.directory.z); dir.rotation.y = Math.PI / 2; } root.add(dir);
   const cols = systems.length > 7 ? 2 : 1, rowsN = Math.ceil(Math.max(1, systems.length) / cols);
   const ph = 0.17, gap = 0.05, pw = cols === 2 ? 0.95 : 1.28; const H = rowsN * (ph + gap) + 0.45, Wd = cols * (pw + 0.08) + 0.25;
   block(dir, Wd, H, 0.06, "#3d2a1a", 0, 0, -0.04);
@@ -90,11 +97,12 @@ export function buildBuilding(scene, plan, { systems = [], current = "" } = {}) 
   dir.position.y = Math.max(0.6, Math.min(1.15, WALL_H - 0.4 - H));
 
   function update(s, t, amb, ctx) {
-    if (ctx.camera) { const c = ctx.camera.position; inside.visible = c.y < WALL_H - 0.15 && c.x > R.x0 && c.x < R.x1 && c.z > R.z0 && c.z < R.z1; }
+    if (ctx.camera) { const c = ctx.camera.position; inside.visible = c.y < WALL_H - 0.15 && c.x > R.x0 - 1.5 && c.x < R.x1 + 1.5 && c.z > R.z0 - 1.5 && c.z < R.z1 + 1.5; } // standing in the doorway too
+    if (ctx.dt != null) door.update(ctx.dt, ctx.doorWant);
     handSg.rotation.z = -((t % 1000) / 1000) * Math.PI * 2; handMg.rotation.z = -(t / Math.max(1, ctx.duration)) * Math.PI * 2;
     const ring = ctx.clockRing; bells.forEach((b, i) => (b.rotation.z = ring ? Math.sin(amb * 60 + i) * 0.25 : 0));
     pend.rotation.z = ctx.paused ? 0 : Math.sin(amb * 3.2) * 0.32;
     lever.rotation.z = [0.5, 0, -0.5][ctx.speedIndex ?? 1];
   }
-  return { root, pick, update, clockMouth, floor, occluders, inside };
+  return { root, pick, update, clockMouth, floor, occluders, inside, door, wallBox: { x0: R.x0 + 0.15, x1: R.x1 - 0.15, z0: R.z0 + 0.15, z1: R.z1 - 0.15 } };
 }

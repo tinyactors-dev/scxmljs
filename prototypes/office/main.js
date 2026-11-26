@@ -1,10 +1,10 @@
 // main.js: The Office for ANY system of statecharts. ?system=<name> loads data/<name>/trace.json
 // (and data/<name>/office.json when there is one); data/index.json lists the systems, which the
 // directory by the door switches between. Everything visible is a function of (playS = playback
-// second of the run, amb = ambient second, the visitor's selections, the camera). Film mode
-// (?rec=1) drives it from film.js.
+// second of the run, amb = ambient second, the visitor's selections, the camera). The visitor is a walker in
+// first person (engine/player.js): nothing moves or turns them but their own input, the spawn, H (back to the
+// door) and a door into or out of a machine room. Film mode (?rec=1) drives a free camera from film.js.
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { createSim } from "./core/sim.js";
 import { makePlan } from "./core/plan.js";
 import { buildBuilding } from "./world/building.js";
@@ -25,6 +25,8 @@ import { createModels } from "./world/models.js";
 import { DESK, MODEL } from "./world/layout.js";
 import { createMachineRoom, ROOM, fovFor } from "./world/machineroom.js";
 import { createOverlay } from "./engine/overlay.js";
+import { createPlayer, FP } from "./engine/player.js";
+import { createBody } from "./world/body.js";
 
 // the flight recorder (engine/log.js, LOGGING.md): always on, from the first line, so boot errors are in it too
 const log = createLog(); log.attachErrors(); window.officeLog = log;
@@ -70,8 +72,12 @@ const scene = new THREE.Scene();
 const SKY = new THREE.Color("#c9d6dc"), NIGHT = new THREE.Color("#1a1d26");
 scene.background = SKY.clone(); scene.fog = new THREE.Fog(SKY.clone(), 70, 170);
 let R = plan.room, RW = R.x1 - R.x0, RD = R.z1 - R.z0, RC = new THREE.Vector3((R.x0 + R.x1) / 2, 0, (R.z0 + R.z1) / 2); // live: let
-const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.05, 400);
-// home: frame whatever was built, from the south-east
+// the free camera (the film, ?rec=1) flies along paths; everyone else walks in first person (FP)
+const FREE = REC;
+// ?third=1 (a replay): a camera behind and above the visitor, who is drawn as a whole block person
+const THIRD = REPLAY && params.has("third");
+const camera = new THREE.PerspectiveCamera(FREE ? 42 : FP.fov, innerWidth / innerHeight, FREE ? 0.05 : FP.near, 400);
+// home (the film's overview): frame whatever was built, from the south-east
 function homeView() {
   const tgt = RC.clone().add(new THREE.Vector3(0, 0.3, 0.6));
   const vfov = (camera.fov * Math.PI) / 180, hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
@@ -80,11 +86,13 @@ function homeView() {
   return { pos: tgt.clone().addScaledVector(dir, need), tgt };
 }
 const H0 = homeView(); camera.position.copy(H0.pos);
-const controls = new OrbitControls(camera, canvas);
-controls.target.copy(H0.tgt); controls.enableDamping = !REC; controls.dampingFactor = 0.12;
-controls.maxPolarAngle = Math.PI * 0.495; controls.minDistance = 0.9; controls.maxDistance = 160; controls.update();
-if (REC) controls.enabled = false;
-
+// what the camera looks at: the free camera's goal (the film's flights move it), else a point ahead of the eye
+const controls = { target: H0.tgt.clone(), enabled: true, update() { camera.lookAt(this.target); }, addEventListener() {} };
+controls.update();
+// the visitor: a walker (engine/player.js) and their arms and shadow (world/body.js)
+const player = createPlayer();
+const body = createBody();
+const blob = body.blob(); blob.visible = false;
 const hemi = new THREE.HemisphereLight("#fff3dc", "#6b5a48", 1.35); scene.add(hemi);
 const sun = new THREE.DirectionalLight("#ffe2b8", 1.7);
 const span = Math.max(RW, RD) * 0.62 + 4;
@@ -162,7 +170,7 @@ function makeBoard() { // live: made again when the run grows
   board.on("select", ({ actorIds = [], messageIds = [] }) => { spot = { actors: new Set(actorIds), messages: new Set(messageIds), at: amb }; });
   board.on("world", () => {});
   board.on("hover", ({ actorIds = [] }) => { hoverId = actorIds[0] || null; }); // a row under the pointer: its person's hover ring
-  board.on("focus", () => { const p = boardMesh.position, n = v3(0, 0, 1).applyQuaternion(boardMesh.quaternion), t = Math.tan(camera.fov * Math.PI / 360), d = Math.max(plan.board.h / 2 / t, plan.board.w / 2 / (t * camera.aspect)) * 1.04; boardBack = boardBack || { pos: camera.position.clone(), tgt: controls.target.clone() }; flyTo(p.clone().addScaledVector(n, d), p.clone(), 1.3); }); // the board's empty part touched: stand squarely in front of it (Escape: back)
+  board.on("focus", () => { if (!FREE) return; /* on foot, the visitor walks up to the board */ const p = boardMesh.position, n = v3(0, 0, 1).applyQuaternion(boardMesh.quaternion), t = Math.tan(camera.fov * Math.PI / 360), d = Math.max(plan.board.h / 2 / t, plan.board.w / 2 / (t * camera.aspect)) * 1.04; boardBack = boardBack || { pos: camera.position.clone(), tgt: controls.target.clone() }; flyTo(p.clone().addScaledVector(n, d), p.clone(), 1.3); }); // the board's empty part touched: stand squarely in front of it (Escape: back)
 }
 let boardBack = null; // where the camera was before it went to stand in front of the board
 try {
@@ -204,7 +212,7 @@ const tNow = () => sim.unwarp(playS);
 // live: a press made while the room still plays the last one plays that one CATCH_UP times faster up to its end
 // (catchUp, a playback second), then its own at the normal pace; pressWatch: the press whose consequence we keep in view
 const CATCH_UP = 6; let catchUp = null, pressWatch = null, revealNext = null, consequenceCheck = null;
-let sel = null, slipMsg = null, spot = null, flight = null; // flight: kept for the live hooks; the rig flies the camera
+let sel = null, slipMsg = null, spot = null, flight = null, cue = null; // cue: on foot, what a press changed out of view ({ids, machines, until}) // flight: kept for the live hooks; the rig flies the camera
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
 // the camera: flights along paths, kept out of furniture, walls and people (world/camera.js)
 let stationBoxes = null, stationBoxesOf = null;
@@ -258,7 +266,7 @@ function startView() {
   }
   return best;
 }
-function home(dur = 1.6) { const h = live ? startView() : homeView(); flyTo(h.pos, h.tgt, dur); }
+function home(dur = 1.6) { if (!FREE) return homeFade(); const h = live ? startView() : homeView(); flyTo(h.pos, h.tgt, dur); } // on foot: a fade to the door, never a flight
 const headPos = (id) => people.headCenter(id, playS);
 const facing = (id) => people.facingOf(id, playS);
 // the machine room (world/machineroom.js) is a place of its own: inRoom while it is what is drawn and what the
@@ -288,10 +296,11 @@ function select(id) {
   if (a && !a.external && headPos(id)) {
     const h = headFor(id); h.focus(null);
     sel = { id, at: amb, focusId: null, head: h, stage: "approach" };
-    const v = frameOf(id); if (v) flyTo(v.pos, v.tgt, 1.4);
+    if (FREE) { const v = frameOf(id); if (v) flyTo(v.pos, v.tgt, 1.4); } // on foot nothing moves the visitor
   } else {
     sel = { id, at: amb, focusId: null, head: null, stage: "close" };
     const st = stations.byId.get(id);
+    if (!FREE) { spot = { actors: new Set([id]), messages: new Set(), at: amb }; return; } // on foot: its ring pulses where it stands
     if (st) { const p = st.group.getWorldPosition(new THREE.Vector3()); const fwd = new THREE.Vector3(Math.sin(st.group.rotation.y), 0, Math.cos(st.group.rotation.y)); const tgt = p.clone().add(v3(0, 1.2, 0)); flyTo(rig.resolve(p.clone().addScaledVector(fwd, 3.2).add(v3(0.9, 1.9, 0))), tgt, 1.4); }
     else if (/timer|clock/i.test(`${a?.kind} ${id}`)) flyTo(rig.resolve(v3(plan.clock.x, 2.6, R.z0 + 4)), v3(plan.clock.x, 2.6, R.z0), 1.4);
   }
@@ -304,7 +313,7 @@ function enterHead() {
   if (!sel || !sel.head || inHead() || trans) return;
   const c = headPos(sel.id); if (!c) return;
   rig.stop("enter"); closeCard("enter");
-  officePose = { pos: camera.position.clone(), tgt: controls.target.clone(), fov: camera.fov }; officeCam.copy(camera);
+  officePose = { pos: camera.position.clone(), tgt: controls.target.clone(), fov: camera.fov, feet: player.pos.clone(), yaw: player.yaw, pitch: player.pitch }; officeCam.copy(camera); // on foot: given back exactly on the way out
   sel.stage = "entering";
   trans = { kind: "enter", t: 0, me: sel, from: camera.position.clone(), tgtFrom: controls.target.clone(), c: c.clone(), sp: clampPt(screenPt(c)), swapped: false };
   log.ev("camera", "fly", { kind: "enter", dur: ENTER_S + OPEN_S, from: xyz(camera.position), to: xyz(c), tgt: xyz(c), via: 0 }); log.note("flight:enter"); // log:
@@ -315,6 +324,7 @@ function leaveHead(then) {
   rig.stop("leave");
   trans = { kind: "leave", t: 0, me, then, swapped: false };
   log.ev("camera", "fly", { kind: "leave", dur: LEAVE_S + OPEN_S, from: xyz(camera.position), to: xyz(officePose.pos), tgt: xyz(officePose.tgt), via: 0 }); log.note("flight:leave"); // log:
+  player.stop();
 }
 // the machine room's entry view: the whole machine (at its entry detail) filling the frame, seen from the front and a
 // little above, as head/head.js fits it (along (0, 0.3, 1)). A chart of up to 80 states is all open from the start
@@ -332,21 +342,48 @@ function roomEntryView(h) {
 }
 const roomDetail = (h, focused) => { const kd = (0.6 * camera.position.distanceTo(roomEntry.tgt)) / roomEntry.dist; const d = Math.max(entryDetail(h) === 1 ? 1 : 0, clamp01((1 - kd) / 0.7)); return focused ? Math.max(d, 0.9) : d; };
 // the swap itself: the head's group stands in the machine room only while the visitor is there
+// on foot (FP) the visitor stands in the room at a scale of their own: their eye a little above the machines (the
+// room is built in head units), facing the machines from where the whole of them fits in the view
+function roomScale(b) { const eye = b.min.y + 0.8 * (b.max.y - b.min.y) + 0.6; return Math.min(7, Math.max(3, (eye - ROOM.floor) / FP.eye)); }
+function roomSpawn(h) {
+  camera.fov = FP.fov; camera.updateProjectionMatrix();
+  h.setDetail(entryDetail(h)); h.update(tNow(), 0, playS);
+  const b = h.boundsOf(null).box.clone(); const s = roomScale(b), c = b.getCenter(v3(0, 0, 0));
+  machineRoom.mount(h.group, s);
+  { const gb = new THREE.Box3().setFromObject(h.group); const ob = b.clone().union(gb); ob.min.y = ROOM.floor; ob.expandByVector(v3(0.35 * s, 0, 0.35 * s)); machineRoom.setMachine(ob); }
+  player.setWorld(machineRoom.world, s);
+  const eye = ROOM.floor + FP.eye * s; const pts = boxPts(b);
+  let d = Math.max(b.max.z - c.z + 1.2 * s, 4); const lim = ROOM.wallR - 2 * s - Math.max(0, c.z);
+  for (; d < lim; d += 0.5) { camera.position.set(c.x, eye, c.z + d); camera.lookAt(c); if (inFrame(pts, 0.86)) break; }
+  d = Math.min(d, lim);
+  const feet = v3(c.x, 0, c.z + d); player.place(feet, 0, Math.atan2(c.y - eye, d));
+  machineRoom.setEntry(v3(feet.x, ROOM.floor, feet.z), 0);
+  camera.near = FP.near * s; camera.far = 260; camera.updateProjectionMatrix(); player.apply(camera);
+  return { pos: camera.position.clone(), tgt: c.clone(), dist: d, s };
+}
+// the swap itself: the head's group stands in the machine room only while the visitor is there
 function swapIn(me) {
   inRoom = true; me.focusId = null; me.focusPoint = null; me.head.focus(null);
+  const seat = people.seatOfActor(me.id, playS), av = seat && seat.avatar;
+  const plaque = { title: nameOf(me.id), sub: `their machines (${sim.actor(me.id)?.chart || "chart"}) · the office runs on`, face: av?.faceMap?.image || null, accent: av ? "#" + av.M.shirt.color.getHexString() : null };
+  if (!FREE) {
+    roomEntry = roomSpawn(me.head); machineRoom.setPlaque(plaque); machineRoom.door.set(false);
+    log.ev("world", "room", { id: me.id, in: true, scale: +roomEntry.s.toFixed(2) }); // log:
+    return;
+  }
   machineRoom.mount(me.head.group);
   const v = roomEntry = roomEntryView(me.head);
   camera.position.copy(v.pos); controls.target.copy(v.tgt); camera.near = 0.1; camera.far = 200; camera.updateProjectionMatrix(); camera.lookAt(controls.target);
-  Object.assign(controls, { enablePan: false, maxPolarAngle: Math.PI * 0.56, minDistance: Math.min(ROOM.minDist, v.dist * 0.4), maxDistance: Math.max(ROOM.maxDist, v.dist * 1.3) });
-  const seat = people.seatOfActor(me.id, playS), av = seat && seat.avatar;
-  overlay.setExit({ title: nameOf(me.id), sub: `their machines (${sim.actor(me.id)?.chart || "chart"}) · the office runs on`, face: av?.faceMap?.image || null, accent: av ? "#" + av.M.shirt.color.getHexString() : null });
+  overlay.setExit(plaque);
   log.ev("world", "room", { id: me.id, in: true }); // log:
 }
 function swapOut() {
-  const me = trans ? trans.me : sel; inRoom = false; machineRoom.unmount(); overlay.setExit(null);
+  const me = trans ? trans.me : sel; inRoom = false; machineRoom.unmount(); overlay.setExit(null); machineRoom.setPlaque(null);
   if (me) { me.focusId = null; me.focusPoint = null; if (me.head) me.head.focus(null); }
-  const p = officePose || homeView(); camera.position.copy(p.pos); controls.target.copy(p.tgt); camera.fov = p.fov || 42; camera.near = 0.05; camera.far = 400; camera.updateProjectionMatrix(); camera.lookAt(controls.target);
-  Object.assign(controls, { enablePan: true, maxPolarAngle: Math.PI * 0.495, minDistance: 0.9, maxDistance: 160 });
+  if (!FREE) { // standing where they were, facing as they were
+    player.setWorld(officeWorld, 1); const p = officePose; if (p && p.feet) player.place(p.feet, p.yaw, p.pitch); else spawn();
+    camera.fov = FP.fov; camera.near = FP.near; camera.far = 400; camera.updateProjectionMatrix(); player.apply(camera);
+  } else { const p = officePose || homeView(); camera.position.copy(p.pos); controls.target.copy(p.tgt); camera.fov = p.fov || 42; camera.near = 0.05; camera.far = 400; camera.updateProjectionMatrix(); camera.lookAt(controls.target); }
   log.ev("world", "room", { id: me ? me.id : null, in: false }); // log:
 }
 function finishTrans() {
@@ -361,7 +398,7 @@ function stepTrans(dt) {
   const W = innerWidth, H = innerHeight;
   if (!tr.swapped) {
     const k = clamp01(tr.t / (tr.kind === "enter" ? ENTER_S : LEAVE_S)), e = ease(k);
-    if (tr.kind === "enter") { camera.position.lerpVectors(tr.from, tr.c, 0.45 * e); controls.target.lerpVectors(tr.tgtFrom, tr.c, e); camera.lookAt(controls.target); overlay.setIris(e, tr.sp.x, tr.sp.y); }
+    if (tr.kind === "enter") { if (FREE) { camera.position.lerpVectors(tr.from, tr.c, 0.45 * e); controls.target.lerpVectors(tr.tgtFrom, tr.c, e); camera.lookAt(controls.target); } overlay.setIris(e, tr.sp.x, tr.sp.y); } // on foot the view stays: only the iris closes
     else overlay.setIris(e, W / 2, H / 2);
     if (k >= 1) {
       tr.swapped = true; tr.t0 = tr.t;
@@ -378,7 +415,8 @@ function stepTrans(dt) {
 function focusHead(stateId) {
   if (!sel || !sel.head || !inRoom || trans) return;
   sel.focusId = stateId; const fb = sel.head.focus(stateId);
-  if (!stateId || !fb) { sel.focusId = null; sel.focusPoint = null; const v = roomEntry = roomEntryView(sel.head); flyTo(v.pos, v.tgt, 1.1); return; }
+  if (!stateId || !fb) { sel.focusId = null; sel.focusPoint = null; if (FREE) { const v = roomEntry = roomEntryView(sel.head); flyTo(v.pos, v.tgt, 1.1); } return; }
+  if (!FREE) { sel.focusPoint = fb.center ? fb.center.clone() : null; return; } // on foot: the machine is staged where it stands, the visitor walks to it
   const b = fb.box.clone(); const sz = b.getSize(v3(0, 0, 0)); b.expandByVector(sz.multiplyScalar(0.06)); // plates stand a little proud of the parts
   const v = frameAll(boxPts(b), { dir: v3(0, 0, 1), el: 0.5, margin: 1.1, minD: 1, free: true });
   sel.focusDist = v.dist; flyTo(machineRoom.contain(v.pos), v.tgt, 1.2); sel.focusPoint = v.tgt.clone();
@@ -393,11 +431,11 @@ function afterTrans(fn) { if (!trans) return fn(); const tr = trans, prev = tr.t
 function back() {
   if (trans) return afterTrans(back);
   if (slipMsg) { closeCard("esc"); return; }
-  if (boardBack && !sel) { const v = boardBack; boardBack = null; flyTo(v.pos, v.tgt, 1.3); return; } // from in front of the board: back where we were
+  if (FREE && boardBack && !sel) { const v = boardBack; boardBack = null; flyTo(v.pos, v.tgt, 1.3); return; } // from in front of the board: back where we were
   if (sel && inRoom && sel.focusId) { focusHead(null); return; }
   if (sel && inRoom) { leaveHead(); return; }
-  if (sel) { const id = sel.id; sel = null; if (board) board.highlight({}); const c = headPos(id); if (c) { const off = camera.position.clone().sub(controls.target); off.setLength(Math.min(9, Math.max(4.5, off.length() * 1.7))); const tgt = controls.target.clone(); flyTo(rig.resolve(tgt.clone().add(off)), tgt, 1.3); return; } }
-  spot = null; home();
+  if (sel) { const id = sel.id; sel = null; if (board) board.highlight({}); const c = headPos(id); if (FREE && c) { const off = camera.position.clone().sub(controls.target); off.setLength(Math.min(9, Math.max(4.5, off.length() * 1.7))); const tgt = controls.target.clone(); flyTo(rig.resolve(tgt.clone().add(off)), tgt, 1.3); } return; }
+  spot = null; cue = null; if (FREE) home(); // on foot: nothing to go back from; the visitor stays where they stand
 }
 // live: after a press, what it caused must be in view from where the visitor stands: the control and the people
 // whose state the chain changed (inside a head: the machines whose marbles move). When they already are, nothing
@@ -407,20 +445,22 @@ function revealConsequence(pw) {
   const evs = sim.trace.events.slice(pw.evN);
   const actors = new Set(); if (pw.actor && sim.actor(pw.actor) && !sim.actor(pw.actor).external) actors.add(pw.actor);
   for (const e of evs) if ((e.type === "transition" || e.type === "spawn" || e.type === "data") && e.actor && !sim.actor(e.actor)?.external) actors.add(e.actor);
-  const ids = [...actors]; let flew = false, machines = [];
+  const ids = [...actors]; let flew = false, machines = [], cued = false;
   if (pw.head && sel && sel.head && (inHead() || sel.focusId)) {
     // the machines whose marble moves now; if none of them is in frame, focus the first
     const h = sel.head; const from = playS - 0.05;
     machines = h.states().filter((id) => h.movesOf(id).some((m) => m.start >= from));
     const inView = machines.filter((id) => inFrame(boxPts(h.boundsOf(id).box), 1.0));
-    if (machines.length && !inView.length) { focusHead(machines[0]); flew = true; }
+    if (machines.length && !inView.length) { if (FREE) { focusHead(machines[0]); flew = true; } else { cue = { machines: machines.slice(0, 3), ids: [], until: amb + 4 }; cued = true; } } // on foot: a cue at the screen's edge toward them
   } else if (!inHead() && !(sel && sel.focusId)) {
     const it = liveControls && liveControls.items.get(pw.id);
     const pts = []; if (it) pts.push(...boxPts(new THREE.Box3().setFromObject(it.ui.group)));
     // a person whose desk model is in view shows what the press did there: their model and their head are enough
     for (const id of ids.slice(0, 4)) { const mb = models && models.boxOf(id); if (mb) { pts.push(...boxPts(mb)); const c = headPos(id); if (c) pts.push(c); } else pts.push(...personPts(id)); }
     const hidden = ids.some((id) => hiddenPerson(id) && !(models && models.boxOf(id)));
-    if (pts.length && (!inFrame(pts, 1.0) || hidden)) {
+    if (!FREE && pts.length && (!inFrame(pts, 1.0) || hidden)) { // on foot nothing turns the visitor: their rings pulse on the floor and a cue on the screen's edge points the way
+      cue = { ids: ids.slice(0, 4), machines: [], until: amb + 4 }; spot = { actors: new Set(ids.slice(0, 4)), messages: new Set(), at: amb, until: amb + 4 }; cued = true;
+    } else if (pts.length && (!inFrame(pts, 1.0) || hidden)) {
       // from the visitor's own direction if the people can be seen from there over the furniture, else turned
       // toward the front of the first of them, a step at a time
       const here = camera.position.clone().sub(controls.target); here.y = 0; here.normalize();
@@ -432,20 +472,20 @@ function revealConsequence(pw) {
         const v = frameAll(pts, { dir, el: 0.24 }); const ok = tops.every((t) => rig.clear(v.pos, t, ids[0])) && rig.clear(v.pos, v.tgt, ids[0]); // and nothing across the middle of the view
         if (ok) { best = v; break; } if (!best) best = v;
       }
-      flyTo(best.pos, best.tgt, 1.3, { kind: "reveal" }); flew = true;
+      if (FREE) { flyTo(best.pos, best.tgt, 1.3, { kind: "reveal" }); flew = true; }
     }
   }
-  consequenceCheck = { due: amb + 2.0, id: pw.id, actors: ids, machines, flew, head: !!pw.head };
+  consequenceCheck = { due: amb + 2.0, id: pw.id, actors: ids, machines, flew, cued, head: !!pw.head };
 }
 // a person is hidden when neither the middle nor the top of their head can be seen (a monitor may hide the chin)
 const hiddenPerson = (id) => !!headPos(id) && occludedFrom(camera.position, id) && occludedFrom(camera.position, id, 0.2);
 function checkConsequence() { // log: was what the press caused in view, two seconds later?
   const c = consequenceCheck; consequenceCheck = null; camera.updateMatrixWorld();
-  if (c.head) { const h = sel && sel.head; const seen = h ? c.machines.filter((id) => inFrame(boxPts(h.boundsOf(id).box), 1.0)) : []; log.ev("world", "consequence", { id: c.id, head: true, machines: c.machines, seen, flew: c.flew }); return; }
+  if (c.head) { const h = sel && sel.head; const seen = h ? c.machines.filter((id) => inFrame(boxPts(h.boundsOf(id).box), 1.0)) : []; log.ev("world", "consequence", { id: c.id, head: true, machines: c.machines, seen, flew: c.flew, cued: c.cued }); return; }
   const subs = subjects(); const seen = [];
   for (const id of c.actors) { const sb = subs.find((x) => x.kind === "actor" && x.id === id); const r = sb && viewer.rect(sb.min, sb.max, camera, innerWidth, innerHeight); if (r && r.frac > 0.002 && !hiddenPerson(id)) seen.push(id); }
   const cs = subs.find((x) => x.kind === "control" && x.id === c.id); const control = !!(cs && viewer.rect(cs.min, cs.max, camera, innerWidth, innerHeight));
-  log.ev("world", "consequence", { id: c.id, actors: c.actors, seen, control, flew: c.flew });
+  log.ev("world", "consequence", { id: c.id, actors: c.actors, seen, control, flew: c.flew, cued: c.cued });
 }
 function openCapsule(id) {
   const a = tubes.active.find((x) => x.msg.id === id); const m = a ? a.msg : sim.messagesBetween(-1, sim.duration + 1).find((x) => x.id === id); if (!m) return;
@@ -456,6 +496,7 @@ function openCapsule(id) {
 }
 // a click on the floor walks there: the view keeps its direction, at a standing distance, out of furniture
 function walkTo(point) {
+  if (!FREE) return; // on foot a tap on the floor does nothing: the visitor walks
   const tgt = v3(point.x, 1.0, point.z); const off = camera.position.clone().sub(controls.target); const hz = v3(off.x, 0, off.z); if (hz.lengthSq() < 1e-4) hz.set(0.4, 0, 0.9);
   const d = Math.min(8, Math.max(3.2, off.length())); const h = Math.min(d * 0.75, Math.max(1.0, off.y));
   hz.setLength(Math.sqrt(Math.max(0.5, d * d - h * h))); flyTo(rig.resolve(tgt.clone().add(hz).add(v3(0, h, 0))), tgt, 1.1);
@@ -466,27 +507,37 @@ function goSystem(id) { if (id && id !== SYSTEM) { const u = new URL(location.hr
 
 // ---------------------------------------------------------------- picking
 const raycaster = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+// on foot a hand reaches FP.reach (the board and the printer's tape are read from further); something further away
+// is "far": the crosshair says so and a click does nothing there. A free camera reaches everything
+const REACH = { board: 9, ticker: 4.5 };
+function reachFor(kind) { if (FREE) return Infinity; if (inRoom) return Math.max(FP.reach * player.scale, 1.3 * (roomEntry ? roomEntry.dist : 0)); return REACH[kind] || FP.reach; }
 function pickAt(x, y) {
+  const p = pickRaw(x, y); if (!p || FREE || p.dist == null) return p;
+  return p.dist > reachFor(p.kind) ? { kind: "far", of: p, dist: p.dist } : p;
+}
+const distTo = (o) => { const q = o.getWorldPosition ? o.getWorldPosition(new THREE.Vector3()) : o; return camera.position.distanceTo(q); };
+function pickRaw(x, y) {
   const o = overlay.hit(x, y); if (o) return { kind: o }; // the overlay first: it is drawn over everything
   if (trans) return null; // between the office and a machine room
   ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1); raycaster.setFromCamera(ndc, camera);
-  if (inRoom) { const hp = sel && sel.head ? sel.head.pick(raycaster) : null; return hp ? { kind: "head", hit: hp } : null; } // nothing of the office is here
-  if (liveControls) { const c = liveControls.pick(raycaster); if (c) return { kind: "control", id: c.id }; } // live: the controls
-  const nearC = liveControls ? liveControls.near(x, y, camera, innerWidth, innerHeight) : null; // live: within a thumb's reach
+  if (inRoom) { const hp = sel && sel.head ? sel.head.pick(raycaster) : null; return hp ? { kind: "head", hit: hp, dist: hp.point ? camera.position.distanceTo(hp.point) : null } : null; } // nothing of the office is here
+  if (liveControls) { const c = liveControls.pick(raycaster); if (c) return { kind: "control", id: c.id, dist: distTo(liveControls.items.get(c.id).ui.group) }; } // live: the controls
+  const nc = liveControls ? liveControls.near(x, y, camera, innerWidth, innerHeight) : null; // live: within a thumb's reach
+  const nearC = nc && distTo(liveControls.items.get(nc.id).ui.group) <= reachFor("control") ? nc : null;
   const cands = [boardMesh, ticker.tape, tubes.caps, ...people.roots().filter((r) => r.visible), ...stations.list.map((s) => s.group), ...building.pick.map((p) => p.object), ...recorder.pick.map((p) => p.object), ...building.occluders, desks.root, ...(models ? [models.root] : [])];
   const shown = (o) => { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; }; // hidden things (the ceiling seen from above) take no clicks
   for (const h of raycaster.intersectObjects(cands, true)) {
     const o = h.object; if (!shown(o)) continue;
-    if (o === boardMesh) return { kind: "board", uv: h.uv, point: h.point };
-    if (o === ticker.tape) return { kind: "ticker", uv: h.uv, point: h.point };
-    if (o === tubes.caps) { const a = tubes.active.find((x) => x.index === h.instanceId); if (a) return { kind: "capsule", id: a.msg.id, point: h.point }; continue; }
-    if (o.userData.actorId) return { kind: "actor", id: o.userData.actorId, point: h.point };
-    if (o.userData.stationId) return { kind: "actor", id: o.userData.stationId, point: h.point };
-    if (o.userData.recorder) return { kind: "recorder", point: h.point };
-    { let q = o; while (q && !(q.name || "").startsWith("desk-model:")) q = q.parent; if (q) return { kind: "actor", id: q.name.slice(11), point: h.point, via: "model" }; } // a desk model: its person
+    if (o === boardMesh) return { kind: "board", uv: h.uv, point: h.point, dist: h.distance };
+    if (o === ticker.tape) return { kind: "ticker", uv: h.uv, point: h.point, dist: h.distance };
+    if (o === tubes.caps) { const a = tubes.active.find((x) => x.index === h.instanceId); if (a) return { kind: "capsule", id: a.msg.id, point: h.point, dist: h.distance }; continue; }
+    if (o.userData.actorId) return { kind: "actor", id: o.userData.actorId, point: h.point, dist: h.distance };
+    if (o.userData.stationId) return { kind: "actor", id: o.userData.stationId, point: h.point, dist: h.distance };
+    if (o.userData.recorder) return { kind: "recorder", point: h.point, dist: h.distance };
+    { let q = o; while (q && !(q.name || "").startsWith("desk-model:")) q = q.parent; if (q) return { kind: "actor", id: q.name.slice(11), point: h.point, via: "model", dist: h.distance }; } // a desk model: its person
     if (building.occluders.includes(o)) return nearSubject(x, y) || { kind: "wall", point: h.point };
-    if (!building.pick.some((p) => p.object === o)) { let q = o; while (q && q !== desks.root) q = q.parent; if (q === desks.root) { const who = deskOwner(h.point); return who ? { kind: "actor", id: who, point: h.point, via: "desk" } : nearSubject(x, y) || { kind: "furniture", point: h.point }; } }
-    const pk = building.pick.find((p) => p.object === o); if (pk) return pk.kind === "floor" && nearC ? { kind: "control", id: nearC.id } : pk.kind === "floor" ? nearSubject(x, y) || { kind: pk.kind, point: h.point } : { kind: pk.kind, id: pk.id, point: h.point };
+    if (!building.pick.some((p) => p.object === o)) { let q = o; while (q && q !== desks.root) q = q.parent; if (q === desks.root) { const who = deskOwner(h.point); return who ? { kind: "actor", id: who, point: h.point, via: "desk", dist: h.distance } : nearSubject(x, y) || { kind: "furniture", point: h.point }; } }
+    const pk = building.pick.find((p) => p.object === o); if (pk) return pk.kind === "floor" && nearC ? { kind: "control", id: nearC.id } : pk.kind === "floor" ? nearSubject(x, y) || { kind: pk.kind, point: h.point } : { kind: pk.kind, id: pk.id, point: h.point, dist: h.distance };
   }
   return nearC ? { kind: "control", id: nearC.id } : nearSubject(x, y);
 }
@@ -501,13 +552,13 @@ function nearSubject(x, y) {
   if (inHead()) return null;
   let best = null, bd = 14; camera.updateMatrixWorld();
   for (const s of subjects()) { if (s.kind !== "actor" && s.kind !== "station") continue; const r = viewer.rect(s.min, s.max, camera, innerWidth, innerHeight); if (!r) continue; const d = Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.y0 - y, 0, y - r.y1)); if (d < bd) { bd = d; best = s; } }
-  return best ? { kind: "actor", id: best.id, via: "near" } : null;
+  return best ? { kind: "actor", id: best.id, via: "near", dist: camera.position.distanceTo(best.min.clone().add(best.max).multiplyScalar(0.5)) } : null;
 }
 // a click becomes an action (what the visitor meant), and perform() does it: the one place where
 // intent becomes behaviour, so the recorder logs it once and the replay can do it again
 function intentOf(p) {
   // an opened card closes on a tap on empty floor, a wall, furniture or nothing (its stamp and Escape close it too)
-  if (slipMsg && !inRoom && (!p || ["floor", "wall", "furniture"].includes(p.kind))) return { do: "closeCard", how: "floor" };
+  if (slipMsg && !inRoom && (!p || ["floor", "wall", "furniture", "far"].includes(p.kind))) return { do: "closeCard", how: "floor" };
   if (!p) return null;
   switch (p.kind) {
     case "card-close": return { do: "closeCard", how: "x" };
@@ -521,12 +572,15 @@ function intentOf(p) {
     case "board": return { do: "board", type: "tap", u: p.uv.x, v: 1 - p.uv.y };
     case "ticker": return { do: "ticker", u: +p.uv.x.toFixed(4), v: +p.uv.y.toFixed(4) };
     case "capsule": return { do: "slip", id: p.id };
-    case "actor": if (sel && sel.id === p.id && sel.head && sel.stage === "approach") return { do: "enter" }; if (sel && sel.id === p.id && !sel.head) return { do: "back" }; if (!(sel && sel.id === p.id)) return { do: "select", id: p.id }; return null;
+    case "actor":
+      // on foot a person (or their desk, or the model on it) within reach is a door into their machine room; a station is selected
+      if (!FREE) { const a = sim.actor(p.id); if (a && !a.external && sim.chartOf(p.id)) return { do: "enter", id: p.id }; return sel && sel.id === p.id ? { do: "deselect" } : { do: "select", id: p.id }; }
+      if (sel && sel.id === p.id && sel.head && sel.stage === "approach") return { do: "enter" }; if (sel && sel.id === p.id && !sel.head) return { do: "back" }; if (!(sel && sel.id === p.id)) return { do: "select", id: p.id }; return null;
     case "clock": return live ? { do: live.viewingPast ? "now" : "advance" } : { do: "pause" }; // live: the clock advances time
     case "lever": return { do: "speed", i: speedIndex + 1 };
     case "system": return REC ? null : { do: "system", id: p.id };
     case "recorder": return { do: "export" };
-    case "floor": return inHead() ? null : { do: "walk", point: [+p.point.x.toFixed(3), +p.point.y.toFixed(3), +p.point.z.toFixed(3)] };
+    case "floor": return inHead() || !FREE ? null : { do: "walk", point: [+p.point.x.toFixed(3), +p.point.y.toFixed(3), +p.point.z.toFixed(3)] };
     default: return null; // a wall, furniture: nothing
   }
 }
@@ -551,7 +605,7 @@ function perform(a, src = "input") {
     case "focus": focusHead(a.state); break;
     case "board": boardHot = true; if (board) { if (a.type === "tap") { board.pointer("down", a.u, a.v); board.pointer("up", a.u, a.v); } else board.pointer(a.type, a.u, a.v, a.extra); } break;
     case "slip": openCapsule(a.id); break;
-    case "enter": enterHead(); break;
+    case "enter": if (a.id && (!sel || sel.id !== a.id) && !inRoom && !trans) select(a.id); enterHead(); break;
     case "exit": afterTrans(() => { if (inRoom) leaveHead(); }); break;
     case "closeCard": closeCard(a.how || "act"); break;
     case "select": select(a.id); break;
@@ -565,103 +619,237 @@ function perform(a, src = "input") {
     case "walk": walkTo(v3(...a.point)); break; // walking never changes the selection
     case "back": back(); break;
     case "home": closeCard("home"); afterTrans(() => { if (inRoom) leaveHead(() => { sel = null; home(); }); else { sel = null; home(); } }); break;
-    case "deselect": afterTrans(() => { if (inRoom) leaveHead(() => { sel = null; }); else sel = null; }); break;
+    case "deselect": afterTrans(() => { if (inRoom) leaveHead(() => { sel = null; }); else { sel = null; spot = null; if (board) board.highlight({}); } }); break;
   }
 }
 function click(x, y) {
   const p = pickAt(x, y); const a = intentOf(p);
-  log.ev("pick", "tap", { x: Math.round(x), y: Math.round(y), hit: p ? [p.kind, p.id ?? p.hit?.id ?? p.hit?.kind ?? null] : null, act: a ? a.do : null, near: nearOf(x, y) }); // log: what was under the pointer, what we did, what was close
+  log.ev("pick", "tap", { x: Math.round(x), y: Math.round(y), hit: p ? (p.kind === "far" ? ["far", `${p.of.kind}:${p.of.id ?? p.of.hit?.id ?? ""}`, +p.dist.toFixed(1)] : [p.kind, p.id ?? p.hit?.id ?? p.hit?.kind ?? null]) : null, act: a ? a.do : null, near: nearOf(x, y) }); // log: what was under the pointer, what we did, what was close
+  if (a && !FREE) body.press(); // the hand pokes forward
   perform(a);
   return p;
 }
 
-// ---------------------------------------------------------------- live input
+// ---------------------------------------------------------------- input: the visitor's body (first person)
+// Desktop: a click captures the pointer (pointer lock); the mouse looks, WASD or the arrows walk (←/→ and Q/E turn),
+// Shift runs, Space hops, a click presses what the crosshair is on (within reach), the wheel scrolls the board.
+// Escape releases the pointer, and goes back when something is open (a card, a machine room). Without the lock
+// (refused, ?nolock=1, or a tool driving the page) a drag looks and a click presses what is under the pointer.
+// Touch: a stick under the left thumb walks, a drag elsewhere looks, a tap presses what is under it.
+const keys = new Set(); window.__keys = keys;
+let lookDX = 0, lookDY = 0, locked = false, lockRefused = params.has("nolock") || FREE || REPLAY, unlockedAt = -1e9;
+let stick = null, pointerAt = null, touchSeen = false, hoverAt = -1, hoverPick = null, movedOnce = false;
+const SENS = 0.0023, DRAG = 0.0045, TOUCH_LOOK = 0.0065, STICK_R = 56;
+const centre = () => ({ x: innerWidth / 2, y: innerHeight / 2 });
+// where a click or the hover looks: the crosshair while the pointer is captured (or on touch), else the pointer
+const aimPoint = () => (locked || (!pointerAt && !FREE) ? centre() : pointerAt || centre());
+let orbiting = false; // log: kept for the analyser's older findings (there is no orbit any more)
 if (!REC && !REPLAY) {
   log.attachInput(canvas); // log: raw pointer, wheel and keys (passive listeners at the canvas)
-  let down = null; const pointers = new Map(); let hoverKey = "", cursorNow = "default", pinch = null;
+  let down = null; const pointers = new Map();
   const gesture = (kind, d) => log.ev("input", "gesture", { kind, ...d }); // log: what the app made of the input
-  controls.addEventListener("start", () => { orbiting = true; orbitFrom = { az: controls.getAzimuthalAngle(), po: controls.getPolarAngle(), d: controls.getDistance(), t: controls.target.clone() }; });
-  controls.addEventListener("end", () => { orbiting = false; if (!orbitFrom) return; const o = orbitFrom; orbitFrom = null; const dd = controls.getDistance() - o.d, da = controls.getAzimuthalAngle() - o.az, dp = controls.getPolarAngle() - o.po, dt = controls.target.distanceTo(o.t); if (Math.abs(dd) > 0.01 || Math.abs(da) > 0.01 || Math.abs(dp) > 0.01 || dt > 0.01) gesture(dt > 0.05 ? "pan" : Math.abs(dd) > 0.05 && Math.abs(da) + Math.abs(dp) < 0.05 ? "zoom" : "orbit", { dAz: +da.toFixed(3), dPolar: +dp.toFixed(3), dDist: +dd.toFixed(2), dTarget: +dt.toFixed(2) }); });
+  document.addEventListener("pointerlockchange", () => {
+    const was = locked; locked = document.pointerLockElement === canvas; if (!locked && was) unlockedAt = performance.now();
+    log.ev("input", "lock", { on: locked }); // log: the pointer captured or released
+    if (!locked && was && slipMsg) perform({ do: "closeCard", how: "esc" }); // the Escape that released the pointer closes an open card too
+  });
+  document.addEventListener("pointerlockerror", () => { lockRefused = true; log.ev("input", "lock", { on: false, refused: true }); }); // log:
+  const tryLock = () => { if (locked || lockRefused || FREE || touchSeen) return; try { const q = canvas.requestPointerLock(); if (q && q.catch) q.catch(() => { lockRefused = true; }); } catch { lockRefused = true; } };
   canvas.addEventListener("pointerdown", (e) => {
-    pointers.set(e.pointerId, [e.clientX, e.clientY]); down = { x: e.clientX, y: e.clientY, at: performance.now(), n: pointers.size, button: e.button };
-    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); }
-    const p = pickAt(e.clientX, e.clientY);
-    if (p && p.kind === "board" && pointers.size === 1) { controls.enabled = false; down.board = true; perform({ do: "board", type: "down", u: p.uv.x, v: 1 - p.uv.y }); }
-    if (!trans) rig.stop("pointerdown"); // a drag never interrupts going into or out of a machine room
+    const touch = e.pointerType === "touch"; if (touch) touchSeen = true;
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    // the left thumb's stick: a touch that starts in the lower left of the screen
+    if (touch && !stick && e.clientX < innerWidth * 0.42 && e.clientY > innerHeight * 0.45) { stick = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY }; gesture("stick", {}); return; }
+    if (down) return; // one look or tap at a time (the stick aside)
+    down = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, at: performance.now(), button: e.button, touch, moved: 0 };
+    if (!locked) { const p = pickAt(e.clientX, e.clientY); if (p && p.kind === "board" && !touch) { down.board = true; perform({ do: "board", type: "down", u: p.uv.x, v: 1 - p.uv.y }); } } // the board's scrubber drags under the pointer
   });
   canvas.addEventListener("pointermove", (e) => {
     if (pointers.has(e.pointerId)) pointers.set(e.pointerId, [e.clientX, e.clientY]);
-    const p = (down && down.board) || !down ? pickAt(e.clientX, e.clientY) : null;
-    if (p && p.kind === "board" && board) { if (down && down.board) perform({ do: "board", type: "move", u: p.uv.x, v: 1 - p.uv.y }); else { board.pointer("move", p.uv.x, 1 - p.uv.y); boardHot = true; } } else if (board && !down) board.pointer("leave", 0, 0);
-    if (!down) overlay.hover(e.clientX, e.clientY); // the card's close stamp and the room's exit brighten under the pointer
-    const cur = p && !["floor", "wall", "furniture", "card"].includes(p.kind) ? "pointer" : "default";
-    if (!down) { const key = p ? `${p.kind}:${p.id ?? p.hit?.id ?? ""}` : ""; if (key !== hoverKey || cur !== cursorNow) log.ev("pick", "hover", { x: Math.round(e.clientX), y: Math.round(e.clientY), hit: p ? [p.kind, p.id ?? p.hit?.id ?? null] : null, cursor: cur }); hoverKey = key; } // log: hover target and cursor changes
-    canvas.style.cursor = cursorNow = cur; if (!down && !(p && p.kind === "board")) hoverId = p && p.kind === "actor" ? p.id : null; // a board row hovered keeps the room's hover
-    if (liveControls && !down) liveControls.hover(p && p.kind === "control" ? p.id : null); // live: a dim control says why
-    if (inRoom && sel && sel.head && sel.head.hoverButton && !down) sel.head.hoverButton(p && p.kind === "head" && p.hit.kind === "event" ? p.hit : null); // live: so does a dim button in a head
+    if (stick && e.pointerId === stick.id) { const dx = e.clientX - stick.x0, dy = e.clientY - stick.y0, d = Math.hypot(dx, dy); const k = d > STICK_R ? STICK_R / d : 1; stick.x = stick.x0 + dx * k; stick.y = stick.y0 + dy * k; return; }
+    // the mouse looks; a single movement of hundreds of pixels is a browser's glitch (some report the pointer's
+    // jump back to where it was captured), never a hand: it is dropped, so the view never lurches
+    if (locked) { const mx = e.movementX || 0, my = e.movementY || 0; if (Math.abs(mx) < 250 && Math.abs(my) < 250) { lookDX -= mx * SENS; lookDY -= my * SENS; } return; }
+    if (e.pointerType !== "touch") pointerAt = { x: e.clientX, y: e.clientY };
+    if (down && e.pointerId === down.id) {
+      const dx = e.clientX - down.lx, dy = e.clientY - down.ly; down.lx = e.clientX; down.ly = e.clientY; down.moved = Math.max(down.moved, Math.hypot(e.clientX - down.x, e.clientY - down.y));
+      if (down.board) { const p = pickAt(e.clientX, e.clientY); if (p && p.kind === "board") perform({ do: "board", type: "move", u: p.uv.x, v: 1 - p.uv.y }); return; }
+      if (down.moved > 6) { const k = down.touch ? TOUCH_LOOK : DRAG; lookDX -= dx * k; lookDY -= dy * k; } // drag to look, the way the mouse looks
+      return;
+    }
+    if (!down) overlay.hover(e.clientX, e.clientY); // the card's close stamp brightens under the pointer
   });
   const end = (e) => {
-    pointers.delete(e.pointerId); if (!down) return; const d = down; down = null; controls.enabled = true;
+    pointers.delete(e.pointerId);
+    if (stick && e.pointerId === stick.id) { stick = null; return; }
+    if (!down || e.pointerId !== down.id) return; const d = down; down = null;
     const dist = Math.hypot(e.clientX - d.x, e.clientY - d.y), ms = performance.now() - d.at;
     if (d.board) { const p = pickAt(e.clientX, e.clientY); perform({ do: "board", type: "up", u: p && p.uv ? p.uv.x : 0, v: p && p.uv ? 1 - p.uv.y : 0 }); gesture(dist < 7 ? "board-tap" : "board-drag", { dist: Math.round(dist), ms: Math.round(ms) }); return; }
-    if (d.n > 1 || pinch) { gesture("pinch", { ms: Math.round(ms) }); pinch = null; return; }
-    if (dist < 7 && ms < 600) { gesture("tap", { x: Math.round(e.clientX), y: Math.round(e.clientY), ms: Math.round(ms) }); click(e.clientX, e.clientY); }
-    else if (dist < 7) gesture("hold", { x: Math.round(e.clientX), y: Math.round(e.clientY), ms: Math.round(ms) }); // a long press does nothing
-    else gesture("drag", { dist: Math.round(dist), ms: Math.round(ms), button: d.button });
+    if (dist < 7 && ms < 600 && d.button === 0) {
+      const at = locked ? centre() : { x: e.clientX, y: e.clientY };
+      gesture("tap", { x: Math.round(at.x), y: Math.round(at.y), ms: Math.round(ms), locked });
+      const wasLocked = locked; click(at.x, at.y);
+      if (!wasLocked && !d.touch) tryLock(); // the first click captures the pointer (and does what it clicked)
+    } else if (dist < 7) gesture("hold", { x: Math.round(e.clientX), y: Math.round(e.clientY), ms: Math.round(ms) }); // a long press does nothing
+    else gesture("look", { dist: Math.round(dist), ms: Math.round(ms), touch: d.touch });
   };
-  canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", (e) => { pointers.delete(e.pointerId); down = null; pinch = null; controls.enabled = true; });
-  canvas.addEventListener("wheel", (e) => { if (board) { const p = pickAt(e.clientX, e.clientY); if (p && p.kind === "board") { e.preventDefault(); e.stopImmediatePropagation(); perform({ do: "board", type: "wheel", u: p.uv.x, v: 1 - p.uv.y, extra: { dy: e.deltaY, dx: e.deltaX } }); return; } } }, { capture: true, passive: false });
-  const keys = new Set();
+  canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", (e) => { pointers.delete(e.pointerId); if (stick && stick.id === e.pointerId) stick = null; if (down && down.id === e.pointerId) down = null; });
+  canvas.addEventListener("pointerleave", () => { pointerAt = null; });
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  canvas.addEventListener("wheel", (e) => { e.preventDefault(); const at = aimPoint(); const p = board ? pickAt(at.x, at.y) : null; if (p && p.kind === "board") { perform({ do: "board", type: "wheel", u: p.uv.x, v: 1 - p.uv.y, extra: { dy: e.deltaY, dx: e.deltaX } }); } }, { capture: true, passive: false }); // the wheel scrolls the board under the crosshair; nothing else
   addEventListener("keydown", (e) => {
-    if (e.key === " ") { e.preventDefault(); perform({ do: "pause" }); }
-    else if (e.key === "Escape") perform({ do: "back" });
-    else if (e.key === "]" || e.key === "+") perform({ do: "speed", i: speedIndex + 1 });
-    else if (e.key === "[" || e.key === "-") perform({ do: "speed", i: speedIndex - 1 });
-    else if (e.key === "," || e.key === "<") perform({ do: "seek", s: playS - 3 });
-    else if (e.key === "." || e.key === ">") perform({ do: "seek", s: playS + 3 });
-    else if (e.key === "h" || e.key === "Home") perform({ do: "home" });
-    else if ((e.key === "l" || e.key === "L") && !e.metaKey && !e.ctrlKey) perform({ do: "export" }); // the flight recorder, from the keyboard
-    else keys.add(e.key.toLowerCase());
+    const k = e.key;
+    if (k === "Escape") { if (performance.now() - unlockedAt < 350 && !(slipMsg || inRoom || (sel && !inRoom))) return; perform({ do: "back" }); return; } // the press that released the pointer goes back only when something is open
+    if (e.metaKey || e.ctrlKey) return;
+    if (k === " ") { e.preventDefault(); keys.add(" "); return; }
+    if (k === "p" || k === "P") perform({ do: "pause" });
+    else if (k === "]" || k === "+") perform({ do: "speed", i: speedIndex + 1 });
+    else if (k === "[" || k === "-") perform({ do: "speed", i: speedIndex - 1 });
+    else if (k === "," || k === "<") perform({ do: "seek", s: playS - 3 });
+    else if (k === "." || k === ">") perform({ do: "seek", s: playS + 3 });
+    else if (k === "h" || k === "H" || k === "Home") perform({ do: "home" });
+    else if (k === "l" || k === "L") perform({ do: "export" }); // the flight recorder, from the keyboard
+    else { if (k.startsWith("Arrow")) e.preventDefault(); keys.add(k.toLowerCase()); }
   });
   addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
-  addEventListener("blur", () => keys.clear()); // a key held while the window lost focus must not walk on
-  window.__keys = keys;
-  addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; if (inRoom) camera.fov = fovFor(camera.aspect); camera.updateProjectionMatrix(); overlay.resize(innerWidth, innerHeight); });
+  addEventListener("blur", () => { keys.clear(); stick = null; }); // a key held while the window lost focus must not walk on
+  addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; if (inRoom && FREE) camera.fov = fovFor(camera.aspect); camera.updateProjectionMatrix(); overlay.resize(innerWidth, innerHeight); });
 }
-let orbiting = false, orbitFrom = null; // log: an orbit gesture in progress (OrbitControls' start/end)
-// walking: WASD or the arrows at a steady pace (Shift: faster), Q/E turn on the spot; the same in the office and
-// in a machine room (there at the room's own scale, kept inside its wall); the camera slides along furniture and
-// walls (it never snaps) and the selection stays as it is
-const WALK_MPS = 2.2, TURN_RPS = 1.5;
+// one step of the walker from what the visitor holds: keys, the look delta since the last frame, the stick
 let walkLogAt = -1;
-function walkKeys(dt) {
-  const keys = window.__keys; if (!keys || !keys.size) return;
-  const fwdK = (keys.has("w") || keys.has("arrowup") ? 1 : 0) - (keys.has("s") || keys.has("arrowdown") ? 1 : 0);
-  const sideK = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
-  const turnK = (keys.has("q") ? 1 : 0) - (keys.has("e") ? 1 : 0);
-  if (!fwdK && !sideK && !turnK) return;
-  if (trans) return; // never strand the camera between the office and a machine room
-  rig.stop("keys");
-  const head = inRoom;
-  const scale = head ? roomEntry.dist / 3.5 : 1; // in a machine room: its own pace (the entry distance in about 1.6 s)
-  const fast = keys.has("shift") ? 2 : 1;
-  if (turnK) { const off = controls.target.clone().sub(camera.position); off.applyAxisAngle(v3(0, 1, 0), turnK * TURN_RPS * dt); controls.target.copy(camera.position).add(off); }
-  if (fwdK || sideK) {
-    const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize(); const r = v3(-f.z, 0, f.x);
-    const step = f.multiplyScalar(fwdK).addScaledVector(r, sideK).normalize().multiplyScalar(WALK_MPS * scale * fast * dt);
-    let want = camera.position.clone().add(step);
-    want = head ? machineRoom.contain(want) : rig.resolve(want, { skip: sel && sel.id }); // inside the room's wall; out of the office's furniture
-    const moved = want.clone().sub(camera.position); camera.position.add(moved); controls.target.add(moved);
-  }
-  if (amb - walkLogAt > 0.5) { walkLogAt = amb; log.ev("camera", "walk", { keys: [...keys].join(""), head: !!head }); } // log: walking (twice a second at most)
+function fpStep(dt) {
+  const k = keys, has = (x) => k.has(x);
+  let mz = (has("w") || has("arrowup") ? 1 : 0) - (has("s") || has("arrowdown") ? 1 : 0);
+  let mx = (has("d") ? 1 : 0) - (has("a") ? 1 : 0);
+  const turn = (has("arrowleft") || has("q") ? 1 : 0) - (has("arrowright") || has("e") ? 1 : 0);
+  if (stick) { mx += (stick.x - stick.x0) / STICK_R; mz -= (stick.y - stick.y0) / STICK_R; }
+  const jump = has(" "); k.delete(" ");
+  const input = { mx, mz, run: has("shift"), jump, dyaw: lookDX + turn * 1.9 * dt, dpitch: lookDY };
+  lookDX = 0; lookDY = 0;
+  if (trans) { input.mx = input.mz = 0; input.dyaw = input.dpitch = 0; } // never walk between the office and a machine room
+  const { moved } = player.step(dt, input);
+  if (moved > 1e-4 || input.dyaw || input.dpitch) movedOnce = true;
+  if (moved > 1e-4 && amb - walkLogAt > 0.5) { walkLogAt = amb; log.ev("camera", "walk", { keys: player.auto ? "auto" : [...k].join("") + (stick ? "stick" : ""), head: inRoom, at: [+player.pos.x.toFixed(2), +player.pos.z.toFixed(2)] }); } // log: walking (twice a second at most)
+  // the machine room's door: walked through, back to the office
+  if (inRoom && !trans && machineRoom.through(player.pos) > 0.9) perform({ do: "exit", how: "door" });
 }
+// the office as the walker sees it (engine/player.js): its walls with the door's opening, the furniture, the people,
+// the door's leaf while it is shut
+let staticBoxes = null, staticOf = null, frameBoxes = [];
+function officeStatic() {
+  if (staticOf === stations && staticBoxes) return staticBoxes;
+  staticOf = stations; const out = [...desks.colliders];
+  for (const st of stations.list) { const b = new THREE.Box3().setFromObject(st.group); out.push([b.min.clone(), b.max.clone()]); }
+  { const b = new THREE.Box3().setFromObject(ticker.root); if (!b.isEmpty()) { b.max.y = Math.min(b.max.y, 1.6); out.push([b.min.clone(), b.max.clone()]); } }
+  if (liveControls) liveControls.root.traverse((o) => { if (o.parent === liveControls.root) { const b = new THREE.Box3().setFromObject(o); if (!b.isEmpty() && b.min.y < 1.5) out.push([b.min.clone(), v3(b.max.x, Math.min(b.max.y, 1.6), b.max.z)]); } }); // the consoles and the levers
+  // the exchange's counters (a ring round the hub) and the walls, the door's opening left free
+  const r = plan.room, d = plan.door, T = 0.15, Hh = WALL_H;
+  out.push([v3(r.x0 - T, 0, r.z0 - T), v3(r.x1 + T, Hh, r.z0 + T)], [v3(r.x0 - T, 0, r.z0 - T), v3(r.x0 + T, Hh, r.z1 + T)], [v3(r.x1 - T, 0, r.z0 - T), v3(r.x1 + T, Hh, r.z1 + T)]);
+  out.push([v3(r.x0 - T, 0, r.z1 - T), v3(d.x - d.w / 2, Hh, r.z1 + T)], [v3(d.x + d.w / 2, 0, r.z1 - T), v3(r.x1 + T, Hh, r.z1 + T)]);
+  if (plan.hub) { const s = plan.seatOf(plan.hub, 0); if (s && Number.isFinite(s.x)) { const cx = s.x, cz = s.z + 0.2; for (let i = 0; i < 8; i++) { if (i === 4) continue; const a = (i / 8) * Math.PI * 2, x = cx + Math.sin(a) * 2.5, z = cz + Math.cos(a) * 2.5; const hw = Math.abs(Math.cos(a)) * 0.95 + Math.abs(Math.sin(a)) * 0.25, hd = Math.abs(Math.sin(a)) * 0.95 + Math.abs(Math.cos(a)) * 0.25; out.push([v3(x - hw, 0, z - hd), v3(x + hw, 0.8, z + hd)]); } } }
+  return (staticBoxes = out);
+}
+const officeWorld = {
+  floor: 0,
+  boxes: () => frameBoxes,
+  limit(p, r) {
+    const R0 = plan.room, d = plan.door, T = 0.15;
+    p.x = Math.min(R0.x1 - T - r, Math.max(R0.x0 + T + r, p.x)); p.z = Math.min(R0.z1 + 1.1, Math.max(R0.z0 + T + r, p.z));
+    if (p.z > R0.z1 - T) p.x = Math.min(d.x + d.w / 2 - r, Math.max(d.x - d.w / 2 + r, p.x)); // in the doorway or on the step outside: within the opening
+    return p;
+  },
+  get rect() { const R0 = plan.room; return { x0: R0.x0, x1: R0.x1, z0: R0.z0, z1: R0.z1 + 1.1 }; },
+};
+function officeBoxes() {
+  const out = [...officeStatic(), ...people.boxes(null).map(([a, b]) => Object.assign([a, v3(b.x, Math.min(b.y, 1.9), b.z)], { soft: true }))]; // people: soft (they never push the visitor)
+  const d = plan.door, z1 = plan.room.z1; if (building.door.k < 0.6) out.push([v3(d.x - d.w / 2, 0, z1 - 0.06), v3(d.x + d.w / 2, d.h, z1 + 0.06)]); // the leaf, unless it is open
+  frameBoxes = out;
+}
+// where the visitor starts: just inside the door, turned to see as much of the room as a standing person can: the
+// people, the board, the stations and (live) the consoles, the first console most
+function spawnPose() {
+  const sp = plan.spawn, eye = v3(sp.x, FP.eye, sp.z), pts = [];
+  for (const seat of people.seats.values()) if (seat.current && seat.avatar.root.visible) { const h = headPos(seat.current.id); if (h) pts.push([h, 2]); }
+  { const b = plan.board; const c = boardMesh.position.clone(); const n = b.wall === "north" ? v3(1, 0, 0) : v3(0, 0, 1); for (const k of [-0.45, 0, 0.45]) pts.push([c.clone().addScaledVector(n, k * b.w), 3]); }
+  for (const st of stations.list) pts.push([st.group.getWorldPosition(v3()).add(v3(0, 1.2, 0)), 1]);
+  const k0 = firstConsole(); if (liveControls) for (const k of liveControls.consoles()) pts.push([k.group.getWorldPosition(v3()).add(v3(0, 1.1, 0)), k === k0 ? 6 : 1.5]);
+  const hf = Math.atan(Math.tan((FP.fov * Math.PI) / 360) * (innerWidth / innerHeight)) * 0.82;
+  let best = null;
+  for (let i = 0; i < 180; i++) { const yaw = -Math.PI + (i / 180) * 2 * Math.PI; let sc = 0; for (const [p, w] of pts) { const a = Math.atan2(-(p.x - eye.x), -(p.z - eye.z)); let d = a - yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; if (Math.abs(d) < hf) sc += w * (1 - 0.25 * Math.abs(d) / hf); } if (!best || sc > best.sc + 1e-6) best = { yaw, sc }; }
+  // looking a little down: at the people's heads and the desks, the board still in view
+  const els = pts.map(([p]) => Math.atan2(p.y - eye.y, Math.hypot(p.x - eye.x, p.z - eye.z))).sort((a, b) => a - b);
+  const pitch = Math.max(-0.32, Math.min(0.02, (els[Math.floor(els.length / 2)] ?? -0.1) - 0.04));
+  return { p: v3(sp.x, 0, sp.z), yaw: best ? best.yaw : 0, pitch };
+}
+function spawn(why = "spawn") { player.setWorld(officeWorld, 1); if (people) officeBoxes(); const v = spawnPose(); player.place(v.p, v.yaw, v.pitch); log.ev("camera", "fly", { kind: "spawn", dur: 0, why, from: xyz(camera.position), to: xyz(player.eye), tgt: xyz(player.eye.add(player.forward)), via: 0 }); player.apply(camera); log.ev("camera", "arrive", { kind: "spawn" }); } // log: a teleport, not a jump
+// the body each frame: the arms, the shadow at the feet, the whole figure for a third-person replay; what the
+// crosshair (or the pointer) is on, its hover ring and the HUD: the crosshair, "walk closer", the cues, the stick
+const HINTS = ["click: look around · WASD / arrows: walk · Shift: run · Space: hop", "click: press what the crosshair is on · wheel: scroll the board", "Esc: back · H: back to the door · P: pause · L: save the flight log"];
+const HINTS_TOUCH = ["left thumb: walk · drag: look · tap: press"];
+const HINT_SHORT = ["Esc: back · H: to the door · L: flight log"];
+function stepBody(dt) {
+  body.update(dt, { phase: player.phase, k: Math.min(1, (ext ? extWalk / Math.max(dt, 1e-3) : player.speed) / FP.walk), pitch: player.pitch });
+  const drawn = inRoom ? machineRoom.scene : scene;
+  if (blob.parent !== drawn) drawn.add(blob);
+  blob.visible = !trans; blob.position.set(player.pos.x, player.floor + 0.02, player.pos.z); blob.scale.setScalar(player.scale);
+  const fig = body.figure.root;
+  if (THIRD) { if (fig.parent !== drawn) drawn.add(fig); fig.visible = !trans; fig.scale.setScalar(player.scale); body.pose(v3(player.pos.x, player.floor, player.pos.z), player.yaw, { k: extWalk > 0.004 ? 1 : 0, phase: player.walked * 3 }); }
+  if (REPLAY) { overlay.setHUD({ crosshair: THIRD ? "none" : "idle", cues: cueMarks() }); return; }
+  // what the visitor aims at, a few times a second (a raycast through the room)
+  if (amb - hoverAt > 1 / 15 || !hoverPick) {
+    hoverAt = amb; const at = aimPoint(); const p = trans || fadeT ? null : pickAt(at.x, at.y); hoverPick = p || { kind: "none" };
+    const live1 = p && p.kind !== "far" ? p : null;
+    hoverId = live1 && live1.kind === "actor" ? live1.id : null;
+    if (liveControls) liveControls.hover(live1 && live1.kind === "control" ? live1.id : null); // live: a dim control says why
+    if (inRoom && sel && sel.head && sel.head.hoverButton) sel.head.hoverButton(live1 && live1.kind === "head" && live1.hit.kind === "event" ? live1.hit : null); // live: so does a dim button in a machine room
+    if (board) { if (live1 && live1.kind === "board") { board.pointer("move", live1.uv.x, 1 - live1.uv.y); boardHot = true; } else board.pointer("leave", 0, 0); }
+    const key = p ? `${p.kind}:${p.id ?? p.hit?.id ?? p.of?.kind ?? ""}` : ""; if (key !== hoverKey) { hoverKey = key; log.ev("pick", "hover", { x: Math.round(at.x), y: Math.round(at.y), hit: p ? [p.kind, p.id ?? p.hit?.id ?? p.of?.id ?? p.of?.kind ?? null] : null, cursor: hotKind(p) ? "pointer" : "default" }); } // log: what the crosshair is on
+    canvas.style.cursor = locked ? "none" : hotKind(p) ? "pointer" : "default";
+  }
+  const p = hoverPick, hot = hotKind(p), far = p && p.kind === "far" && hotKind(p.of), nearly = far && p.dist < 2.5 * reachFor(p.of.kind); // "walk closer" only for something a few steps away
+  overlay.setHUD({
+    crosshair: locked || touchSeen || !pointerAt ? (hot ? "hot" : far ? "far" : "idle") : "none",
+    hint: nearly ? "walk closer" : null, hintAt: locked || touchSeen || !pointerAt ? null : pointerAt && { x: pointerAt.x, y: pointerAt.y + 18 },
+    cues: cueMarks(), stick: stick ? { x0: stick.x0, y0: stick.y0, x: Math.round(stick.x), y: Math.round(stick.y) } : null,
+    hints: touchSeen ? (movedOnce ? [] : HINTS_TOUCH) : movedOnce && amb > 12 ? HINT_SHORT : HINTS,
+  });
+}
+let hoverKey = "";
+const hotKind = (p) => !!p && !["floor", "wall", "furniture", "card", "far", "none"].includes(p.kind);
+// the cues: what a press changed out of view, as chevrons on the screen's edge (quantised: the HUD redraws only on change)
+function cueMarks() {
+  if (!cue || amb > cue.until) { cue = null; return []; }
+  const out = []; camera.updateMatrixWorld();
+  const mark = (p, color) => { const q = p.clone().project(camera); let x = (q.x + 1) / 2 * innerWidth, y = (1 - q.y) / 2 * innerHeight; if (q.z > 1) { x = innerWidth - x; y = innerHeight * 1.5; } const on = q.z <= 1 && Math.abs(q.x) < 0.92 && Math.abs(q.y) < 0.92; if (!on) out.push({ x: Math.round(x / 6) * 6, y: Math.round(y / 6) * 6, color }); };
+  for (const id of cue.ids || []) { const c = headPos(id) || stations.byId.get(id)?.group.getWorldPosition(v3()); if (c && !inRoom) mark(c, "#ffe14d"); }
+  if (inRoom && sel && sel.head) for (const id of cue.machines || []) { const b = sel.head.boundsOf(id); if (b && b.box) mark(b.box.getCenter(v3()), "#ffe14d"); }
+  return out;
+}
+// H: a quick fade to black, the spawn, and back (never a flight)
+let fadeT = null;
+function homeFade() { if (fadeT) return; fadeT = { t: 0, done: false }; }
+function stepFade(dt) { if (!fadeT) return; fadeT.t += dt; const t = fadeT.t; if (t >= 0.16 && !fadeT.done) { fadeT.done = true; spawn("home"); } overlay.setFade(t < 0.16 ? t / 0.16 : Math.max(0, 1 - (t - 0.16) / 0.24)); if (t > 0.4) { fadeT = null; overlay.setFade(0); } }
 
 // ---------------------------------------------------------------- one frame
 const sitCache = new Map();
 let boardAt = -1, boardHot = true; const boardFr = new THREE.Frustum(), boardPV = new THREE.Matrix4();
 const boardSeen = () => { boardPV.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); boardFr.setFromProjectionMatrix(boardPV); return boardFr.intersectsObject(boardMesh); };
 let ext = null; // ?replay=1: {playS, cam: {p, t, fov}} from outside (tools/replay.mjs)
-const applyExt = () => { if (!ext || !ext.cam) return; const c = ext.cam; camera.position.set(...c.p); controls.target.set(...c.t); if (c.fov && c.fov !== camera.fov) { camera.fov = c.fov; camera.updateProjectionMatrix(); } camera.lookAt(controls.target); };
+// a replay's pose is the visitor's eye: on foot the walker stands there (its door opens, its figure is drawn there)
+const applyExt = () => {
+  if (!ext || !ext.cam) return; const c = ext.cam; camera.position.set(...c.p); controls.target.set(...c.t); if (c.fov && c.fov !== camera.fov) { camera.fov = c.fov; camera.updateProjectionMatrix(); } camera.lookAt(controls.target);
+  if (FREE) return;
+  const d = controls.target.clone().sub(camera.position); const yaw = Math.atan2(-d.x, -d.z), pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
+  const sc = inRoom ? machineRoom.scale : 1, fl = inRoom ? ROOM.floor : 0;
+  const was = player.pos.clone(); player.place(v3(camera.position.x, 0, camera.position.z), yaw, pitch); void fl; void sc; extWalk = Math.hypot(player.pos.x - was.x, player.pos.z - was.z);
+  if (THIRD) { // behind and above the visitor, pulled in until it is inside the room (never behind a wall)
+    const f = v3(-Math.sin(yaw), 0, -Math.cos(yaw)); const e = camera.position.clone(); const R0 = plan.room;
+    const inside = (q) => (inRoom ? Math.hypot(q.x, q.z) < ROOM.wallR - 0.6 * sc : q.x > R0.x0 + 0.35 && q.x < R0.x1 - 0.35 && q.z > R0.z0 + 0.35 && q.z < R0.z1 - 0.35);
+    let d = 3.4; const q = v3(); for (; d > 0.5; d -= 0.2) { q.copy(e).addScaledVector(f, -d * sc).add(v3(0, (0.6 + 0.27 * d) * sc, 0)); if (inside(q)) break; }
+    camera.position.copy(q); camera.lookAt(e.clone().addScaledVector(f, 2 * sc).add(v3(0, -0.5 * sc, 0)));
+  }
+};
+let extWalk = 0; const right3 = new THREE.Vector3(), up3 = new THREE.Vector3(0, 1, 0);
 function step(dt) {
   // live: the playhead runs only up to what the driver released, and the room's own motion with it
   let moving = true;
@@ -677,7 +865,12 @@ function step(dt) {
   if (models) models.update({ people, playS, t, dt: moving ? dt : 0, camera: viewCam, selected: sel && sel.id, frame: frameN++ }); // the desk models: built near the camera, their marbles at t
   // a blackout (everyone ended at once): the lights go out
   const k = 1 - 0.85 * dark; hemi.intensity = 1.35 * k; sun.intensity = 1.7 * k; fill.intensity = 0.35 * k; scene.background.copy(SKY).lerp(NIGHT, dark); scene.fog.color.copy(scene.background);
-  building.update(playS, t, wa, { paused: live ? !moving : displayPaused ?? paused, speedIndex, duration: sim.duration, clockRing: recentIn(clockRings, playS, 0.9), camera: viewCam });
+  // the office door opens for whoever goes through: people walking in or out (a moment ahead of them), the visitor near it
+  const ddx = plan.door.x - player.pos.x, ddz = plan.door.z - player.pos.z, dd = Math.hypot(ddx, ddz), toward = (player.vel.x * ddx + player.vel.y * ddz) / Math.max(1e-6, dd);
+  const nearDoor = !inRoom && !FREE && (dd < 0.85 || (dd < 2.0 && toward > 0.35)); // the visitor walking up to it, or standing in it
+  const doorWas = building.door.open;
+  building.update(playS, t, wa, { paused: live ? !moving : displayPaused ?? paused, speedIndex, duration: sim.duration, clockRing: recentIn(clockRings, playS, 0.9), camera: viewCam, dt, doorWant: nearDoor || people.doorTraffic(playS) });
+  if (building.door.open !== doorWas) log.ev("world", "door", { which: "office", open: building.door.open, by: nearDoor ? "visitor" : "people" }); // log: the door opens or shuts
   stations.update(playS, wa);
   desks.update(playS, t, wa, people.occupantOf, { dark: dark > 0.3, situation: (id) => sitCache.get(id) || sitCache.set(id, sim.situationAt(id, t)).get(id), timerRing: (id) => recentIn(timerRings.get(id), playS, 0.9), timerSet: (id) => (timerPending.get(id) || []).some(([a, b]) => playS >= a && playS < b), talking: (a, b) => recentIn(talkSpans.get([a, b].sort().join("|")), playS, 0.8), dropping: (k) => tubes.dropping(k) });
   const active = tubes.update(playS, spot && spot.messages.size ? spot.messages : null);
@@ -686,29 +879,34 @@ function step(dt) {
   if (board && (REC || boardHot || (amb - boardAt >= 1 / 15 && !inRoom && boardSeen()))) { boardAt = amb; boardHot = false; board.update(t); if (board.dirty) { boardTex.needsUpdate = true; board.dirty = false; log.note("board"); } }
   for (const r of Object.values(rings)) r.visible = false;
   hoverRing.visible = false; if (hoverId && !(sel && sel.id === hoverId) && !inHead()) { const seat = people.seatOfActor(hoverId, playS); const pos = seat && seat.avatar.root.visible ? seat.avatar.root.position : stations.byId.get(hoverId)?.group.position; if (pos) { hoverRing.visible = true; hoverRing.position.set(pos.x, 0.035, pos.z); } }
+  if (spot && spot.until && amb > spot.until) spot = null;
   if (spot) for (const id of spot.actors) { let pos = null; const seat = people.seatOfActor(id, playS); if (seat && seat.avatar.root.visible) pos = seat.avatar.root.position; else { const st = stations.byId.get(id); if (st) pos = st.group.position; } if (!pos) continue; const r = ringFor(id); r.visible = true; r.position.set(pos.x, 0.03, pos.z); r.scale.setScalar(1 + 0.08 * Math.sin(amb * 5)); }
-  rig.update(dt); // the camera moves only along a flight someone started (no drift)
-  walkKeys(dt); stepTrans(dt); applyExt();
+  if (FREE) rig.update(dt); // the free camera moves only along a flight someone started (no drift)
+  // on foot: the walker steps (out of the furniture and the people), and the camera is its eye
+  if (!FREE && !ext) { if (!inRoom) officeBoxes(); fpStep(dt); }
+  stepTrans(dt); stepFade(dt);
+  if (!FREE && !ext) { player.apply(camera); controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(right3), 1); } // the target: a point 1 unit ahead of the eye (for the log: turning moves it little)
+  applyExt();
+  if (inRoom && machineRoom.door) { const dp = machineRoom.doorPoints(); const rdx = dp.c.x - player.pos.x, rdz = dp.c.z - player.pos.z, rd = Math.hypot(rdx, rdz), rt = (player.vel.x * rdx + player.vel.y * rdz) / Math.max(1e-6, rd) / player.scale; const want = !FREE && (rd < 0.9 * player.scale || (rd < 2.4 * player.scale && rt > 0.35)); const was = machineRoom.door.open; machineRoom.door.update(dt, want); if (machineRoom.door.open !== was) log.ev("world", "door", { which: "room", open: machineRoom.door.open }); } // log:
   if (inRoom && sel && sel.head) {
-    // the machine room: the head's detail follows the camera's distance as the walk-in head's did (its entry view at 0.57)
+    // the machine room: the head's detail follows the camera's distance from its machines (their entry view at 0.57)
     const h = sel.head; const dist = camera.position.distanceTo(controls.target);
     detailNow = roomDetail(h, !!sel.focusId); h.setDetail(detailNow);
     h.update(t, live && !moving ? 0 : dt, playS); // the playhead itself: past a live run's last instant warp(t) stops
-    camera.near = Math.max(0.02, Math.min(0.3, dist * 0.02));
-    // the free camera cannot be dragged into the machines: a machine in focus keeps half its framing distance
-    controls.minDistance = sel.focusId ? Math.max(0.5, 0.55 * (sel.focusDist || 1)) : Math.min(ROOM.minDist, roomEntry.dist * 0.4);
+    if (FREE) { camera.near = Math.max(0.02, Math.min(0.3, dist * 0.02)); controls.minDistance = sel.focusId ? Math.max(0.5, 0.55 * (sel.focusDist || 1)) : Math.min(ROOM.minDist, roomEntry.dist * 0.4); }
+    else camera.near = FP.near * player.scale;
   } else if (!inRoom) {
     if (sel && sel.head && !trans && !headPos(sel.id)) sel = null; // the person left the office
-    camera.near = 0.05; controls.minDistance = 0.9;
+    camera.near = FREE ? 0.05 : FP.near;
   }
   camera.updateProjectionMatrix();
   // the opened capsule's card follows its capsule on screen (it stays where it was once the capsule has arrived)
   if (slipMsg && !inRoom) { const a = active.find((x) => x.msg.id === slipMsg.id); overlay.pinCard(a ? screenPt(a.pos) : null, amb); }
-  if (!REC && !ext && !trans) controls.update();
-  if (inRoom && !ext) { const p0 = camera.position.clone(); machineRoom.contain(camera.position); if (p0.distanceToSquared(camera.position) > 1e-10) camera.lookAt(controls.target); } // inside the room's wall
-  // nothing cuts through the frame: out of furniture, walls and people (the office only)
-  if (!ext && !inRoom && !trans) { pushes.length = 0; const q = rig.resolve(camera.position, { skip: sel && sel.id, out: pushes }); if (q.distanceToSquared(camera.position) > 1e-8) { camera.position.copy(q); camera.lookAt(controls.target); if (amb - pushLogAt > 0.3) { pushLogAt = amb; log.ev("camera", "push", { n: pushes.length, ...pushes[0], by: rig.flight ? rig.flight.kind : orbiting ? "orbit" : "other" }); } } } // log: collision pushes
-  applyExt();
+  if (FREE && !ext && !trans) controls.update();
+  if (FREE && inRoom && !ext) { const p0 = camera.position.clone(); machineRoom.contain(camera.position); if (p0.distanceToSquared(camera.position) > 1e-10) camera.lookAt(controls.target); } // inside the room's wall
+  // the free camera: nothing cuts through the frame (out of furniture, walls and people; the office only)
+  if (FREE && !ext && !inRoom && !trans) { pushes.length = 0; const q = rig.resolve(camera.position, { skip: sel && sel.id, out: pushes }); if (q.distanceToSquared(camera.position) > 1e-8) { camera.position.copy(q); camera.lookAt(controls.target); if (amb - pushLogAt > 0.3) { pushLogAt = amb; log.ev("camera", "push", { n: pushes.length, ...pushes[0], by: rig.flight ? rig.flight.kind : "other" }); } } } // log: collision pushes
+  if (!FREE) stepBody(dt);
   if (liveControls) { if (amb - liveSyncAt > 0.4) { liveSyncAt = amb; liveControls.sync(); } liveControls.update(amb); } // live
   recorder.update();
   if (!REC && !REPLAY) { const c0 = performance.now(); observe(moving); log.charge(performance.now() - c0 - viewMs); viewMs = 0; } // log: camera, mode, world, view
@@ -760,7 +958,9 @@ function subjects() {
 // in a machine room: its parts, machines and stations alike (the first 120), nothing of the office
 function roomSubjects() {
   const h = sel && sel.head; if (!h) return [];
-  return h.states().slice(0, 120).map((id) => { const b = h.boundsOf(id).box; return { kind: "machine", id, min: b.min, max: b.max }; });
+  const out = h.states().slice(0, 120).map((id) => { const b = h.boundsOf(id).box; return { kind: "machine", id, min: b.min, max: b.max }; });
+  if (!FREE) { const b = new THREE.Box3().setFromObject(machineRoom.door.group); out.push({ kind: "exit", id: "exit", min: b.min, max: b.max }); } // the way out: the room's door
+  return out;
 }
 let platesKept = null, platesN = -1;
 const attached = (o) => { let q = o; while (q.parent) q = q.parent; return q === scene; };
@@ -849,23 +1049,60 @@ if (live) {
   };
   live.on("change", rebuildWorld);
   liveControls.rebuild(worldRefs()); placeTicker(playS);
-  if (!REPLAY && !REC) { people.update(playS, 0); const v = startView(); /* the people at their seats first: the view frames them */ camera.position.copy(v.pos); controls.target.copy(v.tgt); controls.update(); } // live: start where the inputs and the person they drive are
   window.live = live;
   live.screen = () => liveControls.screenPositions(camera, innerWidth, innerHeight);
   live.pressControl = (id) => liveControls.press(id);
 }
 
+// on foot: start just inside the door (the people at their seats first: the spawn turns to see them)
+if (!FREE) { people.update(playS, 0); spawn(); }
+
 // ---------------------------------------------------------------- drawing: the office or a machine room, then the overlay over it
-function render() { renderer.render(inRoom ? machineRoom.scene : scene, camera); overlay.render(renderer); }
+function render() {
+  renderer.render(inRoom ? machineRoom.scene : scene, camera);
+  if (!FREE && !THIRD) body.render(renderer, camera); // the arms, over the world (they never cut into it)
+  overlay.render(renderer);
+}
 
 // ---------------------------------------------------------------- live loop / film hooks
 window.DURATION = LOOP * 1000;
-window.state = () => ({ system: SYSTEM, playS, t: tNow(), paused, speedIndex, sel: sel && { id: sel.id, stage: sel.stage, focusId: sel.focusId }, machineRoom: inRoom ? sel && sel.id : null, slip: slipMsg, card: overlay.rects().card, boardStatus, headStatus, loop: LOOP, actors: sim.actors.length, hub: plan.hub, room: [RW, RD] });
+window.state = () => ({ fp: FREE ? null : { at: xyz(player.pos), yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3), scale: +player.scale.toFixed(2), locked, auto: !!player.auto, door: +building.door.k.toFixed(2), roomDoor: +machineRoom.door.k.toFixed(2) }, system: SYSTEM, playS, t: tNow(), paused, speedIndex, sel: sel && { id: sel.id, stage: sel.stage, focusId: sel.focusId }, machineRoom: inRoom ? sel && sel.id : null, slip: slipMsg, card: overlay.rects().card, boardStatus, headStatus, loop: LOOP, actors: sim.actors.length, hub: plan.hub, room: [RW, RD] });
 window.api = { sim, plan, cfg, scene, camera, controls, people, stations, desks, tubes, building, board: () => board, heads, headFor, machineRoom, overlay, ticker, models,
   select, enterHead, focusHead, frameAll, startView, personPts, boxPts, inFrame, hiddenPerson, back, openCapsule, walkTo, flyTo, home, homeView, togglePause, setSpeed, click, pickAt, perform, intentOf, recorder: () => recorder,
   setPlay: (s) => (playS = s), getPlay: () => playS, setPaused: (b) => (paused = b), setDisplayPaused: (b) => (displayPaused = b), clearSpot: () => (spot = null),
   reset: () => { if (inRoom) swapOut(); trans = null; overlay.setIris(0); sel = null; slipMsg = null; overlay.closeCard(); spot = null; flight = null; rig.stop(); board && board.highlight({}); }, rig, frameOf, leaveHead, inRoom: () => inRoom, render,
-  getActive: () => tubes.active, tick: (sec) => { for (let i = 0; i < Math.round(sec * 30); i++) step(1 / 30); } };
+  getActive: () => tubes.active, tick: (sec) => { for (let i = 0; i < Math.round(sec * 30); i++) step(1 / 30); },
+  fp: { player, spawn, spawnPose, officeWorld, body, approachTo, goalFor, aim: () => aimPoint(), locked: () => locked, busy: () => !!player.auto, last: () => lastApproach } };
+// for the tools (tools/explore.mjs, live/test-live.mjs): walk the visitor up to something the way a visitor would
+// (the autopilot steers the walker round the furniture), face it, and say when they are there; then the tool
+// clicks at its screen point (no pointer lock) or at the crosshair (locked)
+let lastApproach = null;
+function goalFor(spec) {
+  const P = (o) => o.getWorldPosition(v3()), N = (o) => { const n = v3(0, 0, 1).applyQuaternion(o.getWorldQuaternion(new THREE.Quaternion())); n.y = 0; return n.normalize(); };
+  if (spec.exit) { if (!inRoom) return null; const d = machineRoom.doorPoints(); return { through: d.out, look: d.look }; }
+  if (spec.headState || spec.headEvent) { const h = sel && sel.head; if (!h || !inRoom) return null; let p = null; if (spec.headState) { const b = h.boundsOf(spec.headState); p = b && b.box && b.box.getCenter(v3()); } else { const a = h.affordances().find((x) => x.event === spec.headEvent && x.object); p = a && P(a.object); } if (!p) return null; const d = Math.hypot(p.x - player.pos.x, p.z - player.pos.z); return { look: p, at: p, dist: Math.min(d, 0.8 * reachFor("head")), maxDist: 0.9 * reachFor("head") }; }
+  if (spec.control) { const it = liveControls && liveControls.items.get(spec.control); if (!it) return null; const p = P(it.ui.group); return { look: p, at: p, normal: N(it.ui.group), dist: 1.05, maxDist: 2.2 }; }
+  if (spec.actor) {
+    const a = sim.actor(spec.actor), st = stations.byId.get(spec.actor);
+    if (st) { const p = P(st.group).add(v3(0, 1.1, 0)); return { look: p, at: p, normal: N(st.group), dist: 1.7, maxDist: 2.6 }; }
+    const seat = people.seatOfActor(spec.actor, playS); const c = headPos(spec.actor); if (!a || !seat || !c) return null;
+    const f = seat.avatar.root.rotation.y, n = v3(Math.sin(f), 0, Math.cos(f)); const m = models && models.boxOf(spec.actor); const look = m ? m.getCenter(v3()) : c;
+    return { look, at: seat.avatar.root.position.clone(), normal: n, dist: 2.15, maxDist: 2.8 };
+  }
+  if (spec.board) { const c = boardMesh.position.clone(), n = N(boardMesh); return { look: c, at: c, normal: n, dist: Math.min(6.5, Math.max(3.2, plan.board.w * 0.7)) }; }
+  if (spec.ticker) { const b = ticker.box(); const c = b.getCenter(v3()); return { look: c, at: c, normal: N(ticker.root), dist: 1.5 }; }
+  if (spec.recorder) { const b = recorder.box(); const c = b.getCenter(v3()); return { look: c, at: c, normal: v3(0, 0, -1), dist: 1.3 }; }
+  if (spec.door) { const d = plan.door; return { look: v3(d.x, 1.4, d.z), at: v3(d.x, 0, d.z), normal: v3(0, 0, -1), dist: spec.dist ?? 3 }; }
+  if (spec.point) { const p = v3(...spec.point); return { look: spec.look ? v3(...spec.look) : null, at: p, dist: 0.05 }; }
+  return null;
+}
+function approachTo(spec) {
+  const g = goalFor(spec); lastApproach = { spec, ok: null };
+  if (!g) { lastApproach.ok = false; return false; }
+  const r = lastApproach; log.ev("camera", "fly", { kind: "approach", dur: 0, from: xyz(camera.position), to: xyz(g.through || g.at || g.look), tgt: xyz(g.look || g.at), via: 0, auto: true }); // log: the tools' autopilot (the walker walks there)
+  if (!player.approach(g, (ok) => { r.ok = ok || (!!spec.exit && (!inRoom || !!trans)); log.ev("camera", "arrive", { kind: "approach", ok: r.ok }); })) { r.ok = false; return false; } // walking out of a machine room ends the walk there
+  return true;
+}
 if (REC) {
   const { makeFilm } = await import("./film.js");
   const film = makeFilm({ THREE, api: window.api, sim, plan, step, render, setAmb: (a) => (amb = a), camera, controls, cfg });

@@ -179,7 +179,7 @@ export function createControls({ scene, live, still = false }) {
     { const pole = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.7, 0.03), mat("#2b2b2b")); pole.position.y = 0.35; flag.add(pole); const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.02), mat("#d8432f")); cloth.position.set(0.18, 0.58, 0); flag.add(cloth); }
     fixed.time = { group: tc.group }; fixed.pend = { group: pend, w: tc.W - 0.1, last: null }; fixed.flag = { group: flag };
     // the reset lever by the door
-    const rs = new THREE.Group(); rs.position.set(plan.door.x + 0.9, 0, plan.door.z - 1.45); rs.rotation.y = Math.PI / 2; root.add(rs);
+    const rs = new THREE.Group(); rs.position.set(Math.min(R.x1 - 0.5, plan.door.x + (plan.door.w || 1.3) / 2 + 0.8), 0, R.z1 - 0.7); rs.rotation.y = Math.PI; root.add(rs); // beside the door, inside, facing the room
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.1, 0.3), mat(BAKELITE)); post.position.y = 0.55; rs.add(post);
     const head = new THREE.Group(); head.position.set(0, 1.2, 0.2); rs.add(head);
     const rc = { id: "reset", kind: "lever", label: "START OVER", color: "#c43b2e", press: () => live.reset() };

@@ -70,6 +70,8 @@ for (const c of L.cams.filter((c) => c.jump)) {
   if (near.some((e) => e.type === "fly") || flights.some((f) => c.t >= f.t0 && c.t <= f.t1 + 150)) continue; // a flight moves fast at a low frame rate: not a jump
   const orb = L.by("input", "gesture").some((e) => ["orbit", "zoom", "pan", "drag", "pinch"].includes(e.data.kind) && c.t >= e.t - (e.data.ms || 0) - 50 && c.t <= e.t + 1500 * L.slow); // OrbitControls' damping coasts on after the release
   if (orb && L.software) continue; // a drag at 3 fps moves far between frames
+  const walking = L.by("camera", "walk").some((e) => Math.abs(e.t - c.t) < 700 * L.slow) || L.by("input", "gesture").some((e) => e.data.kind === "look" && c.t >= e.t - (e.data.ms || 0) - 50 && c.t <= e.t + 100);
+  if (walking && L.software) continue; // on foot at 3 fps (in a machine room at its scale): a step or a turn is far between frames
   add("camera.jump", 2, c.t, `the camera jumped without a flight (${near.map((e) => e.ch + "/" + e.type).join(", ") || "no event nearby"})`, { pose: [c.px, c.py, c.pz] });
 }
 for (const f of flights.filter((f) => f.end === "interrupt")) add("camera.interrupted", f.by === "pointerdown" || f.by === "keys" ? 1 : 0, f.t0, `a ${f.kind} flight was interrupted by ${f.by} after ${((f.t1 - f.t0) / 1000).toFixed(1)}s`);
@@ -106,6 +108,7 @@ for (const tp of taps) {
   const hitK = tp.data.hit?.[0];
   const m = modeAt(tp.t);
   if (/^(entering|head|machine|leaving):/.test(m)) { if (!tp.data.act) add("tap.head-miss", 1, tp.t, `in ${m.replace(/ .*/, "")}: a tap on ${label(tp.data.hit)} did nothing (no machine, pad or button under it)`, { x: tp.data.x, y: tp.data.y }); continue; }
+  if (hitK === "far") { add("tap.far", 1, tp.t, `a click on ${tp.data.hit[1]} ${tp.data.hit[2] ?? "?"} m away: out of reach (the crosshair said "walk closer")`, { x: tp.data.x, y: tp.data.y }); continue; } // on foot: a hand reaches about 3 m
   if (!tp.data.act) {
     const n0 = near[0];
     add(n0 ? "tap.near-miss" : "tap.dead", n0 ? 2 : 1, tp.t, n0 ? `tap hit ${label(tp.data.hit)} and did nothing; ${n0[0]} ${n0[1]} was ${n0[2]} px away${n0[2] === 0 ? " (inside its outline)" : ""}` : `tap hit ${label(tp.data.hit)} and did nothing`, { x: tp.data.x, y: tp.data.y, hit: tp.data.hit, near: tp.data.near });
@@ -135,9 +138,12 @@ if (S.live) for (const a of acts.filter((e) => ["press", "advance", "headSend"].
 if (S.live) {
   const cons = L.by("world", "consequence");
   if (cons.length) for (const c of cons) {
-    if (c.data.head) { if (c.data.machines?.length && !c.data.seen?.length) add("live.consequence-offscreen", 3, c.t - 2000, `${c.data.id}: the machine whose marble moved (${c.data.machines.join(", ")}) was not in view`); continue; }
+    // on foot nothing turns the visitor: a consequence out of view is pointed at (a chevron on the screen's edge, a
+    // pulsing ring on the floor), which is weaker than seeing it but is the visitor's to follow
+    const sevOf = () => (c.data.cued ? 1 : 3), cuedNote = () => (c.data.cued ? " (cued: a chevron pointed at it)" : "");
+    if (c.data.head) { if (c.data.machines?.length && !c.data.seen?.length) add("live.consequence-offscreen", sevOf(), c.t - 2000, `${c.data.id}: the machine whose marble moved (${c.data.machines.join(", ")}) was not in view${cuedNote()}`); continue; }
     const miss = (c.data.actors || []).filter((a) => !(c.data.seen || []).includes(a));
-    if (miss.length || c.data.control === false) add("live.consequence-offscreen", 3, c.t - 2000, `press ${c.data.id}: what it caused was off screen 2 s later (${[...miss.map((a) => `actor ${a}`), ...(c.data.control === false ? ["the control"] : [])].join(", ")} not in view${c.data.flew ? ", after a reveal flight" : ""})`);
+    if (miss.length || c.data.control === false) add("live.consequence-offscreen", sevOf(), c.t - 2000, `press ${c.data.id}: what it caused was off screen 2 s later (${[...miss.map((a) => `actor ${a}`), ...(c.data.control === false ? ["the control"] : [])].join(", ")} not in view${c.data.flew ? ", after a reveal flight" : ""})${cuedNote()}`);
   }
   else for (const p of L.by("world", "press").filter((e) => e.data.ok)) {
     const who = /^in:([^:]+):/.exec(p.data.id || "")?.[1]; if (!who) continue;

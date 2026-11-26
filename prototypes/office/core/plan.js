@@ -17,7 +17,7 @@
 // lowest free one; a slot is busy from arrival until the leaver has walked out.
 // Everything in metres; y up; north = -z; desks face south (+z), toward the visitor.
 
-export const DESK_W = 3.2, DESK_D = 3.6, VISITOR_D = 1.7, WALK = 3.0, LEAVE = 3.4;
+export const DESK_W = 3.2, DESK_D = 3.6, VISITOR_D = 1.7, WALK = 4.0, LEAVE = 4.4; // WALK: from outside the door to the seat
 const MAX_SIDE = 6, MAX_COLS = 6;
 
 export function makePlan(sim, cfg = {}) {
@@ -210,17 +210,22 @@ export function makePlan(sim, cfg = {}) {
   // keep each north station roughly above its partners when there is room
   for (let pass = 0; pass < 3; pass++) for (let i = 0; i < north.length; i++) { const want = Math.max(room.x0 + 2.2, Math.min(room.x1 - 2.2, centroidX(north[i].id))); const lo = i ? north[i - 1].x + STW : room.x0 + 2.2; const hi = i < north.length - 1 ? north[i + 1].x - STW : room.x1 - 2.2; if (lo <= hi) north[i].x = Math.max(lo, Math.min(hi, want)); }
   if (prev) { const same = ["x0", "x1", "z0", "z1"].every((k) => Math.abs(room[k] - prev.room[k]) < 1e-9); if (same) for (const s of north) { const ps = prev.stations.find((q) => q.id === s.id && q.wall === "north"); if (ps) s.x = ps.x; } }
-  const door = { x: room.x0, z: room.z1 - (small ? 2.2 : 3.2) };
-  const users = stations.filter((s) => s.kind === "user"); users.forEach((s, i) => { s.x = room.x0 + 1.3; s.z = door.z - 2.8 - i * 3.0; s.facing = Math.PI / 2; s.wall = "west"; });
+  // the door: in the south wall near its east end, so a visitor who comes in faces the room, the board on the west
+  // wall ahead and to the left, the stations on the north wall beyond the people (world/building.js cuts the opening)
+  const door = { x: room.x1 - (small ? 1.9 : 2.6), z: room.z1, wall: "south", w: 1.3, h: 2.45 };
+  const users = stations.filter((s) => s.kind === "user"); users.forEach((s, i) => { s.x = room.x0 + 1.3; s.z = room.z1 - 2.8 - i * 3.0; s.facing = Math.PI / 2; s.wall = "west"; });
   const clocks = stations.filter((s) => s.kind === "timer"); clocks.forEach((s, i) => { s.x = room.x1 - 3.5 - i * 3; s.z = room.z0 + 0.2; s.wall = "north"; s.clock = true; });
   const clock = clocks.length ? { x: clocks[0].x, z: clocks[0].z } : { x: room.x1 - 3.5, z: room.z0 + 0.2 };
-  const westFree0 = room.z0 + 1.2, westFree1 = (users.length ? users[users.length - 1].z - 1.8 : door.z - 1.6);
+  const westFree0 = room.z0 + 1.2, westFree1 = (users.length ? users[users.length - 1].z - 1.8 : room.z1 - 1.6);
   const bw = Math.max(3, Math.min(7.2, (westFree1 - westFree0) * 0.95));
   let board = { x: room.x0 + 0.15, z: (westFree0 + westFree1) / 2, w: bw, h: bw * 900 / 1600, wall: "west" };
   // a small live room (cfg.boardNorth): the board hangs on the north wall behind the people, left of the clock, where the start view
   // (in front of the desk, from the console's side) sees it whole above their heads
   if (small && cfg.boardNorth && !north.length) { const a = room.x0 + 0.6, b = clock.x - 1.7; const w = Math.min(3.3, b - a); if (w >= 2.6) board = { x: b - w / 2, z: room.z0 + 0.15, w, h: w * 900 / 1600, wall: "north", y: 1.85 + (w * 900 / 1600) / 2 }; }
-  const directory = { x: room.x0 + 0.15, z: Math.min(room.z1 - 1.0, door.z + (small ? 1.5 : 1.9)) };
+  // the directory hangs on the east wall by the door, facing the room (behind a visitor who comes in, so it does not
+  // fill their first look); the visitor spawns just inside the door
+  const directory = { x: room.x1 - 0.15, z: room.z1 - (small ? 2.7 : 3.6), wall: "east" };
+  const spawn = { x: door.x, z: room.z1 - 1.15 };
   const hubXZ = groups.get("hub") ? { x: groups.get("hub").x, z: groups.get("hub").z } : { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 };
 
   return {
@@ -229,7 +234,7 @@ export function makePlan(sim, cfg = {}) {
         i = -1; for (let j = 0; j < L.length; j++) if (L[j][0] <= t) i = j; if (i < 0) i = 0; }
       return { ...seatOfLife(id, i), life: i, slot: slotOf.get(`${id}#${i}`) ?? 0, group: groupOf.get(id) }; },
     seatOfLife, slotOf: (id, i) => slotOf.get(`${id}#${i}`), seats,
-    stations, machines, attached, room, small, door, board, hubXZ, clock, directory, killed, blackouts, reasonOf, vanishes,
+    stations, machines, attached, room, small, door, spawn, board, hubXZ, clock, directory, killed, blackouts, reasonOf, vanishes,
     weight: w, partners: (id) => [...(partners.get(id) || [])],
   };
 }

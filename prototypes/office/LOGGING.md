@@ -10,9 +10,9 @@ and analyse it.
 |---|---|
 | `engine/log.js` | the stream, its rings and events, export, the crash copy, the error hooks |
 | `engine/view.js` | what is in frame: subjects on screen and their size, the selected one hidden or not, readable plates |
-| `engine/recorder.js` | the orange FLIGHT RECORDER box on the wall above the door |
+| `engine/recorder.js` | the orange FLIGHT RECORDER box on the south wall beside the door |
 | `main.js` (`// log:` lines) | the hooks: session, frames, input gestures, picks, actions (`perform`), modes, world, view |
-| `world/camera.js` (`// log:` lines) | flights, arrivals, interruptions, collision pushes |
+| `world/camera.js` (`// log:` lines) | the film's flights, arrivals, interruptions, collision pushes |
 | `tools/logfile.mjs` | reads a log (`.json` or `.json.gz`) for the tools |
 | `tools/replay.mjs` | watch it: frames, contact sheets, a video |
 | `tools/analyse.mjs` | findings with timestamps and severities |
@@ -21,7 +21,7 @@ and analyse it.
 ## For the owner: capturing a log
 
 Use the Office as you normally would; when something feels wrong, press the orange FLIGHT RECORDER
-box on the wall above the door (or the `L` key), and your browser saves `office-log-<time>.json.gz`
+box on the wall beside the door (walk up to it; or the `L` key), and your browser saves `office-log-<time>.json.gz`
 (it saves a file and sends nothing). Send us that file. If the page tends to crash or hang, add
 `&log=1` to the address before you start: a copy is then kept every 10 s, and the recorder pressed
 after a reload saves the crashed session too (as `previous`).
@@ -33,15 +33,24 @@ node tools/analyse.mjs office-log-....json.gz [--out findings.json]
 node tools/replay.mjs  office-log-....json.gz [--out dir] [--fps 10] [--from 12 --to 30] [--video]
 node tools/explore.mjs --system single-microwave --persona clicker --seconds 60   # make one here
 node tools/explore.mjs --live microwave --script tools/scripts/owner1.json --out out/owner1-after   # a visit, step by step
+node tools/explore.mjs --live microwave --script tools/scripts/microwave-story.json --lock          # the same with the pointer captured
+node tools/replay.mjs  office-log-....json.gz --third     # watch from behind the visitor, drawn as a block person
 ```
+(`explore.mjs` has no `--help`: any run starts a visit.)
 
 A script (`--script`) is a list of steps done with real input, in order: hold a key for some app
-milliseconds, tap a control, a person, an event button or a machine in a machine room, its exit (`exit: true`) or an opened card's stamp (`cardClose: true`), wait, Escape. Its taps go
-to the screen points the page reports for what each step names, so a script survives layout changes.
+milliseconds (the keys walk the visitor), tap a control, a person, the board, the printer, the recorder, an event
+button or a machine in a machine room, its door (`exit: true`: walks out through it) or an opened card's stamp
+(`cardClose: true`), wait, Escape. The visitor is on foot, so a tap first walks up to what it names (the page's
+autopilot, `window.api.fp.approachTo`, steers the real walker round the furniture and turns it to face the thing)
+and then clicks at the screen point the page reports (or, with `--lock`, at the crosshair after turning the view with
+real mouse movements), so a script survives layout changes and exercises the controller. By default the page runs
+with `?nolock=1`.
 `tools/scripts/owner1.json` is the owner's first logged visit (2026-11-26), step for step.
 
-`replay.mjs` opens the same URL with `?replay=1` at the log's viewport. The page then keeps no
-clock or camera of its own: the tool steps it by the log's app time, sets the playhead and the
+`replay.mjs` opens the same URL with `?replay=1` at the log's viewport (with `--third`, `&third=1`: the camera
+behind and above the visitor, who is drawn as a whole block person where they stood). The page then keeps no
+clock or camera of its own (the logged pose is the visitor's eye: the walker is put there, its doors open for it): the tool steps it by the log's app time, sets the playhead and the
 camera pose from the camera channel, and performs the visitor's actions (the `act` channel) at the
 moments they happened, awaiting live presses. Each frame gets a strip below the 3D view (time, app
 time, mode, last tap and what was near it, what is in view, flights, gestures, errors) and pointer
@@ -70,7 +79,7 @@ it. Events `session/start`, `ready` (ms to first frame), `resize`, `visibility`,
 | Ring | Fields | When |
 |---|---|---|
 | `frame` | `t, dt, work` (ms; `work` = the previous frame's step + render) | every frame, 131072 rows (36 min at 60 Hz) |
-| `camera` | `t, px, py, pz, tx, ty, tz, fov, playS, jump` | every 66 ms and on every jump (> 0.75 m in one frame), 16384 rows |
+| `camera` | `t, px, py, pz, tx, ty, tz, fov, playS, jump` (on foot: `p` the eye, `t` a point 1 unit ahead of it) | every 66 ms and on every jump (> 0.75 m in one frame), 16384 rows |
 | `pointer` | `t, x, y, buttons, type (0 mouse, 1 touch, 2 pen), id` | moves at <= 30 Hz with a button down, <= 10 Hz hovering; every down and up |
 
 **Events by channel**
@@ -78,12 +87,12 @@ it. Events `session/start`, `ready` (ms to first frame), `resize`, `visibility`,
 | Channel | Types and data |
 |---|---|
 | `frame` | `long {dt, work, tags, sev}` for dt > 32 ms, with what the previous frame did (`flight:*`, `act:*`, `rebuild`, `head-built`, `board`, `shader`, `view`, `log-save`, `first-frame`); `sec {fps, p50, p95, max, calls, tris, work}` each second |
-| `input` | `down/up {x, y, type, id}`, `cancel`, `wheel {x, y, dy, dx, mode}`, `key {key, down}`, `gesture {kind: tap, hold, drag, orbit, zoom, pan, pinch, board-tap, board-drag, ...}` (what the app made of it) |
-| `pick` | `tap {x, y, hit: [kind, id] or null, act, near: [[kind, id, px, %screen]...]}` (`near`: subjects whose screen outline is within 40 px; 0 = inside it); `hover {x, y, hit, cursor}` on every change of target or cursor |
-| `act` | one per action (`perform` in main.js), replayable: `select {id}`, `enter` (into the selected person's machine room), `exit` (its exit control), `focus {state, point}`, `back`, `slip {id}` (open a capsule's card), `closeCard {how: x, floor}` (its stamp; a tap on the floor, a wall or nothing), `walk {point}`, `press {id}`, `headSend`, `advance`, `now`, `pause`, `speed {i}`, `seek {s}`, `home`, `deselect`, `board {type, u, v, extra}`, `ticker {u, v}` (a tap on the printer's tape), `system {id}`, `export`; `src` input or replay |
-| `camera` | `walk {keys, head}` (`head`: in a machine room; twice a second at most while walking), `fly {kind, dur, from, to, tgt, via}` (`kind: reveal`: turned to show what a press caused; `enter` / `leave`: the iris into and out of a machine room: `from`/`to` are office points and the camera jumps between the two places in its middle), `arrive {kind}`, `interrupt {kind, k, by}`, `push {n, box, person, axis, d, by}` (out of furniture), `limit {which}` (orbit limits while dragging) |
+| `input` | `down/up {x, y, type, id}`, `cancel`, `wheel {x, y, dy, dx, mode}`, `key {key, down}`, `lock {on, refused}` (the pointer captured or released), `gesture {kind: tap (x, y where it acted: the crosshair when captured; locked), hold, look (a drag that turned the view), stick (the touch stick), board-tap, board-drag; older logs: drag, orbit, zoom, pan, pinch}` (what the app made of it) |
+| `pick` | `tap {x, y, hit: [kind, id] or ["far", "kind:id", metres] (out of reach) or null, act, near: [[kind, id, px, %screen]...]}` (`near`: subjects whose screen outline is within 40 px; 0 = inside it); `hover {x, y, hit, cursor}` on every change of what the crosshair (or the pointer) is on |
+| `act` | one per action (`perform` in main.js), replayable: `select {id}`, `enter {id}` (into that person's machine room; older logs: the selected person's), `exit {how: door}` (out of a machine room through its door), `exit` (its exit control), `focus {state, point}`, `back`, `slip {id}` (open a capsule's card), `closeCard {how: x, floor}` (its stamp; a tap on the floor, a wall or nothing), `walk {point}` (older logs; on foot a floor tap does nothing), `press {id}`, `headSend`, `advance`, `now`, `pause`, `speed {i}`, `seek {s}`, `home` (on foot: a fade back to the door), `deselect`, `board {type, u, v, extra}`, `ticker {u, v}` (a tap on the printer's tape), `system {id}`, `export`; `src` input or replay |
+| `camera` | `walk {keys, head, at}` (the walker moved: its keys, `auto` for the tools' autopilot, `stick`; `head`: in a machine room; `at` [x, z]; twice a second at most), `fly {kind, dur, from, to, tgt, via}` (`kind: spawn`: placed at the door (at the start, `why: home` for H; a teleport, not a jump); `approach`: the tools' autopilot set off, `auto: true`; `enter` / `leave`: the iris into and out of a machine room: the walker is put in the other place in its middle; the film's and older logs': `reveal`, `move`), `arrive {kind, ok}`, `interrupt {kind, k, by}`, `push {n, box, person, axis, d, by}` and `limit {which}` (the film's free camera; older logs) |
 | `mode` | `change {from, to, cause}`: `overview`, `person:<id>`, `station:<id>`, `entering:<id>` (the iris closing on the person), `head:<id>` (in their machine room), `machine:<id>` (a machine of it in focus), `leaving:<id>`, plus ` +slip`, ` +paused`, and in live mode ` +rest`, ` +playing`, ` +past` |
-| `world` | `press {id, ok, why, queued, stepping, pending}` (also `head:<event>` for a dim button in a machine room, refused with its reason) (a refusal's reason as the control shows it; `queued`: pressed while the last press still played), `consequence {id, actors, seen, control, flew}` 2 s after a press (the people it changed and which were on screen and unhidden; in a machine room `{head: true, machines, seen}`), `ticker {key, actors, text}` (a printed line selected), `head {id, how: built or refreshed}`, `tick {playS, t, rate}` each second, `people {arrive, leave}`, `room {id, in}` (the visitor arrives in a machine room, or leaves it: the swap in the iris's middle), `card {id, open, how}` (a capsule's card opened, or closed: `x` its stamp, `floor`, `esc`, `enter`, `home`), `detail {id, d}` (a head's detail as it changes), `rebuild {ms, events, actors}` (live) |
+| `world` | `press {id, ok, why, queued, stepping, pending}` (also `head:<event>` for a dim button in a machine room, refused with its reason) (a refusal's reason as the control shows it; `queued`: pressed while the last press still played), `consequence {id, actors, seen, control, flew, cued}` 2 s after a press (`cued`: on foot, out of view, so pointed at by rings and an edge chevron) (the people it changed and which were on screen and unhidden; in a machine room `{head: true, machines, seen}`), `ticker {key, actors, text}` (a printed line selected), `head {id, how: built or refreshed}`, `tick {playS, t, rate}` each second, `people {arrive, leave}`, `room {id, in, scale}` (the visitor arrives in a machine room, or leaves it: the swap in the iris's middle; `scale`: the walker's scale there), `door {which: office or room, open, by: visitor or people}` (a door opens or shuts), `card {id, open, how}` (a capsule's card opened, or closed: `x` its stamp, `floor`, `esc`, `enter`, `home`), `detail {id, d}` (a head's detail as it changes), `rebuild {ms, events, actors}` (live) |
 | `view` | `frame` twice a second: `in [[kind, id, x0, y0, x1, y1, %screen]...]` (largest first; kinds include `model`, a desk model), `n {kind: count}`, `sel {id, on, pct, occ}`, `plates`, `readable` (glyph >= 9 px), `bestGlyph`, `pickable`; `card [x0, y0, x1, y1]` while a capsule's card is open; in a machine room the subjects are its parts (`machine`, the first 120) and the `exit` control, plus `room` (whose) and `head {focus, inside, clipped, shown}` (the machine the camera is inside of, if any; plates of what is in focus cut by the frame's edge) |
 | `error` | `error`, `rejection`, `resource`, `console {level, msg}`, `fetch {url, status or msg}`, `webgl-lost`, `webgl-restored` |
 
@@ -104,10 +113,10 @@ checked against the owner's first real log.
 | `camera.orbit-pushed`, `camera.limits`, `camera.zoom-bounce` | dragging into furniture; orbit limits hit again and again; zooming in and out |
 | `camera.nothing`, `view.no-plates`, `view.readable-share` | looking at nothing pickable; nothing readable |
 | `view.card-offscreen`, `view.card-closed` | an opened card reached past the screen; how each card was closed (information) |
-| `tap.dead`, `tap.near-miss`, `tap.other`, `tap.repeat`, `tap.rage`, `tap.scenery`, `tap.head-miss` | taps that did nothing, missed something close, hit the wrong thing, repeated, clustered, landed on desks, or hit nothing inside a head |
+| `tap.dead`, `tap.near-miss`, `tap.other`, `tap.repeat`, `tap.rage`, `tap.scenery`, `tap.head-miss`, `tap.far` | taps that did nothing, missed something close, hit the wrong thing, repeated, clustered, landed on desks, hit nothing inside a head, or were out of reach |
 | `hover.cursor-only`, `hover.touch`, `input.hold` | feedback before a tap |
 | `comp.first-success`, `comp.head-bounce`, `comp.regret`, `comp.lost`, `comp.modes` | comprehension proxies |
-| `live.consequence-offscreen` | a press whose consequence was off screen: the people it changed not in view (or hidden) 2 s later, or in a machine room no machine whose marble moved; older logs: the driven person (`in:<actor>:...`) missing from the view 1 to 2.5 s after |
+| `live.consequence-offscreen` | a press whose consequence was off screen (severity 1 when it was cued, on foot): the people it changed not in view (or hidden) 2 s later, or in a machine room no machine whose marble moved; older logs: the driven person (`in:<actor>:...`) missing from the view 1 to 2.5 s after |
 | `live.refused`, `live.queued` | a refused press with no reason shown (older builds) or with one (info); a press made while the last still played |
 | `selection.lost-walking` | a walking key deselected the selected person, or left their mode for the overview |
 | `head.camera-inside`, `head.plate-clipped`, `head.too-near` | in a machine room: the camera inside a machine; plates of the focused machine cut by the frame's edge; older logs: a plate over a tenth of the screen tall while a machine is in focus |

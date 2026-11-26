@@ -1,5 +1,5 @@
 // world/people.js: everyone who works here, pooled by seat. An actor's life takes a seat (plan),
-// walks in from the door (or, an invoked child, from its parent's desk to the visitor's stool),
+// walks in from outside through the door (or, an invoked child, from its parent's desk to the visitor's stool),
 // works there, and walks out when it ends; the next occupant of that seat reuses the avatar.
 // Posture comes from core/situation.js (no per-system table); office.json may map states to poses.
 // A mass end at one instant (a process kill) is a blackout: everyone vanishes in the dark, and the
@@ -16,7 +16,10 @@ const REACT_GAP = 3.0; // a reaction plays once per event; events closer than th
 export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map(), desks = null) {
   const keyOf = (s) => `${s.x.toFixed(2)},${s.z.toFixed(2)}`;
   const V = (x, z) => new THREE.Vector3(x, 0, z);
-  const door = V(plan.door.x + 0.3, plan.door.z);
+  // the door is a real opening in the south wall (world/building.js): people come from outside, straight through it,
+  // and leave the same way; `doorTraffic(s)` says when the door should be open for them
+  const dz = plan.door.z, dx = plan.door.x;
+  const outside = V(dx, dz + 3.2), stepOut = V(dx, dz + 0.9), stepIn = V(dx, dz - 0.9), door = V(dx, dz - 1.9);
   const W = sim.warp;
 
   // ---- mass ends: blackouts (from the plan) ----
@@ -35,11 +38,15 @@ export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map(),
       const kill = plan.vanishes(a.id, i); const reason = plan.reasonOf(a.id, i);
       let path = null;
       if (seat.visitor && seat.parentSeat) path = curve([V(seat.parentSeat.x + 0.6, seat.parentSeat.z + 0.5), V(seat.x, seat.z - 0.7), V(seat.x, seat.z)]);
-      else if (seat.hub) path = curve([door, V(door.x + 1.4, door.z), V(seat.x, door.z), V(seat.x, seat.z - 3.4), V(seat.x, seat.z - 1.0), V(seat.x, seat.z)]);
-      else path = curve([door, V(door.x + 1.4, door.z), V(seat.x, seat.z - 1.7), V(seat.x, seat.z - 0.6), V(seat.x, seat.z)]);
+      else if (seat.hub) path = curve([outside, stepOut, stepIn, door, V(seat.x, door.z), V(seat.x, seat.z - 3.4), V(seat.x, seat.z - 1.0), V(seat.x, seat.z)]);
+      else { // round the bay and along the aisle behind the row, not across the desks
+        const g = plan.groups.find((x) => x.id === plan.groupOf(a.id)); const az = seat.z - 1.6;
+        const side = g && g.kind === "bay" ? (dx > g.x ? g.x + g.w / 2 + 0.5 : g.x - g.w / 2 - 0.5) : null;
+        path = curve(side === null ? [outside, stepOut, stepIn, door, V(seat.x, seat.z - 1.7), V(seat.x, seat.z - 0.6), V(seat.x, seat.z)] : [outside, stepOut, stepIn, door, V(side, Math.max(az, Math.min(door.z, g.z + g.d / 2 + 0.6))), V(side, az), V(seat.x, az), V(seat.x, seat.z - 0.6), V(seat.x, seat.z)]);
+      }
       // done: tidy up and walk out; cancelled: fetched away by the parent (out past its desk)
       const ps = seat.parentSeat || (sim.actor(a.id).parent && plan.seatOf(sim.actor(a.id).parent, e === Infinity ? b : e - 1e-6));
-      const outPath = reason === "cancelled" && ps && ps.x !== undefined ? curve([V(seat.x, seat.z), V(ps.x + 0.7, ps.z + 1.3), V(ps.x + 0.7, ps.z - 1.6), V(door.x + 1.4, door.z), door]) : seat.visitor ? curve([V(seat.x, seat.z), V(seat.x + 0.9, seat.z + 0.9), V(door.x + 1.4, door.z), door]) : null;
+      const outPath = reason === "cancelled" && ps && ps.x !== undefined ? curve([V(seat.x, seat.z), V(ps.x + 0.7, ps.z + 1.3), V(ps.x + 0.7, ps.z - 1.6), door, stepIn, stepOut, outside]) : seat.visitor ? curve([V(seat.x, seat.z), V(seat.x + 0.9, seat.z + 0.9), door, stepIn, stepOut, outside]) : null;
       seats.get(key).occ.push({ id: a.id, life: i, bornS, endS, kill, reason, path, outPath });
     });
   }
@@ -125,10 +132,24 @@ export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map(),
     }
     return dark;
   }
+  // where an occupant is at s while walking in or out (null: seated, or not walking)
+  function walkPos(o, s) {
+    if (o.bornS > -Infinity && o.path && s >= o.bornS && s < o.bornS + WALK) return o.path.getPointAt(ease(clamp01((s - o.bornS) / WALK)));
+    if (s >= o.endS && !o.kill && s < o.endS + LEAVE) { const f = clamp01((s - o.endS - 0.6) / (LEAVE - 0.8)); if (f <= 0) return null; const p = o.outPath || o.path; return p.getPointAt(o.outPath ? ease(f) : 1 - ease(f)); }
+    return null;
+  }
+  /** is anyone at the door now or about to be (within `ahead` playback seconds): the door opens ahead of them */
+  function doorTraffic(s, ahead = 0.9, r = 2.0) {
+    for (const seat of seats.values()) for (const o of seat.occ) {
+      if (!(s >= o.bornS - ahead && s < o.bornS + WALK) && !(s >= o.endS && s < o.endS + LEAVE)) continue;
+      for (const k of [0, ahead / 2, ahead]) { const p = walkPos(o, s + k); if (p && Math.hypot(p.x - dx, p.z - dz) < r) return true; }
+    }
+    return false;
+  }
   // what the camera keeps out of: a box round everyone in the room now
   function boxes(skipId) { const out = []; for (const seat of seats.values()) { const r = seat.avatar.root; if (!r.visible || !seat.current || seat.current.id === skipId) continue; const h = seat.P && seat.P.sit > 0.5 ? 1.95 : 2.35; /* head top plus a hand's width */ out.push([new THREE.Vector3(r.position.x - 0.36, 0, r.position.z - 0.36), new THREE.Vector3(r.position.x + 0.36, h, r.position.z + 0.36)]); } return out; }
   const seatOfActor = (id, s) => { for (const seat of seats.values()) { const o = occAt(seat, s); if (o && o.id === id) return seat; } return null; };
   function headCenter(id, s, out = new THREE.Vector3()) { const seat = seatOfActor(id, s); if (!seat) return null; seat.avatar.head.updateWorldMatrix(true, false); return seat.avatar.head.getWorldPosition(out); }
   function facingOf(id, s) { const seat = seatOfActor(id, s); return seat ? seat.avatar.root.rotation.y + (seat.avatar.body.rotation.y || 0) : 0; }
-  return { seats, update, occupantOf, headCenter, facingOf, seatOfActor, boxes, blackouts, darkAt, roots: () => [...seats.values()].map((x) => x.avatar.root) };
+  return { seats, update, occupantOf, headCenter, facingOf, seatOfActor, boxes, doorTraffic, blackouts, darkAt, roots: () => [...seats.values()].map((x) => x.avatar.root) };
 }

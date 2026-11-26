@@ -3,7 +3,35 @@
 Any system of statecharts in, an office out. `index.html?system=<name>` loads
 `data/<name>/trace.json` and, when `data/index.json` marks it, `data/<name>/office.json`.
 `node core/make-index.mjs` rewrites `data/index.json` from the `data/` folders. Inside the room,
-the DIRECTORY by the door has a brass plate per system; clicking one switches systems.
+the DIRECTORY on the east wall by the door has a brass plate per system; clicking one switches systems.
+
+**The visitor is on foot, in first person** (2026-11-26, owner: "I don't want to have camera, but I want actually to
+have a Minecraft style avatar moving, so I can explore everything in first person"). There is no orbit or fly
+camera for a visitor any more, and nothing moves or turns them but their own input, the spawn (just inside the
+door, turned to see as much of the room as a standing person can), H (a fade back to the door) and a door into or
+out of a machine room. Controls:
+
+| | Desktop | Touch |
+|---|---|---|
+| look | click the view once (it captures the pointer), then the mouse; without the capture (refused, `?nolock=1`): drag | drag anywhere but the lower left |
+| walk | W A S D or the arrows (← → and Q E turn), Shift runs, Space hops | the stick under the left thumb (a touch in the lower left) |
+| press, pull, open, read | click: what the crosshair is on (captured), or under the pointer; within reach (about 3 m; the board 9 m, the printer's tape 4.5 m), else the crosshair says "walk closer" | tap it |
+| a person's machines | click the person, their desk or the model on it: the iris opens on their machine room | tap |
+| the board | click a row or a face; the wheel scrolls it while the crosshair is on it | tap |
+| back | Escape (it also releases the pointer; a second press, or one with a card or a machine room open, goes back) | — |
+| other | H back to the door, P pause (recorded runs), L save the flight log, [ ] speed, , . seek | — |
+
+A key hint panel sits at the bottom left until the visitor has moved, then one short line. What a press changes out
+of view is pointed at, not flown to: a pulsing ring on the floor under the people it changed and a chevron on the
+screen's edge toward them (in a machine room: toward the machines whose marbles moved), for 4 s.
+
+The office door is a real door (`world/door.js`) in a framed opening in the SOUTH wall near its east end: jambs,
+lintel, architraves, a threshold, a stone step outside, no wall across it. Its leaf is hinged and swings out with
+an eased motion, closed by default; it opens for people walking in or out (`people.doorTraffic`, a moment ahead of
+them: they come from outside, straight through the opening) and for the visitor walking up to it, and shuts behind
+them. The machine room's way out is the same door, with a sign over it; walking through it gives back the office
+exactly where the visitor stood, facing as they were. A plaque on a post beside where they come in says whose
+machines these are.
 
 Checks (node, no browser):
 - `node core/check-situation.mjs [system...]`: per actor, the situation over the loop as a strip
@@ -34,10 +62,13 @@ eye level, after a click, after leaving a head): `node tools/sweep.mjs <dir>`.
 | `world/people.js` | Avatars pooled per seat, walking in and out, poses from situations, one-shot reactions, the swivel chair. |
 | `world/avatar.js` | The rig (joint hierarchy, two-bone IK, a limited roll-free neck) and the poses. |
 | `world/layout.js` | Where things are on a desk, in the seat frame: shared by the desk, the poses and the pose check. |
-| `world/camera.js` | Camera flights along paths, collision against furniture, walls and people, the conversational framing. |
+| `engine/player.js` | The visitor as a first-person walker: acceleration, collision (a circle sliding along boxes), look, a hop, the head bob; the autopilot the tools use to walk up to something (a grid path round the furniture). |
+| `world/body.js` | The visitor's body: block arms in view (they swing as the feet walk, poke on a press), a shadow blob at the feet, and the whole figure for a third-person replay. |
+| `world/door.js` | A real door: frame, threshold, a hinged leaf with an eased swing; the office's and the machine room's. |
+| `world/camera.js` | The film's free camera (`?rec=1`): flights along paths, collision against furniture, walls and people, the conversational framing. Not used by a visitor. |
 | `world/tubes.js` | The comb manifold, routes, instanced capsules, what a capsule carries (`summaryText`). |
-| `world/machineroom.js` | The machine room: a scene of its own where a person's machines (`head/head.js`) stand when the visitor enters them; floor, wall, lights, the mail pipe, the camera's bounds there. Nothing of it is in the office, nothing of the office in it. |
-| `engine/overlay.js` | What is drawn over the view in screen pixels: the iris between the office and a machine room, an opened capsule's card (on screen, on top, with a close stamp), the machine room's exit control and plaque. |
+| `world/machineroom.js` | The machine room: a scene of its own where a person's machines (`head/head.js`) stand when the visitor enters them; floor, the round wall with a doorway, its door and the passage behind it, the plaque, lights, the mail pipe, and the walker's world there (the visitor walks it at a scale of their own, their eye a little above the machines). Nothing of it is in the office, nothing of the office in it. |
+| `engine/overlay.js` | What is drawn over the view in screen pixels: the iris between the office and a machine room, the fade of H, an opened capsule's card (on screen, on top, never over the crosshair, with a close stamp), the first-person HUD (crosshair, "walk closer", the cues, the touch stick, the key hints). |
 | `film.js` | A visit planned from the run. |
 
 ## Generic rules
@@ -63,7 +94,7 @@ eye level, after a click, after leaving a head): `node tools/sweep.mjs <dir>`.
 
 | Kind | Becomes |
 |---|---|
-| user | the hatch by the door ("people at the keyboards") |
+| user | the hatch on the west wall near the door ("people at the keyboards") |
 | timer | the wall clock; a delayed send pops out of the receiver's desk timer |
 | log / storage | an archive whose pile grows |
 | model | an oracle cabinet |
@@ -158,7 +189,11 @@ The desk lamp is on while someone sits there. A charted actor with no datamodel 
 ## Known gaps
 
 - The room is often larger than its contents (the station row on the north wall, the minimum
-  size). The home view frames the room, not the people.
+  size). On foot that is a walk: in a big room the board is 20 m from the door.
+- People still walk round bays on a curve that can graze a desk corner; they walk through the visitor (the visitor
+  is pushed aside).
+- Pointer lock and touch are written for and checked only through synthetic input in headless Chromium (pointer
+  lock is granted there; touch is CDP touch events): not on a real phone or with a real mouse.
 - Waiting between actors needs cause links. Without them, actor-to-actor requests never show as
   waiting.
 - The exception heuristic is partly name-based (English words).

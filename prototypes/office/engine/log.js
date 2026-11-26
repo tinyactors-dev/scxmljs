@@ -14,7 +14,7 @@
 
 export const LOG_SCHEMA = "office-log/1";
 // bump on every change that ships (the log says which build made it)
-export const BUILD = "office-2026-11-26.7";
+export const BUILD = "office-2026-11-26.8";
 
 const KEEP_MS = 12 * 60 * 1000; // events older than this are dropped from the list
 const MAX_EVENTS = 60000;

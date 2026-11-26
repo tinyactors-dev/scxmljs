@@ -1,5 +1,5 @@
-// engine/recorder.js: the FLIGHT RECORDER as a thing in the room: a small orange box on the west
-// wall above the door, one big button and an engraved plate. Pressing it saves this session's log
+// engine/recorder.js: the FLIGHT RECORDER as a thing in the room: a small orange box on the south
+// wall beside the door, one big button and an engraved plate. Pressing it saves this session's log
 // (engine/log.js) as a file on the visitor's machine; nothing is sent anywhere, and the plate says
 // so. The lamp blinks while the file is made and glows green once it is saved.
 //
@@ -11,11 +11,10 @@ import { box, plate } from "../world/kit.js";
 const ORANGE = "#e8731f";
 
 export function buildRecorder(scene, plan) {
-  const R = plan.room, dz = plan.door.z;
+  const R = plan.room, dr = plan.door;
   const root = new THREE.Group(); root.name = "flight-recorder"; scene.add(root);
-  // on the west wall right above the door: the one place by the door that no plan fills (the board,
-  // the directory, the reception hatch and the open door leaf all move with the room's size)
-  root.position.set(R.x0 + 0.17, 3.32, dz - 0.3); root.rotation.y = Math.PI / 2; // its north half: the directory may reach over the door from the south
+  // on the south wall beside the door, at hand height, facing the room: the first thing a visitor passes
+  root.position.set(dr.x - (dr.w || 1.3) / 2 - 0.6, 1.55, R.z1 - 0.17); root.rotation.y = Math.PI;
   const body = box(0.42, 0.34, 0.16, ORANGE); body.position.z = 0.08; root.add(body);
   const bezel = box(0.17, 0.17, 0.03, "#2a2a2a"); bezel.position.set(-0.07, -0.02, 0.17); root.add(bezel);
   const capM = new THREE.MeshLambertMaterial({ color: "#c43b2e", emissive: "#5a0d08", emissiveIntensity: 0.4 });

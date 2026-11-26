@@ -197,8 +197,11 @@ the mail pipe running from the inlet back to the wall, where a plate says the ma
 the room instead of the office while the visitor is in it, and frames the whole machine from the `ENTRY`
 direction. A chart of up to 80 states is opened fully at once (`MIN_PLATE` keeps its plates legible at that
 framing); a bigger one opens at the entry detail (0.57) and further as the camera comes closer or a machine is
-focused. Going in and out is an iris (`engine/overlay.js`) of about half a second; the office keeps running,
-and the exit (a control at the top left, or Escape) gives back exactly the office view the visitor left.
+focused. Going in and out is an iris (`engine/overlay.js`) of about half a second; the office keeps running.
+The visitor is on foot there too (main.js, engine/player.js), at a scale of their own (their eye a little above the
+machines), spawned facing the machines where the whole of them fits in the view; the head's detail follows their
+distance from the machines. The way out is a real door in the room's wall (world/door.js) with a sign over it:
+walking up to it opens it, walking through it (or Escape) gives back the office exactly where the visitor stood.
 
 The head builds no room of its own any more: until 2026-11-26 it had an attic under the skull's dome
 (`room`), mounted inside the person's head in the office behind a hinged lid; the owner found the lid could

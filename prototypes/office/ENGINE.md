@@ -64,3 +64,22 @@ head, and the walk limits under the dome. The overlay is also where the opened c
 top, always on screen, closed by its stamp, a tap on the floor or Escape. Both belong to the future `plates` and
 `modes` pieces; the swap is the first place where `camera` needs a goal in another scene.
 
+
+## On foot (2026-11-26)
+
+Owner: "Camera movements are still a bit off, and the door looks off ... I don't want to have camera, but I want
+actually to have a Minecraft style avatar moving, so I can explore everything in first person." The `camera` piece
+above changes shape: a visitor has no director any more. `engine/player.js` is the walker (state, motion, collision
+against `[min, max]` boxes and a world's own `limit`, and an autopilot for the tools); `main.js` gives it a world
+(`officeWorld`: the furniture, the people, the walls with the door's opening, the leaf while it is shut; the machine
+room's `world` in `world/machineroom.js`) and the input, and puts the camera at its eye each frame. Every automatic
+camera move a visitor had is gone: the reveal after a press (now a cue: rings and an edge chevron), the focus flight
+in a machine room (the head stages the machine where it stands), the start view as a camera position (now the
+spawn: a place and a yaw), the flight to the board, the floor tap that walked, the back and home flights (H fades to
+the door). `world/camera.js` and `flyTo` remain for the film (`?rec=1`, `FREE`), which keeps its free camera.
+
+`perform(action)` is unchanged as the one place intent becomes behaviour; a click on a person is now `enter {id}`
+(select and the iris at once), a click on a station `select` / `deselect`. Taps out of reach are logged with
+`hit: ["far", what, metres]` and do nothing. The tools walk the visitor through `window.api.fp.approachTo(spec)`
+(`{control}`, `{actor}`, `{board}`, `{ticker}`, `{recorder}`, `{exit}`, `{headState}`, `{headEvent}`, `{door}`,
+`{point}`), which drives the real walker, then click as a visitor would.

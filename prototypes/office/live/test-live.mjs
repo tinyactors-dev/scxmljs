@@ -2,8 +2,9 @@
 // Live mode in a real browser (Playwright, software GL). For each system it
 //   1. loads ?live=<system>&still=1 and checks there are no page errors;
 //   2. asserts stillness: two screenshots 3 s apart are pixel-identical;
-//   3. runs the system's script: presses controls by their screen positions (a real mouse click
-//      at the point the page reports), advances the clock, and checks window.live.snapshot();
+//   3. runs the system's script: walks the visitor up to each control (the page's autopilot steers the real
+//      first-person walker), presses it at its screen position (a real mouse click at the point the page
+//      reports), advances the clock, and checks window.live.snapshot();
 //   4. checks the room comes to rest again after each press, and resets.
 // With --shots it writes close-ups of every control to live/out/ (not published) to look at.
 import { createRequire } from "node:module";
@@ -100,10 +101,21 @@ const SCRIPTS = {
   ],
 };
 
-/** Put the camera `dist` m in front of a control (at eye height 1.65 m when `up` is null). */
-async function lookAt(page, c, dist, up) {
-  await page.evaluate(([w, f, dist, up]) => { const a = window.api; a.camera.position.set(w[0] + f[0] * dist + f[2] * 0.25, up === null ? 1.65 : w[1] + up, w[2] + f[2] * dist - f[0] * 0.25); a.controls.target.set(w[0], w[1], w[2]); a.controls.update(); a.tick(0.05); }, [c.world, c.facing, dist, up]);
+/** Stand the visitor `dist` m in front of a control, facing it (for close-up shots only: a press walks there). */
+async function lookAt(page, c, dist) {
+  await page.evaluate(([w, f, dist]) => { const a = window.api, p = a.fp.player; p.place({ x: w[0] + f[0] * dist + f[2] * 0.25, z: w[2] + f[2] * dist - f[0] * 0.25 }); p.face({ x: w[0], y: w[1], z: w[2] }); a.tick(0.05); }, [c.world, c.facing, dist]);
 }
+/** Walk the visitor up to a control the way a visitor would (the page's autopilot drives the real walker round the
+ *  furniture), facing it; the test steps the world faster than it renders. */
+async function walkTo(page, c) {
+  const ok = await page.evaluate((id) => window.api.fp.approachTo({ control: id }), c.id);
+  if (!ok) throw new Error(`cannot walk to ${c.label}`);
+  for (let i = 0; i < 400; i++) { if (!(await page.evaluate(() => { window.api.tick(0.2); return window.api.fp.busy(); }))) break; }
+  const r = await page.evaluate(() => window.api.fp.last());
+  if (!r.ok) throw new Error(`did not reach ${c.label}`);
+}
+/** Back to where a visitor comes in (H without its fade). */
+const atDoor = (page) => page.evaluate(() => { const a = window.api; a.fp.spawn("test"); a.tick(0.05); });
 async function screen(page) { return page.evaluate(() => window.live.screen()); }
 async function settle(page, max = 60000) {
   const t0 = Date.now();
@@ -116,8 +128,8 @@ async function clickControl(page, re, { expectEnabled = true, pick } = {}) {
   const cs = pick ? [pick(all)].filter(Boolean) : all.filter((c) => re.test(c.label));
   if (!cs.length) throw new Error(`no control ${re}: ${(await screen(page)).map((c) => c.label).join(", ")}`);
   const c = cs.find((x) => x.enabled) || cs[0];
-  // fly close to it so the click is a real one at a real point
-  await lookAt(page, c, 1.7, 0.9);
+  // walk up to it so the click is a real one, within reach, at a real point
+  await walkTo(page, c);
   const c2 = (await screen(page)).find((x) => x.id === c.id);
   if (expectEnabled && !c2.enabled) throw new Error(`control ${c.label} is inert`);
   await page.mouse.click(c2.x, c2.y);
@@ -130,13 +142,13 @@ for (const system of only.length ? only : Object.keys(SCRIPTS)) {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-  await page.goto(`${base}?live=${system}&still=1`);
+  await page.goto(`${base}?live=${system}&still=1&nolock=1`); // no pointer lock: the clicks land where the test points
   try { await page.waitForFunction(() => window.ready === true && window.live, null, { timeout: 60000 }); }
   catch { failures++; console.log(`  FAIL does not load: ${errors.join(" | ") || "(no error)"}`); await page.close(); continue; }
   await sleep(500);
   ok(!errors.length, `loads without errors ${errors.slice(0, 3).join(" | ")}`);
-  // stillness at the home view
-  await page.evaluate(() => { const a = window.api; const h = a.homeView(); a.camera.position.copy(h.pos); a.controls.target.copy(h.tgt); a.controls.update(); });
+  // stillness where the visitor comes in
+  await atDoor(page);
   await sleep(600);
   const a1 = await page.screenshot(); await sleep(3000); const a2 = await page.screenshot();
   ok(a1.equals(a2), "still: two screenshots 3 s apart are identical");
@@ -148,7 +160,7 @@ for (const system of only.length ? only : Object.keys(SCRIPTS)) {
     for (const c of cs) {
       const key = c.at + (c.kind === "lever" ? c.id : ""); if (seen.has(key)) continue; seen.add(key);
       // 2 m in front of it, at eye height
-      await lookAt(page, c, 2.0, null);
+      await lookAt(page, c, 2.0);
       await sleep(250);
       await page.screenshot({ path: path.join(outDir, `${system}-control-${c.id.replace(/[^a-z0-9]+/gi, "_")}.png`) });
     }
@@ -157,9 +169,8 @@ for (const system of only.length ? only : Object.keys(SCRIPTS)) {
     try {
       if (st.shot) {
         if (!SHOTS) continue;
-        if (st.of) { const c = (await screen(page)).find((x) => st.of.test(x.label)); if (c) await lookAt(page, c, 2.0, null); }
-        else if (st.pos) await page.evaluate(([p, t]) => { const a = window.api; a.camera.position.set(...p); a.controls.target.set(...t); a.controls.update(); a.tick(0.05); }, [st.pos, st.tgt]);
-        else await page.evaluate(() => { const a = window.api; const h = a.homeView(); a.camera.position.copy(h.pos); a.controls.target.copy(h.tgt); a.controls.update(); a.tick(0.05); });
+        if (st.of) { const c = (await screen(page)).find((x) => st.of.test(x.label)); if (c) await lookAt(page, c, 2.0); }
+        else await atDoor(page);
         await sleep(300); await page.screenshot({ path: path.join(outDir, `${system}-${st.shot}.png`) }); continue;
       }
       if (st.past) {
@@ -173,7 +184,7 @@ for (const system of only.length ? only : Object.keys(SCRIPTS)) {
         ok(!s2.viewingPast && s2.atRest, st.what); continue;
       }
       if (st.check) { ok(st.check(await page.evaluate(() => window.live.snapshot())), st.what); continue; }
-      if (st.inert) { const c = (await screen(page)).find((x) => st.inert.test(x.label)); ok(c && !c.enabled, st.what); if (c) { await lookAt(page, c, 1.7, 0.9); const before = await page.evaluate(() => window.live.snapshot().events); const c2 = (await screen(page)).find((x) => x.id === c.id); await page.mouse.click(c2.x, c2.y); await sleep(300); ok((await page.evaluate(() => window.live.snapshot().events)) === before, "  pressing it does nothing"); } continue; }
+      if (st.inert) { const c = (await screen(page)).find((x) => st.inert.test(x.label)); ok(c && !c.enabled, st.what); if (c) { await walkTo(page, c); const before = await page.evaluate(() => window.live.snapshot().events); const c2 = (await screen(page)).find((x) => x.id === c.id); await page.mouse.click(c2.x, c2.y); await sleep(300); ok((await page.evaluate(() => window.live.snapshot().events)) === before, "  pressing it does nothing"); } continue; }
       if (st.press) { await clickControl(page, st.press, { pick: st.pick }); }
       else if (st.advance) { for (let i = 0; i < (st.advance === true ? 1 : st.advance); i++) { await clickControl(page, /ADVANCE TIME/); await settle(page); } }
       else if (st.advanceUntil) { let s; for (let i = 0; i < st.max; i++) { s = await page.evaluate(() => window.live.snapshot()); if (st.advanceUntil(s)) break; await clickControl(page, /ADVANCE TIME/); await settle(page); } s = await page.evaluate(() => window.live.snapshot()); ok(st.advanceUntil(s), st.what); continue; }
@@ -185,7 +196,7 @@ for (const system of only.length ? only : Object.keys(SCRIPTS)) {
     } catch (err) { failures++; console.log(`  FAIL ${st.what}: ${err.message}`); }
   }
   // still again after all that
-  await page.evaluate(() => { const a = window.api; const h = a.homeView(); a.camera.position.copy(h.pos); a.controls.target.copy(h.tgt); a.controls.update(); });
+  await atDoor(page);
   await sleep(600);
   const b1 = await page.screenshot(); await sleep(3000); const b2 = await page.screenshot();
   ok(b1.equals(b2), "still again at the end");

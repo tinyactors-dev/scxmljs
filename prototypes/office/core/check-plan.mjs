@@ -22,7 +22,7 @@ for (const name of names) {
   for (const [k, s] of plan.seats) put(s.x, s.z, "o");
   for (const s of plan.stations) put(s.x, s.z, s.kind[0].toUpperCase());
   for (const m of plan.machines) put(m.x, m.z, "m");
-  put(plan.door.x + 0.5, plan.door.z, "D"); put(plan.board.x + 0.5, plan.board.z, "B");
+  put(plan.door.x, plan.door.z - 0.5, "D"); put(plan.board.x + 0.5, plan.board.z, "B");
   console.log("   +" + "-".repeat(Wd) + "+"); for (const row of grid) console.log("   |" + row.join("") + "|"); console.log("   +" + "-".repeat(Wd) + "+");
   // seat sharing over time
   const occ = []; for (const a of sim.actors.filter((x) => !x.external)) sim.lifetimes(a.id).forEach(([b, e], i) => { const s = plan.seatOfLife(a.id, i); if (!s) { console.log("   NO SEAT", a.id); bad++; return; } occ.push({ id: a.id, x: s.x, z: s.z, s0: b <= 0 ? -1 : sim.warp(b), s1: e === Infinity ? Infinity : sim.warp(e) + (plan.vanishes(a.id, i) ? 0.5 : LEAVE) }); });

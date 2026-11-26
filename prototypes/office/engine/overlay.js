@@ -4,8 +4,10 @@
 //   - cards: a paper card (title, a line under it, a body, wrapped) pinned to a point of the world by a thin
 //     leader, placed beside the point and kept wholly on screen, with a round red CLOSE stamp at its top-right
 //     corner (44 px to hit, it brightens under the pointer);
-//   - the exit: a big door-shaped control at the top left with a plaque beside it (whose place this is), shown
-//     while the visitor is somewhere they leave by it.
+//   - the exit: a big door-shaped control at the top left with a plaque beside it (whose place this is); the
+//     Office no longer shows it (the machine room has a real door), but a free camera may;
+//   - the first-person HUD: a crosshair (hot on something within reach), a hint under it ("walk closer"), cues on
+//     the screen's edge pointing at what a press just changed, a touch stick, the key hints; and a black fade.
 // Hits are tested on the drawn rectangles (hit(x, y)), in CSS pixels, before anything in the 3D view.
 //
 // Owns: the overlay's layout, drawing and hit rectangles. Must never know: a system, a message's shape, the
@@ -24,7 +26,7 @@ export function createOverlay() {
   const plane = new THREE.PlaneGeometry(1, 1);
   const texOf = () => { const c = document.createElement("canvas"); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; return t; };
   const quad = (order) => { const m = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ map: texOf(), transparent: true, depthTest: false, depthWrite: false, toneMapped: false })); m.renderOrder = order; m.visible = false; scene.add(m); return m; };
-  const ctxFor = (m, w, h) => { const c = m.material.map.image; if (c.width !== Math.ceil(w * RES) || c.height !== Math.ceil(h * RES)) { c.width = Math.ceil(w * RES); c.height = Math.ceil(h * RES); m.material.map.dispose(); } const g = c.getContext("2d"); g.setTransform(RES, 0, 0, RES, 0, 0); g.clearRect(0, 0, w, h); return g; };
+  const ctxFor = (m, w, h, res = RES) => { const c = m.material.map.image; if (c.width !== Math.ceil(w * res) || c.height !== Math.ceil(h * res)) { c.width = Math.ceil(w * res); c.height = Math.ceil(h * res); m.material.map.dispose(); } const g = c.getContext("2d"); g.setTransform(res, 0, 0, res, 0, 0); g.clearRect(0, 0, w, h); return g; };
   const round = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
   function wrap(g, text, maxW, maxLines) { // words onto lines; a word longer than a line is cut where it must be
     const out = []; let line = "";
@@ -89,6 +91,8 @@ export function createOverlay() {
       let x = ax + gap, y = ay - h - gap; // above and to the right of the point, else the other side
       if (x + w > W - PAD) x = ax - gap - w; if (y < PAD) y = ay + gap;
       x = Math.min(W - PAD - w, Math.max(PAD, x)); y = Math.min(H - PAD - h, Math.max(PAD, y));
+      // never over the crosshair (the middle of the view): to whichever side has room
+      if (x < W / 2 + 40 && x + w > W / 2 - 40 && y < H / 2 + 40 && y + h > H / 2 - 40) { if (W / 2 + 60 + w <= W - PAD) x = W / 2 + 60; else if (W / 2 - 60 - w >= PAD) x = W / 2 - 60 - w; else y = H / 2 + 60 + h <= H - PAD ? H / 2 + 60 : Math.max(PAD, H / 2 - 60 - h); }
       cardR = { x, y, w, h };
       const inside = ax >= 0 && ax <= W && ay >= 0 && ay <= H;
       if (inside) { const cx = Math.min(x + w, Math.max(x, ax)), cy = Math.min(y + h, Math.max(y, ay)); const p = leader.geometry.attributes.position; p.setXYZ(0, ax, -ay, 0); p.setXYZ(1, cx, -cy, 0); p.needsUpdate = true; leader.visible = Math.hypot(cx - ax, cy - ay) > 4; dot.position.set(ax, -ay, 0); dot.visible = true; }
@@ -130,6 +134,41 @@ export function createOverlay() {
   /** the exit control and its plaque ({title, sub, face (a canvas), accent}), or null for none */
   function setExit(c) { exitC = c; exitHot = false; exitB.visible = plaque.visible = !!c; if (c) layoutExit(); }
 
+  // ---------------------------------------------------------------- the first-person HUD: crosshair, reach hint, cues, stick, fade
+  // one canvas over the whole view, redrawn only when what it shows changes
+  const hud = quad(70); let hudKey = "", hudOn = false;
+  const fade = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthTest: false, depthWrite: false })); fade.renderOrder = 90; fade.visible = false; scene.add(fade);
+  /** {crosshair: "none" | "idle" | "hot" | "far", hint: text or null, cues: [{x, y, color}] (points off screen or on
+   *  its edge to point at), stick: {x0, y0, x, y} (a touch stick), hints: [lines] (the key hints, bottom left)} */
+  function setHUD(h) {
+    const key = JSON.stringify(h); if (key === hudKey) return; hudKey = key;
+    const on = h && (h.crosshair !== "none" || h.hint || (h.cues && h.cues.length) || h.stick || (h.hints && h.hints.length)); hudOn = !!on; hud.visible = hudOn; if (!on) return;
+    const g = ctxFor(hud, W, H, 1); const cx = W / 2, cy = H / 2; // one canvas pixel per CSS pixel: it is uploaded whole when it changes
+    if (h.crosshair && h.crosshair !== "none") {
+      const col = h.crosshair === "hot" ? "#ffe14d" : h.crosshair === "far" ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.85)"; const r = h.crosshair === "hot" ? 11 : 8;
+      g.lineCap = "round"; g.strokeStyle = "rgba(0,0,0,0.55)"; g.lineWidth = 4; g.beginPath(); g.moveTo(cx - r, cy); g.lineTo(cx + r, cy); g.moveTo(cx, cy - r); g.lineTo(cx, cy + r); g.stroke();
+      g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - r, cy); g.lineTo(cx + r, cy); g.moveTo(cx, cy - r); g.lineTo(cx, cy + r); g.stroke();
+      if (h.crosshair === "hot") { g.beginPath(); g.arc(cx, cy, 16, 0, Math.PI * 2); g.stroke(); }
+    }
+    if (h.hint) { g.font = "bold 15px Georgia, serif"; const tw = g.measureText(h.hint).width + 20; const hy = h.hintAt ? h.hintAt.y : cy + 26, hx = h.hintAt ? h.hintAt.x : cx; g.fillStyle = "rgba(20,14,9,0.72)"; round(g, hx - tw / 2, hy, tw, 26, 6); g.fill(); g.fillStyle = "#f3dfae"; g.textBaseline = "middle"; g.textAlign = "center"; g.fillText(h.hint, hx, hy + 13); g.textAlign = "left"; }
+    // a cue: a glowing chevron on the screen's edge, pointing toward something that just changed
+    for (const c of h.cues || []) {
+      const dx = c.x - cx, dy = c.y - cy; const a = Math.atan2(dy, dx); const m = 34;
+      const k = Math.min((W / 2 - m) / Math.max(1e-6, Math.abs(dx)), (H / 2 - m) / Math.max(1e-6, Math.abs(dy)));
+      const inside = c.x > m && c.x < W - m && c.y > m && c.y < H - m;
+      const px = inside ? c.x : cx + dx * k, py = inside ? c.y : cy + dy * k;
+      g.save(); g.translate(px, py); g.fillStyle = c.color || "#ffe14d"; g.globalAlpha = c.alpha ?? 1;
+      if (inside) { g.strokeStyle = c.color || "#ffe14d"; g.lineWidth = 4; g.beginPath(); g.arc(0, 0, 26, 0, Math.PI * 2); g.stroke(); }
+      else { g.rotate(a); g.beginPath(); g.moveTo(16, 0); g.lineTo(-10, -14); g.lineTo(-4, 0); g.lineTo(-10, 14); g.closePath(); g.shadowColor = "rgba(0,0,0,0.6)"; g.shadowBlur = 6; g.fill(); }
+      g.restore();
+    }
+    if (h.stick) { const s = h.stick; g.strokeStyle = "rgba(255,255,255,0.55)"; g.lineWidth = 3; g.beginPath(); g.arc(s.x0, s.y0, 56, 0, Math.PI * 2); g.stroke(); g.fillStyle = "rgba(255,255,255,0.35)"; g.beginPath(); g.arc(s.x, s.y, 26, 0, Math.PI * 2); g.fill(); }
+    if (h.hints && h.hints.length) { g.font = "13px 'DejaVu Sans Mono', monospace"; const lh = 18, bw = Math.max(...h.hints.map((t) => g.measureText(t).width)) + 20, bh = h.hints.length * lh + 12; g.fillStyle = "rgba(20,14,9,0.55)"; round(g, PAD, H - PAD - bh, bw, bh, 7); g.fill(); g.fillStyle = "#f3dfae"; g.textBaseline = "top"; h.hints.forEach((t, i) => g.fillText(t, PAD + 10, H - PAD - bh + 6 + i * lh)); }
+    hud.material.map.needsUpdate = true; place(hud, 0, 0, W, H);
+  }
+  /** a black fade over everything: 0 none .. 1 black */
+  function setFade(k) { fade.visible = k > 0.002; fade.material.opacity = Math.min(1, k); place(fade, 0, 0, W, H); }
+
   // ---------------------------------------------------------------- hits, hover, size, drawing
   const inR = (r, x, y) => r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
   /** what of the overlay is at (x, y): "card-close", "card", "exit", or null */
@@ -144,12 +183,12 @@ export function createOverlay() {
     if ((h === "exit") !== exitHot && exitC) { exitHot = h === "exit"; drawExit(); }
     return h;
   }
-  function resize(w, h) { W = w; H = h; cam.right = W; cam.bottom = -H; cam.updateProjectionMatrix(); if (cardC) drawCard(); layoutExit(); }
+  function resize(w, h) { W = w; H = h; cam.right = W; cam.bottom = -H; cam.updateProjectionMatrix(); if (cardC) drawCard(); layoutExit(); hudKey = ""; }
   function render(renderer) {
-    if (!iris.visible && !card.visible && !exitB.visible) return;
+    if (!iris.visible && !card.visible && !exitB.visible && !hud.visible && !fade.visible) return;
     const ac = renderer.autoClear; renderer.autoClear = false; renderer.clearDepth(); renderer.render(scene, cam); renderer.autoClear = ac;
   }
   const r4 = (r) => (r ? [Math.round(r.x), Math.round(r.y), Math.round(r.x + r.w), Math.round(r.y + r.h)] : null);
-  return { setIris, openCard, closeCard, pinCard, setExit, hit, hover, resize, render,
+  return { setIris, openCard, closeCard, pinCard, setExit, setHUD, setFade, hit, hover, resize, render,
     get cardOpen() { return !!cardC; }, rects: () => ({ card: cardC ? r4(cardR) : null, exit: exitC ? r4(exitR) : null }) };
 }

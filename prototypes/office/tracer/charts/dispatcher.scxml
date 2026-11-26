@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A support desk's dispatcher: every ticket that arrives gets a ticket machine of its own (spawned
+  through the pool processor); tickets report back with #_scxml_ sends, and escalated tickets wait
+  for the dispatcher's approval. Synthetic, for the tracer's scale test.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="dispatcher" initial="desk">
+  <datamodel>
+    <!-- tickets with a machine working on them -->
+    <data id="open" expr="0"/>
+    <data id="resolved" expr="0"/>
+    <data id="escalated" expr="0"/>
+    <data id="peak" expr="0"/>
+    <!-- the newest tickets, newest last -->
+    <data id="recent" expr="[]"/>
+  </datamodel>
+  <state id="desk" initial="quiet">
+    <transition event="ticket.new" type="internal">
+      <assign location="open" expr="open + 1"/>
+      <assign location="peak" expr="Math.max(peak, open)"/>
+      <script>recent.push(_event.data.id); if (recent.length > 8) recent.shift()</script>
+      <send type="pool" event="spawn"><param name="ticket" expr="_event.data"/></send>
+    </transition>
+    <transition event="ticket.resolved" type="internal">
+      <assign location="open" expr="open - 1"/>
+      <assign location="resolved" expr="resolved + 1"/>
+    </transition>
+    <transition event="ticket.escalated" type="internal">
+      <assign location="escalated" expr="escalated + 1"/>
+      <!-- the supervisor looks at it for a moment, then approves -->
+      <send event="approve" delay="800ms"><param name="to" expr="_event.origin"/></send>
+    </transition>
+    <transition event="approve" type="internal">
+      <send targetexpr="_event.data.to" event="supervisor.approved"/>
+    </transition>
+    <!-- Nothing open. -->
+    <state id="quiet">
+      <transition cond="open &gt; 0" target="busy"/>
+    </state>
+    <!-- Some tickets open. -->
+    <state id="busy">
+      <transition cond="open &gt;= 15" target="swamped"/>
+      <transition cond="open == 0" target="quiet"/>
+    </state>
+    <!-- Fifteen or more open: the desk is swamped. -->
+    <state id="swamped">
+      <transition cond="open &lt; 10" target="busy"/>
+    </state>
+  </state>
+</scxml>

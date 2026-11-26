@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One support ticket, from triage to resolution: an agent works on it, some need the supervisor's
+  approval first, some wait for the customer. It reports to the dispatcher and ends. Synthetic.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="ticket" initial="triage">
+  <datamodel>
+    <data id="ticket" expr="null"/>
+    <data id="dispatcher" expr="''"/>
+    <data id="replies" expr="0"/>
+  </datamodel>
+  <!-- Reading the ticket and deciding what it needs. -->
+  <state id="triage">
+    <onentry><send event="triaged" delayexpr="ticket.triageMs + 'ms'"/></onentry>
+    <transition event="triaged" cond="ticket.kind === 'refund'" target="escalated"/>
+    <transition event="triaged" target="working"/>
+  </state>
+  <!-- Waiting for the supervisor's approval. -->
+  <state id="escalated">
+    <onentry><send targetexpr="dispatcher" event="ticket.escalated"><param name="id" expr="ticket.id"/></send></onentry>
+    <transition event="supervisor.approved" target="working"/>
+  </state>
+  <!-- An agent works on it; some need an answer from the customer first. -->
+  <state id="working" initial="investigating">
+    <state id="investigating">
+      <onentry><send id="work" event="worked" delayexpr="ticket.workMs + 'ms'"/></onentry>
+      <transition event="worked" cond="ticket.kind === 'bug' &amp;&amp; replies === 0" target="awaitingCustomer"/>
+      <transition event="worked" target="resolved"/>
+    </state>
+    <!-- Asked the customer something; their answer comes later. -->
+    <state id="awaitingCustomer">
+      <onentry><send event="customer.reply" delay="1500ms"/></onentry>
+      <transition event="customer.reply" target="investigating"><assign location="replies" expr="replies + 1"/></transition>
+    </state>
+  </state>
+  <final id="resolved">
+    <onentry><send targetexpr="dispatcher" event="ticket.resolved"><param name="id" expr="ticket.id"/></send></onentry>
+  </final>
+</scxml>

@@ -109,6 +109,20 @@ export function demosIndex(): string {
 </div>`;
 }
 
+/**
+ * /prototypes/: unlisted. Nothing links here from a listed page, it's not in the nav, the footer,
+ * the sitemap or the search index, and it carries robots noindex (scripts/site/build.ts).
+ */
+export function prototypesIndex(): string {
+  return `<div class="wrap">
+  <h1 class="page-title">Prototypes</h1>
+  <p class="lede">Experiments built on scxmljs. They are not part of the library, have no documentation or API to rely on, and may change or vanish without notice.</p>
+  <div class="demo-cards">
+    <a class="card" href="/prototypes/office/"><h2>The Office</h2><p>A recorded run of the LLM chat example as an office you can walk through: every actor is a person at a desk, every message is mail in a pneumatic tube. Drag to look around, click a person to see inside their head, click mail to read it, touch the board to jump in time. Full screen, WebGL; best with a mouse.</p></a>
+  </div>
+</div>`;
+}
+
 export function explorerDemo(samples: { id: string; title: string }[]): string {
   return `<div class="wrap explorer-demo">
   <h1 class="page-title">Explorer</h1>

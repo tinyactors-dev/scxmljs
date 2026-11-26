@@ -1,5 +1,6 @@
 {
-  // Type-checks the whole workspace (library, examples, conformance runner).
+  // Type-checks the whole workspace (library, examples, conformance runner); prototypes/ are
+  // experiments in plain JavaScript, outside the checks.
   // The library's own build config lives in packages/scxmljs.
   "compilerOptions": {
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
@@ -24,5 +25,5 @@
       "@tinyactors/scxmljs/*": ["./packages/scxmljs/src/*.ts"]
     }
   },
-  "exclude": ["node_modules", "**/node_modules", "**/dist", "conformance/.cache", "conformance/ecma", "examples/frameworks"]
+  "exclude": ["node_modules", "**/node_modules", "**/dist", "conformance/.cache", "conformance/ecma", "examples/frameworks", "prototypes"]
 }

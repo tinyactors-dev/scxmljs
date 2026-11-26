@@ -10,12 +10,15 @@
  *   /api/                  the TypeDoc reference (`mise run docs:api`; built here if missing)
  *   /search/               Pagefind UI over the build-time index in /pagefind/
  *   /charts/*.scxml        every chart the pages load
+ *   /prototypes/           UNLISTED: experiments (noindex; not in nav, footer, sitemap or search)
+ *   /prototypes/office/    prototypes/office as committed at HEAD, static files verbatim
  *   404.html, sitemap.xml, robots.txt, CNAME, .nojekyll, favicon.svg, og.png
  *
  * The client scripts are bundled from source (the repository's `@tinyactors/scxmljs` path
  * mapping), minified, with content-hashed names under /assets/.
  */
-import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { $, Glob } from "bun";
 import { Window } from "happy-dom";
@@ -197,6 +200,49 @@ await emit("/search/", "search", "Search", "Search the scxmljs documentation.", 
   head: '<link rel="stylesheet" href="/pagefind/pagefind-ui.css">\n<script src="/pagefind/pagefind-ui.js"></script>\n',
 });
 await emit("/404.html", "none", "Not found", "This page doesn't exist.", pages.notFound(), { noindex: true });
+
+// ── prototypes (unlisted) ─────────────────────────────────────────────────
+// Experiments, not the library. Unlisted: no link from any listed page, not in the nav or the
+// footer, noindex (so not in the sitemap; no data-pagefind-body, so not in the search index).
+await emit(
+  "/prototypes/",
+  "none",
+  "Prototypes",
+  "Experiments built on scxmljs: not part of the library, and they may change or vanish.",
+  pages.prototypesIndex(),
+  { noindex: true },
+);
+// Each app is copied as COMMITTED at HEAD (git archive), never from the working tree, so
+// half-finished edits in progress never ship. Static files verbatim (no build step), without what
+// only serves development: notes, node scripts (*.mjs), test pages, the tracer, reports, renders.
+const PROTOTYPES = ["office"];
+const devOnly = (rel: string) =>
+  /\.(md|mjs)$/.test(rel) ||
+  /(^|\/)(test\.html|shots\.json)$/.test(rel) ||
+  /^(tracer|reports|out|node_modules)(\/|$)|\/out(\/|$)/.test(rel);
+for (const name of PROTOTYPES) {
+  const tmp = await mkdtemp(join(tmpdir(), "site-prototype-"));
+  try {
+    await $`git archive --format=tar HEAD prototypes/${name} | tar -x -C ${tmp}`.cwd(root).quiet();
+    const src = join(tmp, "prototypes", name);
+    let n = 0;
+    await cp(src, join(out, "prototypes", name), {
+      recursive: true,
+      filter: (f) => {
+        const rel = f.slice(src.length + 1);
+        const keep = rel === "" || !devOnly(rel);
+        if (keep && rel.includes(".")) n++;
+        return keep;
+      },
+    });
+    const index = await Bun.file(join(out, "prototypes", name, "index.html")).text();
+    if (!index.includes('<meta name="robots" content="noindex">'))
+      throw new Error(`site: prototypes/${name}/index.html must carry <meta name="robots" content="noindex"> (prototypes are unlisted)`);
+    log(`prototype ${name}: ${n} files from HEAD`);
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
+  }
+}
 
 // ── docs ──────────────────────────────────────────────────────────────────
 const docFiles = GROUPS.flatMap((g) => g.items.filter((i) => i.file).map((i) => ({ file: i.file!, group: g.name })));

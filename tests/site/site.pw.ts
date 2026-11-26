@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { expect, type Page, test } from "@playwright/test";
 
@@ -279,6 +279,47 @@ test("gallery: every chart renders with playback controls", async ({ page }) => 
 test("search returns results", async ({ page }) => {
   await page.goto("/search/?q=clock");
   await expect(page.locator(".pagefind-ui__result").first()).toBeVisible();
+});
+
+// /prototypes/ is unlisted: reachable by its URL only
+test("prototypes are unlisted: noindex, and not in the sitemap, nav, footer or any listed page", async ({ page }) => {
+  const site = new URL("../../_site/", import.meta.url);
+  expect(readFileSync(new URL("sitemap.xml", site), "utf8")).not.toContain("/prototypes");
+  const listed = readdirSync(site, { recursive: true, encoding: "utf8" }).filter(
+    (f) => f.endsWith(".html") && !f.startsWith("prototypes/") && !f.startsWith("api/"),
+  );
+  expect(listed.length).toBeGreaterThan(10);
+  for (const f of listed) expect(readFileSync(new URL(f, site), "utf8"), f).not.toContain("/prototypes");
+  for (const path of ["/prototypes/", "/prototypes/office/"]) {
+    await page.goto(path);
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex");
+  }
+  await page.goto("/prototypes/");
+  await expect(page.locator(".site-nav a[href^='/prototypes']")).toHaveCount(0);
+  await page.locator("a.card[href='/prototypes/office/']").click();
+  await expect(page).toHaveURL(/\/prototypes\/office\/$/);
+});
+
+test("prototypes: the Office loads every file it asks for and starts, without errors", async ({ playwright, baseURL }) => {
+  // its own browser: WebGL in headless Chromium without a GPU needs SwiftShader
+  const browser = await playwright.chromium.launch({
+    args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
+  });
+  try {
+    const page = await browser.newPage({ baseURL });
+    const errors = watchErrors(page);
+    const failed: string[] = [];
+    page.on("requestfailed", (r) => failed.push(`${r.url()} ${r.failure()?.errorText}`));
+    page.on("response", (r) => r.status() >= 400 && failed.push(`${r.url()} ${r.status()}`));
+    await page.goto("/prototypes/office/");
+    await expect(page).toHaveTitle(/The Office/);
+    await page.waitForFunction(() => (window as any).ready === true, undefined, { timeout: 20_000 });
+    await expect(page.locator("canvas#gl")).toBeVisible();
+    expect(failed).toEqual([]);
+    expect(errors).toEqual([]);
+  } finally {
+    await browser.close();
+  }
 });
 
 test("docs: a guide renders with sidebar, TOC and highlighted code", async ({ page }) => {
@@ -587,13 +628,13 @@ test.describe("390px wide: no horizontal overflow", () => {
     });
 });
 
-// every page in the sitemap (the TypeDoc reference aside), plus the unindexed search and 404 pages
+// every page in the sitemap (the TypeDoc reference aside), plus the unindexed search, 404 and prototypes pages
 const SITEMAP = [
   ...readFileSync(new URL("../../_site/sitemap.xml", import.meta.url), "utf8").matchAll(/<loc>https?:\/\/[^/]+(\/[^<]*)<\/loc>/g),
 ]
   .map((m) => m[1]!)
   .filter((p) => !p.startsWith("/api/"));
-const AUDITED = [...new Set([...SITEMAP, "/search/?q=clock", "/404.html"])];
+const AUDITED = [...new Set([...SITEMAP, "/search/?q=clock", "/404.html", "/prototypes/"])];
 
 for (const scheme of ["light", "dark"] as const)
   test.describe(`accessibility (axe-core), ${scheme}`, () => {

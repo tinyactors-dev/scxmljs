@@ -33,20 +33,22 @@ export function canvasTex(w, h, draw, opts = {}) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   if (opts.pixel) { t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; }
-  else t.anisotropy = 4;
+  else t.anisotropy = 8;
   t.userData.canvas = c; t.userData.ctx = g;
   return t;
 }
 
 // a small engraved plate with text: brass or paper. Returns a mesh lying in its local XY plane.
 export function plate(text, { w = 0.9, h = 0.22, bg = "#c9a24a", fg = "#3a2a0c", font = "bold 46px Georgia, serif", border = "#8a6a22" } = {}) {
-  const px = 512, py = Math.round((512 * h) / w);
+  // drawn once, at a resolution that keeps the letters ~60 % of the plate's height, mipmapped and
+  // anisotropic, so it reads crisply near and fades cleanly far (no shimmer)
+  const px = 768, py = Math.max(48, Math.round((768 * h) / w)); const bw = Math.max(4, Math.round(py * 0.07));
   const tex = canvasTex(px, py, (g) => {
     g.fillStyle = bg; g.fillRect(0, 0, px, py);
-    g.strokeStyle = border; g.lineWidth = 10; g.strokeRect(5, 5, px - 10, py - 10);
+    g.strokeStyle = border; g.lineWidth = bw; g.strokeRect(bw / 2, bw / 2, px - bw, py - bw);
     g.fillStyle = fg; g.font = font; g.textAlign = "center"; g.textBaseline = "middle";
-    let size = parseInt(font.match(/(\d+)px/)[1], 10);
-    while (size > 12) { g.font = font.replace(/\d+px/, size + "px"); if (g.measureText(text).width < px - 40) break; size -= 2; }
+    let size = Math.round(py * 0.6);
+    while (size > 12) { g.font = font.replace(/\d+px/, size + "px"); if (g.measureText(text).width < px - 3 * bw - 16) break; size -= 2; }
     g.fillText(text, px / 2, py / 2 + 2);
   });
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: tex }));

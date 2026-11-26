@@ -2,42 +2,56 @@
 
 `head.js` exports `createHead({ THREE, sim, actorId, options? })` as `../CONTRACT.md` says. It imports
 nothing, adds no lights (`MeshStandardMaterial`: WORLD's lights light it) and writes text only on
-small engraved plates. Nothing in it knows a system: everything comes from the chart and the run.
+engraved plates. Nothing in it knows a system: everything comes from the chart and the run.
 
 Pages and tools (not used by WORLD):
 
-- `test.html?system=<name>&actor=<id>[&t=ms][&detail=d]`: one head. Orbit with the mouse, the wheel
-  sets detail, a click on a machine or a station focuses it, Esc goes home, Space pauses. It has a
-  system picker and an actor picker. `system` is a folder of `../data/`, or `fixture:<name>` for
-  `head/fixtures/<name>/trace.json`.
-- `gallery.html?system=<name>[&detail=0.5][&play]`: one head per distinct chart of the system (its
-  busiest actor, at a busy moment), in a grid. This is the regression sheet.
-- `shoot.mjs <out.png> <page?query> [setView JSON] ...`: Playwright stills of either page.
-- `fixtures/make.mjs` writes `fixtures/shapes/trace.json`, a hand-made system covering the shapes the
-  recorded examples lack. `bench.js` holds what the two pages share.
+- `inspect.html` + `inspect.mjs`: **the inspection harness**. It mounts a head the way `main.js` does
+  (no tone mapping, the world's lights, fov 42, the entry camera of `enterHead`: direction (0, 0.3, 1),
+  0.6 world units = 14.3 head units from the head's centre, and `detail = (1 - dist) / 0.7`) and shoots,
+  per chart, the full entry frame (1440 x 900) and a contact sheet of 3 details (0.1 = just inside the
+  skull, 0.57 = entry, 1) x 7 visitor angles (entry, left, right, above, low side, high left, behind).
+  It measures every plate on screen: overlaps (from the front), the smallest text of open machines at
+  detail 1 (fails under 9 px glyphs), and stillness (60 updates at a fixed t move nothing).
+  `node head/inspect.mjs [--tag x] [--only system[:chart],...] [--all] [--mod ./out/before/head.js]`
+  writes `out/inspect/<tag>/<system>--<chart>-{entry,sheet}.png` and `report.json`. Without `--all` it
+  shoots the three reference heads: single-microwave (small), llm-chat `host` (medium), support-desk
+  (big). `INTERACTIVE=1` mounts heads with their push-buttons.
+- `perf.mjs [system] [actor]`: builds a head in Node (a stub canvas) and times `update` at detail 0,
+  0.57 and 1, and while zooming; prints its affordances.
+- `test.html?system=<name>&actor=<id>[&t=ms][&detail=d]`: one head to orbit (the wheel sets detail, a
+  click focuses, Esc goes home, Space pauses). `gallery.html?system=<name>`: one head per chart.
+  `shoot.mjs`: stills of either page. `fixtures/make.mjs`: a hand-made system of rare shapes.
 
 ## The grammar
 
+One state, one thing. A state is either a pad (atomic) or a housing (compound), never both.
+
 | Chart | Mechanism |
 |---|---|
-| parallel state | a **bench**: one machine per region. At the top, three to six regions become two tiers (the biggest machine in front); more regions, or nested benches with four or more, wrap into rows. An atomic or final region is a small machine with one pad. |
-| compound state | a **machine**: a painted housing on a plinth. **Closed**: a solid box whose header beam carries the nameplate and **one round lamp per part** (two rows of lamps past 14 parts); the lit lamp is the running part. **Opening** (detail): glass walls, the lid fades, the beam slides down to the plinth, the parts appear. An inactive machine is painted darker; a dead actor's machines go dark. |
-| atomic state | a **station**: a pad with an engraved plate. Up to six parts stand in one row; more parts wrap into a **serpentine** of rows (left to right, then right to left), so the main flow reads as one snake and pads never overlap. |
-| the active state | **the marble**, one per running machine, on the occupied pad, whose lamp glows (yellow; red on an exceptional part; green on a final). |
+| parallel state | a **bench**: one machine per region, side by side (three to six regions: two tiers; more: rows). An atomic or final region is a small machine with one pad. |
+| compound state | a **machine**: a housing on a plinth with a brass **door** in its front wall. **In its parent the housing stands in the row where a pad would be**: there is no pad for it. While the marble is inside, its door glows. **Closed**: a solid box; its beam carries its name and, in a dark window, the name of the part that runs. **Open** (detail): glass walls, the parts inside. A machine inside a machine **grows as it opens** (scale 0.5 closed, 0.86 open) and its parent makes room: the layout is re-run, so pads, tracks and housings move apart and the whole head is re-fitted to the view. An inactive machine is painted darker; a dead actor's machines go dark. |
+| atomic state | a **station**: a pad with an engraved plate in front of it and its own lamp (lit = running; yellow, red on an exceptional part, green on a final). Up to six parts in a row; more wrap into a serpentine. |
+| the active state | **the marble**, one per open machine, on the running pad. When the running part is a compound, the parent has no marble: it went in through that housing's door, and the housing's own marble shows where. |
+| initial state | the **entry ramp**: a flat brass strip from the machine's door along the floor to the initial part, ending in an arrow. A marble that enters the machine comes in at the door and rolls along it. |
 | final state | a **drain**: a dark pad with a brass ring round a hole. |
-| history state | a pad on the back shelf with a brass **notch** and a plate **H** (shallow) or **H\*** (deep). While its machine is inactive, a **ghost marble** waits on the part it will come back to (deep history: also in every machine inside). When the machine is re-entered at a part other than its initial one, the marble drops onto the notch first and rolls to that part. |
-| initial state | a small brass **spout** leaning over its pad; a machine that starts drops its marble in from above. |
-| transition between parts | a **track** from pad to pad: brass with sleepers = **main line**, thin red = **exceptional** (rule below). A main and an exceptional transition between the same two parts are two tracks; each keeps to its right, so A→B and B→A are separate; a cone near the end shows the direction. Tracks never taken so far are dim; the last one taken glows for about 2 s. |
-| transition out of a compound from any child | drawn **once**, from the compound's pad at the level where it leaves (not from every child). |
-| transition the machine itself takes to one of its parts | a **chute** from the machine's hopper down to that pad. |
-| self-transition / re-entry | a **loop** standing over the pad. |
-| targetless transition (reacts in place) | a small **bell** on a bracket beside the pad. When it fires, the bell rings and the marble hops in place. |
-| multiple targets | one track for each part they land in, at the level where the transition is drawn. |
-| delayed `<send>` (a `timer` event) | a small **clock** on a stalk beside the station that set it, while the timer runs: its hand and an amber wedge sweep from set to due. It disappears when the timer fires or is cancelled. |
-| a hub with many tracks (more than 10) | a **bus**: one raised brass rail over the hub's partners, in their snake order, with a drop over each. A marble between the hub and a partner rides the bus (up, along, down) instead of 64 separate arcs (support-desk's `routing` › `classifying`). |
-| `<invoke>` | a green **speaking tube** rising from the pad and leaving over the housing, ending in a **horn**. It glows while its state is active and an invoked child of this actor lives. `outlets()` gives WORLD each horn's world position, so it can lead a line to the child at the next desk. |
-| an event arriving | a **mail capsule** drops into the machine's **hopper** (the brass funnel at its back-left corner), then the marble travels. Eventless transitions have no capsule. Mail that moves nothing rings the bell or hops the marble of the deepest active state that has a transition for it, or makes the hopper ring. |
-| variables | up to four **gauges** on the roof of the machine that reads each one most: a **glass tube of balls** for an array or object (one ball per item or key), a **dial** for a number, a **lever and lamp** for a boolean, a **lamp** for anything else. Copper **pipes** run to the other machines that read or write the variable; a light runs up the writer's pipe when the trace writes it. Chosen from variables that guards read (if the chart records `readBy`) and that change in the run, ranked by changes + 1.5 × readers. A chart with no datamodel, or nothing that changes, has no gauges and no pipes. |
+| history state | a pad on the back shelf with a brass **notch** and a plate **H** / **H\***; a **ghost marble** waits where it will come back to. |
+| transition between parts | a **track**: an arch with an **arrowhead** near its end and its event engraved on a plate over its **crown** (eventless: the guard in brackets, or `auto`; both: `event / [guard]`). Brass = main line, thin red = exceptional (rule below). Tracks between the same two parts take **lanes**: the first (left to right, or front to back) a high arch set back, the second a low arch set forward, its plate between the two arches. Event plates that would cover another plate are lifted. Never-taken tracks are dim; the last one taken glows for about 2 s. |
+| transition to or from a compound | ends at (starts from) its **door**. A transition out of one specific part inside it starts at that part's pad and climbs out over the housing. |
+| transition the machine itself takes to one of its parts | a track from the machine's **door** to that part. |
+| self-transition / re-entry | a **loop** standing over the pad, its event on top. |
+| targetless transition | a **bell** beside the pad; it rings and the marble hops. |
+| delayed `<send>` | a **clock on a post** beside the station that set it, its face to the viewer: twelve ticks and the delay (`1s`). While the timer runs the face lights and a red hand and an amber wedge sweep from set to due. |
+| a hub with more than 10 tracks | a **bus**: one raised rail over the partners, a drop to each (no event plates). |
+| `<invoke>` | a green **speaking tube** from the pad ending in a horn, lit while the child lives; `outlets()` gives its world position. |
+| an event arriving | a **mail capsule** comes out of the **inlet** (a brass pipe down from the dome, top back of the head), flies to the **funnel** of the machine that takes it, drops in and is gone; then the marble moves. Only machines that take mail have a funnel (upright, on a short chute into the roof, at the back-left corner), and each region above them, which takes the mail while they are shut. A capsule for a machine that is shut, hidden or staged away goes to the nearest visible funnel above it. |
+| variables | up to four **gauges** standing on the back top rail of the machine that reads each most, their plate below: a glass tube of balls (array, object), a round dial with its value in a window (number), a lever and lamp (boolean), a lamp (anything else). Copper pipes run to the other machines that read or write it. |
+
+History of the grammar: until 2026-11-26 a compound was ALSO a pad in its parent (with the housing behind
+it), the initial state was a brass cone leaning over its pad, every machine had a hopper on a pole,
+the beam carried one round lamp per part, timers were clocks on stalks and the dial gauge was a box on
+the roof with a copper pipe up to it. The owner's first visit (QUALITY.md, H1–H9) showed none of them
+explained itself at the size the world mounts a head; they were replaced as above.
 
 ## Exceptional: the structural rule
 
@@ -68,11 +82,13 @@ reaches it by a normal `task.abort`.
 
 - The `__root__` wrapper is skipped when it has a single compound or parallel child. A machine for
   `__root__` itself is named after the actor's chart.
-- Within a machine the order is: the initial part, then breadth first along normal tracks, then
-  chute targets, then the rest in document order. Exceptional and history parts go to the shelf.
-- A nested machine stands behind its own pad at half scale (`NEST`). Nested parts take its depth, so
-  the parent grows to hold them.
-- The whole head is scaled and centred to 9.4 units of the 10 × 10 × 10 box.
+- Within a machine the order is: the initial part (front row, leftmost: the door and its ramp are left
+  of it), then breadth first along normal tracks, then the machine's own targets, then the rest in
+  document order. Exceptional and history parts go to the shelf at the back.
+- Layout is a function of each nested machine's current scale; it is re-run (and the meshes moved,
+  tracks rebuilt) only when a scale changes, i.e. while the detail changes. A parent with more than 16
+  parts, a machine with a bus, and every machine of a chart of more than 80 states keep their machines
+  at the closed scale (big charts use the stage, below).
 
 ## Big charts: built lazily, opened along the active path
 
@@ -80,7 +96,8 @@ A head builds almost nothing up front. Measuring the whole chart (sizes, places 
 the marble's moves) costs no meshes. Meshes are built in three steps:
 - **Lite housing**, when the parent first opens: plinth, walls with their top, the beam with its
   nameplate and one instanced lamp strip (about 5 meshes).
-- **Full housing**, when the machine starts to open itself: floor, frame, lid, hopper.
+- **Full housing**, when the machine starts to open itself: floor, frame, lid (the door, the funnel and the
+  beam's name and window are in the lite housing).
 - **Inside**, when it opens: stations (instanced pads and lamps), tracks, buses, marble.
 
 With more than 80 states, an unfocused head opens only machines on the **active path** (and level
@@ -131,10 +148,15 @@ actor's spawn, transition, config and end events builds each machine's marble mo
   transitions, and a restart at a checkpoint.
 - An `end` sinks every marble (the machine winds down, about 0.9 s).
 
-**Moves of one trace event start together**, after every machine they touch has finished its
-previous move, so a parent never leaves a part before the machines inside it have finished. Each
-move starts `CAP_LEAD` (0.26 s) after its message arrives (`sim.flight`); a move travels 0.38 s and
-a drop takes 0.28 s.
+**Moves of one trace event run in order**, after every machine they touch has finished its previous
+move: first the machines being left, innermost first (their marbles roll back to the door and are
+gone), then the travels, then the machines being entered, outermost first (the parent's marble reaches
+the compound's door and shrinks into it; the inner marble comes in at that housing's door and rolls
+along its entry ramp). Each event starts `CAP_LEAD` (0.26 s) after its capsule drops into a funnel; the
+capsule leaves the inlet `CAP_FLY` (0.55 s) before. A move travels 0.38 s, an entry 0.32 s.
+
+**Stillness**: with `t` fixed, `update` changes nothing. The only easing (the stage re-scale) runs with
+`dt` towards a fixed target and stops there; growth follows `detail`, not time. The harness checks it.
 
 **Bursts**: when the queue lags its trace by more than 0.35 s, moves get shorter. Beyond 1.6 s they
 fast-forward: 0.03 s each, and the marble is drawn as a stretched streak (a blur). Forty transitions
@@ -147,7 +169,67 @@ resume), else from `bornAt`/`diedAt`:
 
 Missing `cause`, snapshots or datamodel are fine.
 
+## The room (for WORLD to mount)
+
+`head.room` is a `THREE.Group` in the head's own units, **not** added to `group`: an attic under the
+skull's dome. A lathe-shaped plaster dome over wood panelling with brass ribs like sutures, a plank
+floor at y = -4.6, a green lamp hanging from the crown with a warm halo, and **two round windows at the
+front, where the eyes are**, cut out of the wall: looking forward from inside (orbit round to the back)
+you see the office through them. It is drawn from inside only (`BackSide`), so a camera outside it (the
+world's entry camera is 14.3 head units from the centre, outside the 9.2-unit dome) sees in through the
+cut-away near side, from any angle. The machines stand on a wooden **table** (part of `group`, fitted
+to whatever is shown) whose legs reach that floor; the mail **inlet** pipe (also in `group`) reaches the
+dome. `options.room === false` builds no room.
+
+What WORLD changes in `main.js` (`headFor` and the frame loop):
+
+```js
+// headFor(id): drop the skull box (lines 121-122) and mount the room in its place
+h.group.scale.setScalar(HEAD_SCALE); h.group.visible = false; scene.add(h.group);
+if (h.room) { h.group.add(h.room); h.room.visible = false; h.skull = h.room; }   // replaces the BoxGeometry skull
+// step(): unchanged: `h.skull.visible = sel.skinHidden` now shows the room while the skin is hidden
+```
+
+The room spans x and z of +-9.2 and y from -4.6 to 7.8 head units (+-0.39 x -0.19..0.33 world units at
+HEAD_SCALE 0.042): bigger than the avatar's 0.46 head, so keep it hidden until the skin is (as the skull
+was). The content itself may now reach x +-7.5 (it is fitted to the entry camera's frame, not to the
+10-unit box: a two-machine head fills the view as a twelve-machine one does).
+
+## Fitting to the view
+
+The head knows where WORLD's camera is when it enters (`ENTRY` in head.js: direction (0, 0.3, 1),
+distance 14.3, fov 42, assumed aspect 1.45). After every layout it chooses a scale and a height for the
+content so its projected box fills 90 % of that frame's width or 72 % of its height (within x +-7.5,
+z +-6.25, above the floor), vertically centred. A small chart gets big machines, not a big void.
+Opening is paced by size: a chart of up to 12 states is fully open at the entry camera's detail (0.57),
+a medium one opens level 1 there and the rest as the visitor comes closer, a big one (more than 80
+states) as before. Plates of an open machine are at least 0.23 head units tall (scaled up when their
+machine is small, as wide as their place allows; long names break onto two lines).
+
+## Click-driven use: `affordances()` and `{interactive: true}`
+
+`head.affordances()` → for the configuration of the last `update(t)`, every event that would make a
+transition now, deepest state first (as SCXML selects):
+`[{event, from, to, targets, cond, preempted, object, pick}]`. `from` is the state whose transition it
+is, `to` its first target (`null` for a targetless one), `cond` its guard (the head does not evaluate
+guards: the caller decides), `preempted` is true when a deeper (or earlier) unguarded transition of an
+active state already takes that event. `object` is what to click: the push-button when there is one,
+else the track it runs on, else the station (its bell). `pick` is what `pick(raycaster)` returns for it:
+`{kind: 'event', id: '<from>:<event>', event, from, to, targets, object}`. Wildcards (`input.*`) and
+`done.*` / `error.*` events are left out: a visitor cannot send them.
+
+`createHead({..., options: {interactive: true}})` adds a small brass **push-button** plate engraved with
+the event at the start of each track, one per event (up to three per track), shown only while that event
+would move the actor. `pick()` on one returns the `kind: 'event'` result above. Without the option no
+buttons are built and nothing else changes.
+
+`head.plates()` → `[{text, kind, level, focal, mesh}]`: every engraved plate now shown (the harness
+measures them).
+
 ## API (CONTRACT.md, plus)
+
+- `room` (a Group, or null with `options.room === false`), `affordances()`, `plates()`, `options.interactive`:
+  above.
 
 - `focusBounds` (getter) `{center, radius, box, object}`, in world coordinates, as it will be once
   settled.
@@ -162,13 +244,26 @@ Missing `cause`, snapshots or datamodel are fine.
 - `options.maxGauges` (default 4).
 
 **Cost**:
-- Pad bases and lamps are two `InstancedMesh`es per machine; sleepers and gauge balls are
-  instanced too.
-- A 24-part machine is about 130 meshes. The largest example heads (llm-chat clients) are about 290
-  meshes.
-- `update` takes 0.01–0.12 ms in Node (300 calls over the run).
+- Pad bases and lamps are two `InstancedMesh`es per machine; gauge balls are instanced; a housing's
+  posts and rails are one geometry, a track and its arrowhead one, the entry ramp one.
+- Measured with `perf.mjs` (Node, 2026-11-26): microwave 84 meshes, llm-chat host 190, support-desk
+  368 at detail 1 unfocused (was 415). `update` with the detail still: 0.03-0.15 ms (microwave, host),
+  up to 0.45 ms (support-desk). While the detail changes, a growing machine re-lays out in 20 steps over
+  the zoom: 1-2 ms a frame on average on host, with single frames of several ms (tracks rebuilt).
 
 ## What still breaks or is weak
+
+- Medium charts (llm-chat host and client, pi-durable tasks) still have a few event plates that cover
+  one another at the entry camera (`report.json`: 1-7 per head), mostly between a nested machine's
+  plates and its parent's, which the per-machine declutter does not see; and from oblique angles plates
+  at different depths overlap as any 3D labels do.
+- Long guards make long plates: `[task.state.status…]` is cut at 18 characters.
+- A big chart (support-desk) is not legible at detail 1 without a focus: 63 plates of its open machines
+  are under 9 px. It relies on the stage (focus), as before.
+- A capsule is visible in flight from the inlet for 0.55 s before it drops; in a paused frame it is in
+  the air, on its way (the inlet and the funnel are both visible).
+- The room is seen from outside at detail ~0.1 (a dome on a table, the office around it); WORLD shows
+  the skin until 0.95, so a visitor meets it only briefly.
 
 - Wide machines with nested machines in a back row: the nested housings of the front rows can hide
   the pads of the rows behind them, seen from low angles.

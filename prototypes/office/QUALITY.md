@@ -64,3 +64,34 @@ D8. The cursor shows a pointing hand over empty wall.
 - Poses were authored as joint angles with no check that limbs do not intersect the body.
 - Cameras were tuned for the film's path, not for where a click leaves a visitor.
 - Small systems (one actor, one small chart) were only checked for "loads without errors".
+
+## Status of the world's items (X, P, D), 2026-11-26
+
+How to see it: `node tools/inspect.mjs` (one person, every pose, 8 angles at 1 m and 3 m, and an
+oriented-box intersection check that fails on penetration or stretch: `out/inspect/`);
+`node tools/sweep.mjs <dir>` (every system: overview, eye level, after a click, after leaving a
+head); before/after pairs in `out/quality/pair-*.png`.
+
+- X1 fixed: entering rises over the person, the lid swings open on its hinge, the camera descends
+  into the head; leaving is the reverse and ends in the conversational view (2.5-3 m, above eye level).
+- X2 fixed: the lid is tied to the camera's flight and closes on the way out; an interrupted flight
+  still closes it.
+- P1-P5 fixed: a new rig (joint hierarchy, shoulder caps, a neck, two-bone IK on fixed limb lengths,
+  lean before reach, roll-free limited look-at), poses as hand targets clear of the body, hands
+  moving in arcs between poses, reactions once per event (3 s apart at least). Exception is
+  "hands thrown up beside the head" with the desk's red alarm lamp.
+- P6 fixed: people cast no shadow-map shadows; a soft blob under each.
+- D1 mostly: monitor (shows the state), keyboard, phone, in-basket under the tube's hatch,
+  hourglass, desk lamp, alarm lamp, value objects on the back edge with plates on the desk's edge.
+- D2, D3 fixed: one capsule size; mail lands in the basket through the hatch and rests there; tubes
+  have clamps on hangers from the ceiling, no rings without a tube.
+- D4 fixed (cause: the hatch's plaque was coplanar with the window's face, z-fighting).
+- D5 fixed: the camera is kept out of furniture, walls and people (sphere against boxes), framing
+  checks the line of sight to the face.
+- D6 fixed: ceiling, beams, lamps and the upper south/east walls show at eye level, hidden from above.
+- D7 partly: the board is mounted larger in small rooms (4.4 m in single-*); its span labels still
+  collide at small span widths (board owner).
+- D8 fixed: walls, partitions and desks occlude picking; the cursor is a pointer only over what
+  responds; hidden things take no clicks.
+- Small systems: a cosy room; the externals stand at arm's length (the person using it is a control
+  panel beside the desk).

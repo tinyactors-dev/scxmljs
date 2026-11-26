@@ -9,6 +9,7 @@
 // A station is busy from a request's arrival until it answers that requester.
 import * as THREE from "three";
 import { box, block, cyl, mat, plate, canvasTex } from "./kit.js";
+import { crankAngle } from "./avatar.js";
 
 const WOOD = "#a8743f", WOOD_D = "#7d5330", WOOD_L = "#c99a62", BRASS = "#c9a14a", PAPER = "#f6f0de";
 
@@ -32,18 +33,33 @@ export function buildStations(scene, sim, plan, cfg = {}) {
     for (let i = 0; i < 6; i++) { const tooth = box(0.07 * k, 0.4 * k, 0.04, BRASS); tooth.rotation.z = (i * Math.PI) / 6; gear.add(tooth); }
     const rim = new THREE.Mesh(new THREE.TorusGeometry(0.22 * k, 0.03 * k, 6, 16), mat("#2b2b2b")); rim.position.set(0, 0.62 * k, 0.37 * k); g.add(rim);
     block(g, 0.16 * k, 0.35 * k, 0.16 * k, "#2b2b2b", 0.22 * k, 1.13 * k, -0.15 * k);
-    const crank = new THREE.Group(); crank.position.set(-0.4 * k, 0.6 * k, 0); g.add(crank); const arm = box(0.04, 0.3 * k, 0.04, "#8d96a3"); arm.position.y = 0.13 * k; crank.add(arm); const knob = box(0.09, 0.09, 0.09, "#c43b2e"); knob.position.set(-0.05, 0.27 * k, 0); crank.add(knob);
+    // the crank on the side that faces its owner's chair (people.js's "machine" pose turns it with crankAngle)
+    const crank = new THREE.Group(); crank.position.set(-0.4 * k, 0.78 * k, 0.05 * k); g.add(crank); const hubC = cyl(0.05, 0.04, "#555", 10); hubC.rotation.z = Math.PI / 2; crank.add(hubC); const arm = box(0.04, 0.15, 0.04, "#8d96a3"); arm.position.set(-0.03, 0.065, 0); crank.add(arm); const knob = box(0.08, 0.08, 0.08, "#c43b2e"); knob.position.set(-0.06, 0.13, 0); crank.add(knob);
     const lp = lamp(g, 0.24 * k, 1.13 * k + 0.07, 0.22 * k, "#5cff9c");
     const p = plate(label.toUpperCase(), { w: 0.62 * k, h: 0.13 * k, bg: "#d6c18a" }); p.position.set(0, 0.25 * k, 0.356 * k); g.add(p);
     const puffs = [0, 1, 2].map(() => { const s = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), new THREE.MeshLambertMaterial({ color: "#eeeeee", transparent: true, opacity: 0.8 })); s.visible = false; g.add(s); return s; });
-    return { mouth: new THREE.Vector3(0, 1.25 * k, 0), update(busy, amb) { gear.rotation.z = busy ? amb * 6 : 0.3; crank.rotation.x = busy ? amb * 7 : 0; lp.set(busy); puffs.forEach((pf, i) => { pf.visible = busy; const f = (amb * 0.8 + i / 3) % 1; pf.position.set(0.22 * k + Math.sin(i * 3 + amb) * 0.05, 1.5 * k + f * 0.9, -0.15 * k); pf.scale.setScalar(0.6 + f * 1.4); pf.material.opacity = 0.8 * (1 - f); }); } };
+    return { mouth: new THREE.Vector3(0, 1.25 * k, 0), update(busy, amb) { gear.rotation.z = busy ? amb * 6 : 0.3; crank.rotation.x = busy ? crankAngle(amb) : 0; lp.set(busy); puffs.forEach((pf, i) => { pf.visible = busy; const f = (amb * 0.8 + i / 3) % 1; pf.position.set(0.22 * k + Math.sin(i * 3 + amb) * 0.05, 1.5 * k + f * 0.9, -0.15 * k); pf.scale.setScalar(0.6 + f * 1.4); pf.material.opacity = 0.8 * (1 - f); }); } };
   }
 
   function build(s, attachedTo) {
     const g = new THREE.Group(); g.position.set(s.x, 0, s.z); g.rotation.y = s.facing || 0; root.add(g);
     const label = s.label.replace(/^the /i, "");
     let mouthLocal = new THREE.Vector3(0, 2.2, 0.4), update = () => {};
-    if (s.kind === "model") {
+    if (attachedTo && s.kind === "user") {
+      // the person using it, at arm's length: a control panel on a pedestal, a speaker grille, three
+      // big buttons that light when they press something (a message to the desk), a lamp while it listens
+      block(g, 0.5, 0.95, 0.42, "#6d4a8a", 0, 0, 0); const top = new THREE.Group(); top.position.set(0, 0.95, 0); top.rotation.x = 0.35; g.add(top);
+      block(top, 0.56, 0.06, 0.46, "#4a2f62", 0, 0, 0);
+      const btnM = ["#e0473a", "#e9b83a", "#3aa86a"].map((c) => new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.05 }));
+      const btns = btnM.map((m, i) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.04, 14), m); b.position.set(-0.15 + i * 0.15, 0.07, 0.07); top.add(b); return b; });
+      for (let i = 0; i < 5; i++) block(top, 0.3, 0.012, 0.018, "#2a1a3a", 0, 0.06, -0.15 + i * 0.03);
+      const lp = lamp(g, 0.2, 1.12, -0.12, "#7dffb0");
+      const pp = plate(label.toUpperCase(), { w: 0.46, h: 0.08, bg: "#e9dcb4" }); pp.position.set(0, 0.75, 0.215); g.add(pp);
+      mouthLocal = new THREE.Vector3(0, 1.4, -0.12);
+      let pressAt = -9; update = (busy, amb, n, rang) => { if (rang && amb - pressAt > 0.7) pressAt = amb; const k = amb - pressAt; btns.forEach((b, i) => { const on = k >= 0 && k < 0.6 && i === Math.floor(pressAt * 3.7) % 3; b.position.y = on ? 0.05 : 0.07; btnM[i].emissiveIntensity = on ? 1.2 : 0.05; }); lp.set(busy); };
+    } else if (attachedTo && s.kind !== "service" && s.kind !== "tool") {
+      const m = machine(g, 1.0, "#5a5a6a", label); mouthLocal = m.mouth; update = (busy, amb) => m.update(busy, amb);
+    } else if (s.kind === "model") {
       const or = new THREE.Group(); g.add(or);
       block(or, 3.0, 2.3, 1.1, "#3f3a5c", 0, 0, 0); block(or, 3.2, 0.15, 1.25, "#2a2640", 0, 2.3, 0); block(or, 3.2, 0.3, 1.25, "#2a2640", 0, 0, 0);
       const reels = [-0.75, 0.75].map((x) => { const r = new THREE.Group(); r.position.set(x, 1.6, 0.57); or.add(r); const d = cyl(0.38, 0.06, "#d8d8d8", 20); d.rotation.x = Math.PI / 2; r.add(d); for (let i = 0; i < 3; i++) { const sp = box(0.06, 0.64, 0.02, "#555"); sp.position.z = 0.04; sp.rotation.z = (i * Math.PI) / 3; r.add(sp); } return r; });
@@ -69,13 +85,13 @@ export function buildStations(scene, sim, plan, cfg = {}) {
       const people = []; for (let i = 0; i < 3; i++) { const ph = new THREE.Group(); ph.position.set(-0.5 + i * 0.5, 1.15, -0.95); g.add(ph); const hd = box(0.26, 0.26, 0.04, "#6a4a3a"); hd.position.y = 0.5; ph.add(hd); const bd = box(0.36, 0.4, 0.04, ["#3c6aa8", "#a83c5a", "#3ca87a"][i]); bd.position.y = 0.17; ph.add(bd); people.push(ph); }
       block(g, 2.2, 1.0, 0.6, "#6d4a8a", 0, 0, -0.2); block(g, 2.4, 0.08, 0.76, WOOD_L, 0, 1.0, -0.2);
       const bell = new THREE.Group(); bell.position.set(0.6, 1.1, -0.1); g.add(bell); { const b = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(BRASS)); bell.add(b); const base = cyl(0.15, 0.03, "#333"); bell.add(base); }
-      const pp = plate(label.toUpperCase(), { w: 1.7, h: 0.18, bg: "#ffe7a8", fg: "#4a2a10" }); pp.position.set(0, 2.0, -0.9); g.add(pp);
+      const pp = plate(label.toUpperCase(), { w: 1.7, h: 0.18, bg: "#ffe7a8", fg: "#4a2a10" }); pp.position.set(0, 2.33, -0.9); g.add(pp); // above the window, on its own (never coplanar with the window's face)
       mouthLocal = new THREE.Vector3(-0.8, 1.45, 0.1);
       update = (busy, amb, n, rang) => { bell.rotation.z = rang ? Math.sin(amb * 55) * 0.25 : 0; people.forEach((p, i) => (p.position.y = 1.15 + (rang ? Math.abs(Math.sin(amb * 9 + i)) * 0.05 : 0))); };
     } else if (s.kind === "timer") {
       return null; // the wall clock is part of the room
     } else if (s.kind === "service" || s.kind === "tool") {
-      const m = machine(g, s.kind === "service" ? 1.5 : 1.0, s.kind === "service" ? "#5a4a6a" : "#4b5b4a", label);
+      const m = machine(g, s.kind === "service" && !attachedTo ? 1.5 : 1.0, s.kind === "service" ? "#5a4a6a" : "#4b5b4a", label);
       mouthLocal = m.mouth; update = (busy, amb) => m.update(busy, amb);
     } else {
       block(g, 1.0, 1.7, 0.7, "#7f8794", 0, 0, 0); block(g, 0.6, 0.06, 0.1, "#111", 0, 1.2, 0.36);

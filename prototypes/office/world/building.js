@@ -33,6 +33,18 @@ export function buildBuilding(scene, plan, { systems = [], current = "" } = {}) 
   trim.add(1.2, 0.02, 1.6, "#3a4a6a", R.x0 + 0.75, 0, dz);
   root.add(trim.mesh());
   const door = block(root, 0.08, 2.75, 1.6, "#6b4a2b", R.x0 + 0.5, 0, dz - 1.25); door.rotation.y = 1.25;
+  const occluders = root.children.filter((o) => o.isMesh && o.geometry.type === "BoxGeometry" && o.material === wallM);
+  // the ceiling, its beams and lamps, and the upper parts of the south and east walls: shown when the
+  // camera is inside the room below the ceiling (eye level), hidden for the high overview
+  const inside = new THREE.Group(); root.add(inside);
+  { const ceilM = new THREE.MeshLambertMaterial({ color: "#efe6d2", side: THREE.DoubleSide }); const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W + 0.3, D + 0.3), ceilM); ceil.rotation.x = Math.PI / 2; ceil.position.set(cx, WALL_H, cz); inside.add(ceil);
+    const beams = new BoxBatch(); for (let x = R.x0 + 2.5; x < R.x1 - 1; x += 3.2) beams.add(0.22, 0.3, D, WOOD_D, x, WALL_H - 0.3, cz); beams.add(W, 0.18, 0.18, WOOD_D, cx, WALL_H - 0.18, R.z0 + 0.25).add(0.18, 0.18, D, WOOD_D, R.x0 + 0.25, WALL_H - 0.18, cz);
+    const bm = beams.mesh({ cast: false }); bm.receiveShadow = false; inside.add(bm);
+    const lampM = new THREE.MeshLambertMaterial({ color: "#fff6dc", emissive: "#fff0c8", emissiveIntensity: 0.9 });
+    for (let x = R.x0 + 4.1; x < R.x1 - 1.5; x += 6.4) for (let z = R.z0 + 3; z < R.z1 - 1.5; z += 5) { const l = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 0.4), lampM); l.position.set(x, WALL_H - 0.36, z); inside.add(l); }
+    const upM = new THREE.MeshLambertMaterial({ map: wallTex }); const up = (w, h, d, x, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), upM); b.position.set(x, 0.9 + h / 2, z); inside.add(b); occluders.push(b); };
+    up(W + 0.3, WALL_H - 0.9, 0.3, cx, R.z1); up(0.3, WALL_H - 0.9, D, R.x1, cz);
+    inside.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } }); }
   // windows high on the north wall, where no station stands below
   const taken = [...plan.stations.filter((s) => s.wall === "north").map((s) => s.x), plan.clock.x];
   for (let x = R.x0 + 3; x < R.x1 - 2; x += 5.5) { if (taken.some((t) => Math.abs(t - x) < 2.6)) continue; block(root, 2.6, 1.6, 0.1, WOOD_D, x, 2.2, R.z0 + 0.16); const g = block(root, 2.3, 1.3, 0.12, "#bfe3ff", x, 2.35, R.z0 + 0.18, { mat: { emissive: "#6fa6d6", emissiveIntensity: 0.55 } }); g.castShadow = false; }
@@ -53,8 +65,9 @@ export function buildBuilding(scene, plan, { systems = [], current = "" } = {}) 
   block(clk, 0.55, 1.15, 0.08, WOOD_D, 0, -2.0, 0.0).castShadow = false;
   const lever = new THREE.Group(); lever.position.set(0.55, -1.0, 0.12); clk.add(lever); const lv = box(0.05, 0.36, 0.05, "#1b1b1b"); lv.position.y = 0.16; lever.add(lv); const lk = box(0.12, 0.12, 0.12, "#c43b2e"); lk.position.y = 0.34; lever.add(lk);
   const leverPlate = plate("½  1  2", { w: 0.42, h: 0.12, bg: "#e9dcb4", font: "bold 60px Georgia, serif" }); leverPlate.position.set(0.55, -0.65, 0.12); clk.add(leverPlate);
+  { const out = cyl(0.13, 0.12, BRASS, 14); out.position.set(1.25, 2.45 - 3.2, 0.22); clk.add(out); const pipe = box(0.06, 0.06, 0.2, BRASS); pipe.position.set(1.25, 2.45 - 3.2, 0.1); clk.add(pipe); }
   pick.push({ object: clockFace, kind: "clock" }, { object: back, kind: "clock" }, { object: rimC, kind: "clock" }, { object: lk, kind: "lever" }, { object: lv, kind: "lever" }, { object: leverPlate, kind: "lever" });
-  const clockMouth = new THREE.Vector3(plan.clock.x, 2.05, R.z0 + 0.45);
+  const clockMouth = new THREE.Vector3(plan.clock.x + 1.25, 2.45, R.z0 + 0.4); // beside the clock, never across its face
 
   // ---- the board's frame on the west wall ----
   const bf = new THREE.Group(); bf.position.set(plan.board.x, 2.45, plan.board.z); root.add(bf);
@@ -77,10 +90,11 @@ export function buildBuilding(scene, plan, { systems = [], current = "" } = {}) 
   dir.position.y = Math.max(0.6, Math.min(1.15, WALL_H - 0.4 - H));
 
   function update(s, t, amb, ctx) {
+    if (ctx.camera) { const c = ctx.camera.position; inside.visible = c.y < WALL_H - 0.15 && c.x > R.x0 && c.x < R.x1 && c.z > R.z0 && c.z < R.z1; }
     handSg.rotation.z = -((t % 1000) / 1000) * Math.PI * 2; handMg.rotation.z = -(t / Math.max(1, ctx.duration)) * Math.PI * 2;
     const ring = ctx.clockRing; bells.forEach((b, i) => (b.rotation.z = ring ? Math.sin(amb * 60 + i) * 0.25 : 0));
     pend.rotation.z = ctx.paused ? 0 : Math.sin(amb * 3.2) * 0.32;
     lever.rotation.z = [0.5, 0, -0.5][ctx.speedIndex ?? 1];
   }
-  return { root, pick, update, clockMouth, floor };
+  return { root, pick, update, clockMouth, floor, occluders, inside };
 }

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Head inspection</title>
+<style>
+  html, body { margin: 0; background: #111; color: #ddd; font: 13px ui-monospace, Menlo, monospace; }
+  canvas { display: block; }
+  .lab { position: absolute; padding: 2px 5px; background: #000a; color: #ffd27a; border-radius: 3px; pointer-events: none; white-space: pre; }
+  #title { position: absolute; left: 6px; top: 4px; color: #fff; font-size: 15px; }
+</style>
+</head>
+<body>
+<div id="title"></div>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
+<script type="module">
+// head/inspect.html: what a visitor of the WORLD sees inside a head, as contact sheets (driven by head/inspect.mjs).
+// It copies main.js's mounting: the renderer (no tone mapping, sRGB), the lights, fov 42, the head at HEAD_SCALE
+// 0.042 (here the head stays at scale 1 and the camera is placed in head-local units: dist / 0.042), the entry
+// camera (enterHead: dir (0, 0.3, 1), 0.6 world units from the head centre), the distance -> detail mapping
+// (detail = (1 - dist) / 0.7) and camera.near. `?mod=` loads another head module (a "before" copy).
+import * as THREE from "three";
+import { loadSystem, busyTime } from "./bench.js";
+const q = new URLSearchParams(location.search);
+const { createHead } = await import(q.get("mod") || "./head.js");
+const HEAD_SCALE = 0.042;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setPixelRatio(1); renderer.setScissorTest(true);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color("#c9d6dc");
+scene.add(new THREE.HemisphereLight("#fff3dc", "#6b5a48", 1.35));
+const sun = new THREE.DirectionalLight("#ffe2b8", 1.7); sun.position.set(-14, 26, 16); scene.add(sun);
+const fill = new THREE.DirectionalLight("#cfe0ff", 0.35); fill.position.set(20, 10, -10); scene.add(fill);
+// the world's office around the head, roughly: a floor and a few desks far away, so windows show something
+{ const fl = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: "#b9a98e" })); fl.rotation.x = -Math.PI / 2; fl.position.y = -32; scene.add(fl);
+  for (let i = 0; i < 14; i++) { const d = new THREE.Mesh(new THREE.BoxGeometry(30, 18, 16), new THREE.MeshLambertMaterial({ color: i % 2 ? "#8a6a4a" : "#d0c8b8" })); const a = i * 0.9; d.position.set(Math.sin(a) * (60 + i * 9), -23, Math.cos(a) * (60 + i * 9)); scene.add(d); } }
+const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 4000);
+let sim = null, head = null, skull = null, sys = null, actor = null;
+window.load = async ({ system, actorId, interactive = false, room = true }) => {
+  if (sys !== system) { sim = await loadSystem(system); sys = system; }
+  if (head) { head.dispose(); if (head.room) head.room.removeFromParent(); }
+  if (skull) skull.removeFromParent();
+  actor = actorId || sim.actors.find((a) => !a.external && sim.chartOf(a.id)).id;
+  head = createHead({ THREE, sim, actorId: actor, options: { interactive } }); scene.add(head.group);
+  if (head.room && room) head.group.add(head.room);
+  else { // the world's skull box (main.js) for a head that brings no room
+    skull = new THREE.Mesh(new THREE.BoxGeometry(14.5, 12.5, 14.5), new THREE.MeshLambertMaterial({ color: "#6a3a40", side: THREE.BackSide, emissive: "#2a1214", emissiveIntensity: 0.6 }));
+    skull.position.y = 0.5; head.group.add(skull);
+  }
+  return { actor, busy: busyTime(sim, actor), duration: sim.duration, levels: head.levels, stats: head.stats() };
+};
+// a view: detail d (the world's distance), or an explicit distance; az/el around the head centre (az 0 = the
+// face side, where enterHead puts the camera); focus: a state id (the world flies to it at detail >= 0.9)
+const ENTRY_EL = Math.atan2(0.3, 1);
+function place(v, aspect) {
+  const d = v.detail ?? 0.571;
+  const distW = v.distW ?? (1 - 0.7 * d); // world units
+  let tgt = new THREE.Vector3();
+  if (v.focus) { const fb = head.focusBounds; tgt = fb.center.clone(); }
+  const dist = (v.focus ? Math.max(0.09, Math.min(0.35, head.focusBounds.radius * HEAD_SCALE * 2.0)) : distW) / HEAD_SCALE;
+  const el = v.el ?? ENTRY_EL, az = v.az ?? 0;
+  camera.position.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(dist).add(tgt);
+  camera.up.set(0, 1, 0); camera.lookAt(tgt); camera.aspect = aspect;
+  camera.near = Math.max(0.004, Math.min(0.05, (dist * HEAD_SCALE) * 0.05)) / HEAD_SCALE; camera.far = 4000; camera.updateProjectionMatrix();
+  return { d: v.focus ? Math.max(clamp01((1 - dist * HEAD_SCALE) / 0.7), 0.9) : d, dist };
+}
+const clamp01 = (x) => Math.min(1, Math.max(0, x));
+function settle(t, d, focus) {
+  head.focus(focus || null); head.setDetail(d);
+  for (let i = 0; i < 90; i++) head.update(t, 1 / 30); // the eased parts settle; time itself does not move
+}
+// plates in screen space at W x H: rects, overlaps, smallest text
+function plateRects(W, H) {
+  head.group.updateMatrixWorld(true);
+  const out = []; const v = new THREE.Vector3();
+  const list = head.plates ? head.plates() : (() => { const a = []; head.group.traverse((o) => { if (o.isMesh && o.geometry && o.geometry.type === "PlaneGeometry" && o.material && o.material.map && o.material.map.isCanvasTexture) a.push({ mesh: o, text: "?" }); }); return a; })();
+  for (const p of list) {
+    const o = p.mesh; let vis = true; for (let x = o; x; x = x.parent) if (!x.visible) vis = false; if (!vis) continue;
+    if (o.material.opacity !== undefined && o.material.transparent && o.material.opacity < 0.3) continue;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, behind = false;
+    for (const [a, b] of [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]) { v.set(a, b, 0).applyMatrix4(o.matrixWorld); v.project(camera); if (v.z > 1 || v.z < -1) behind = true; const sx = (v.x + 1) / 2 * W, sy = (1 - v.y) / 2 * H; x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy); }
+    if (behind || x1 < 0 || y1 < 0 || x0 > W || y0 > H) continue;
+    // facing the camera?
+    const n = new THREE.Vector3(0, 0, 1).transformDirection(o.matrixWorld); const c = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
+    if (n.dot(camera.position.clone().sub(c)) <= 0) continue;
+    // the text's height on screen: the plate's projected height along its own up axis at its centre
+    const up = new THREE.Vector3(0, 0.5, 0).applyMatrix4(o.matrixWorld).project(camera), dn = new THREE.Vector3(0, -0.5, 0).applyMatrix4(o.matrixWorld).project(camera);
+    const ph = Math.hypot((up.x - dn.x) / 2 * W, (up.y - dn.y) / 2 * H);
+    out.push({ text: p.text, kind: p.kind || "", level: p.level ?? 0, focal: !!p.focal, rect: [x0, y0, x1, y1], px: ph * 0.6 /* glyph height of a plate */ });
+  }
+  const overlaps = [];
+  for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
+    const a = out[i].rect, b = out[j].rect; const ix = Math.min(a[2], b[2]) - Math.max(a[0], b[0]), iy = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
+    if (ix > 2 && iy > 2) { const area = ix * iy, sm = Math.min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1])); if (area > 0.12 * sm) overlaps.push([out[i].text, out[j].text, Math.round(100 * area / sm)]); }
+  }
+  return { plates: out, overlaps };
+}
+window.measure = ({ t, view, W = 1440, H = 900 }) => {
+  const p = place(view, W / H); settle(t, p.d, view.focus); place(view, W / H);
+  const r = plateRects(W, H);
+  const MIN = 9; // px of glyph height
+  const small = r.plates.filter((x) => x.focal && x.px < MIN).map((x) => `${x.text}:${x.px.toFixed(1)}`);
+  return { n: r.plates.length, overlaps: r.overlaps, small, minFocal: Math.min(...r.plates.filter((x) => x.focal).map((x) => x.px)) };
+};
+// a contact sheet: rows x cols of views into one canvas; labels as HTML
+window.sheet = ({ t, rows, cols, cellW = 480, cellH = 300, title = "" }) => {
+  const W = cols.length * cellW, H = rows.length * cellH + 26;
+  renderer.setSize(W, H); document.querySelectorAll(".lab").forEach((x) => x.remove());
+  document.getElementById("title").textContent = title;
+  renderer.setScissor(0, 0, W, H); renderer.setViewport(0, 0, W, H); renderer.setClearColor(0x111111); renderer.clear();
+  const info = [];
+  rows.forEach((row, ri) => cols.forEach((col, ci) => {
+    const v = { ...col, ...row };
+    const p = place(v, cellW / cellH); settle(t, p.d, v.focus); place(v, cellW / cellH);
+    const x = ci * cellW, y = H - 26 - (ri + 1) * cellH;
+    renderer.setViewport(x, y, cellW, cellH); renderer.setScissor(x + 1, y + 1, cellW - 2, cellH - 2);
+    renderer.render(scene, camera);
+    const lab = document.createElement("div"); lab.className = "lab"; lab.style.left = `${x + 4}px`; lab.style.top = `${26 + ri * cellH + 4}px`;
+    lab.textContent = `${col.name || ""} d=${p.d.toFixed(2)}${v.focus ? " focus " + v.focus : ""}`; document.body.append(lab);
+    info.push({ ri, ci, d: p.d });
+  }));
+  return { W, H, info };
+};
+// one full-size frame (what the visitor sees)
+window.frame = ({ t, view, W = 1440, H = 900, title = "" }) => {
+  renderer.setSize(W, H); document.querySelectorAll(".lab").forEach((x) => x.remove()); document.getElementById("title").textContent = title;
+  renderer.setViewport(0, 0, W, H); renderer.setScissor(0, 0, W, H);
+  const p = place(view, W / H); settle(t, p.d, view.focus); place(view, W / H); renderer.render(scene, camera);
+  return { d: p.d };
+};
+window.headApi = () => head;
+window.simApi = () => sim;
+window.THREE = THREE; window.cam = camera;
+window.ready = true;
+</script>
+</body>
+</html>

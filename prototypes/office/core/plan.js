@@ -92,12 +92,17 @@ export function makePlan(sim, cfg = {}) {
 
   // externals: attached to one actor's desk, or a station on a wall
   const stations = []; const attached = new Map(); // ext id -> actor id
+  const small = cfg.small ?? (people.length <= 2 && !hub);
   for (const x of exts) {
     const ps = [...(partners.get(x.id) || [])].filter((p) => !sim.actor(p)?.external);
     const tot = ps.reduce((s, p) => s + w(x.id, p), 0);
     const top = ps.sort((a, b) => w(x.id, b) - w(x.id, a))[0];
     const kind = classifyExternal(x, cfg);
     if (kind === "bus") continue; // the tubes are the bus
+    // a small system (one or two people) is a cosy office: every external it uses but the clock stands
+    // at arm's length beside the desk it talks to (the person using it as a control panel, a service
+    // as a machine), not on a far wall
+    if (small && kind !== "timer" && top && tot > 0 && cfg.attach !== false && !(cfg.stations || []).includes(x.id) && groupOf.get(top) && !String(groupOf.get(top)).startsWith("side:") && ![...attached.values()].includes(top)) { attached.set(x.id, top); continue; }
     if (kind !== "user" && kind !== "timer" && kind !== "log" && top && tot > 0 && w(x.id, top) / tot > 0.9 && top !== hub && !(cfg.stations || []).includes(x.id) && groupOf.get(top) && !String(groupOf.get(top)).startsWith("side:") && cfg.attach !== false) { attached.set(x.id, top); continue; }
     if (!tot && !(cfg.showIdleExternals)) continue; // never used in this run
     stations.push({ id: x.id, kind, label: cfg.names?.[x.id] || x.label || x.id, weight: tot });
@@ -146,7 +151,7 @@ export function makePlan(sim, cfg = {}) {
       const c = k % g.cols, r = Math.floor(k / g.cols);
       const x = g.x - g.w / 2 + (c + 0.5) * g.cellW - (g.cellW - DESK_W) / 2;
       const z = g.z - g.d / 2 + r * g.cellD + 1.05;
-      seats.set(`${g.id}#${k}`, { x, z, facing: 0, machineX: g.cellW > DESK_W ? x + 1.9 : null });
+      seats.set(`${g.id}#${k}`, { x, z, facing: 0, machineX: g.cellW > DESK_W ? x + 1.05 : null });
     }
   }
   const seatOfLife = (id, i) => {
@@ -167,10 +172,10 @@ export function makePlan(sim, cfg = {}) {
   const machines = []; const usedSpots = new Set();
   for (const [x, owner] of attached) {
     const L = sim.lifetimes(owner); const s = seatOfLife(owner, 0);
-    const spot = s ? `${((s.machineX ?? s.x + 1.9)).toFixed(1)},${s.z.toFixed(1)}` : null;
+    const spot = s ? `${((s.machineX ?? s.x + 1.05)).toFixed(1)},${s.z.toFixed(1)}` : null;
     if (s && usedSpots.has(spot)) { stations.push({ id: x, kind: classifyExternal(sim.actor(x), cfg), label: cfg.names?.[x] || sim.actor(x).label || x, weight: 1 }); continue; }
     if (s) usedSpots.add(spot);
-    if (s) machines.push({ id: x, owner, kind: classifyExternal(sim.actor(x), cfg), label: cfg.names?.[x] || sim.actor(x).label || x, x: (s.machineX ?? s.x + 1.9), z: s.z + 0.55, facing: 0, lives: L.length });
+    if (s) machines.push({ id: x, owner, kind: classifyExternal(sim.actor(x), cfg), label: cfg.names?.[x] || sim.actor(x).label || x, x: (s.machineX ?? s.x + 1.05), z: s.z - 0.05, facing: 0, lives: L.length });
   }
 
   // ---- room ----
@@ -182,23 +187,24 @@ export function makePlan(sim, cfg = {}) {
   const centroidX = (id) => { let sx = 0, sw = 0; for (const [k, v] of pairW) { const [a, b] = k.split("|"); const o = a === id ? b : b === id ? a : null; if (!o) continue; const g = groups.get(groupOf.get(o)); if (g) { sx += g.x * v; sw += v; } } return sw ? sx / sw : 0; };
   north.sort((a, b) => centroidX(a.id) - centroidX(b.id));
   const STW = 4.2;
-  let room = { x0: minX - 6.5, x1: maxX + 4.5, z0: minZ - 5.6, z1: maxZ + 3.0 };
+  let room = small ? { x0: minX - 3.4, x1: maxX + 2.4, z0: minZ - 3.4 - (north.length ? 1.6 : 0), z1: maxZ + 2.6 } : { x0: minX - 6.5, x1: maxX + 4.5, z0: minZ - 5.6, z1: maxZ + 3.0 };
+  const MIN_W = small ? 9.5 : 18, MIN_D = small ? 8.5 : 13.5;
   const needW = north.length * STW + 4;
   if (room.x1 - room.x0 < needW) { const extra = (needW - (room.x1 - room.x0)) / 2; room.x0 -= extra; room.x1 += extra; }
-  if (room.x1 - room.x0 < 18) { const extra = (18 - (room.x1 - room.x0)) / 2; room.x0 -= extra; room.x1 += extra; }
-  if (room.z1 - room.z0 < 13.5) { const extra = 13.5 - (room.z1 - room.z0); room.z0 -= extra * 0.5; room.z1 += extra * 0.5; }
+  if (room.x1 - room.x0 < MIN_W) { const extra = (MIN_W - (room.x1 - room.x0)) / 2; room.x0 -= extra; room.x1 += extra; }
+  if (room.z1 - room.z0 < MIN_D) { const extra = MIN_D - (room.z1 - room.z0); room.z0 -= extra * 0.5; room.z1 += extra * 0.5; }
   const span = room.x1 - room.x0 - 4; const step = north.length ? Math.min(STW + 1.5, span / north.length) : 0;
   north.forEach((s, i) => { s.x = room.x0 + 2 + step * (i + 0.5); s.z = room.z0 + 2.2; s.facing = 0; s.wall = "north"; });
   // keep each north station roughly above its partners when there is room
   for (let pass = 0; pass < 3; pass++) for (let i = 0; i < north.length; i++) { const want = Math.max(room.x0 + 2.2, Math.min(room.x1 - 2.2, centroidX(north[i].id))); const lo = i ? north[i - 1].x + STW : room.x0 + 2.2; const hi = i < north.length - 1 ? north[i + 1].x - STW : room.x1 - 2.2; if (lo <= hi) north[i].x = Math.max(lo, Math.min(hi, want)); }
-  const door = { x: room.x0, z: room.z1 - 3.2 };
+  const door = { x: room.x0, z: room.z1 - (small ? 2.2 : 3.2) };
   const users = stations.filter((s) => s.kind === "user"); users.forEach((s, i) => { s.x = room.x0 + 1.3; s.z = door.z - 2.8 - i * 3.0; s.facing = Math.PI / 2; s.wall = "west"; });
   const clocks = stations.filter((s) => s.kind === "timer"); clocks.forEach((s, i) => { s.x = room.x1 - 3.5 - i * 3; s.z = room.z0 + 0.2; s.wall = "north"; s.clock = true; });
   const clock = clocks.length ? { x: clocks[0].x, z: clocks[0].z } : { x: room.x1 - 3.5, z: room.z0 + 0.2 };
   const westFree0 = room.z0 + 1.2, westFree1 = (users.length ? users[users.length - 1].z - 1.8 : door.z - 1.6);
   const bw = Math.max(3, Math.min(7.2, (westFree1 - westFree0) * 0.95));
   const board = { x: room.x0 + 0.15, z: (westFree0 + westFree1) / 2, w: bw, h: bw * 900 / 1600 };
-  const directory = { x: room.x0 + 0.15, z: Math.min(room.z1 - 1.2, door.z + 1.9) };
+  const directory = { x: room.x0 + 0.15, z: Math.min(room.z1 - 1.0, door.z + (small ? 1.5 : 1.9)) };
   const hubXZ = groups.get("hub") ? { x: groups.get("hub").x, z: groups.get("hub").z } : { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 };
 
   return {
@@ -207,7 +213,7 @@ export function makePlan(sim, cfg = {}) {
         i = -1; for (let j = 0; j < L.length; j++) if (L[j][0] <= t) i = j; if (i < 0) i = 0; }
       return { ...seatOfLife(id, i), life: i, slot: slotOf.get(`${id}#${i}`) ?? 0, group: groupOf.get(id) }; },
     seatOfLife, slotOf: (id, i) => slotOf.get(`${id}#${i}`), seats,
-    stations, machines, attached, room, door, board, hubXZ, clock, directory, killed, blackouts, reasonOf, vanishes,
+    stations, machines, attached, room, small, door, board, hubXZ, clock, directory, killed, blackouts, reasonOf, vanishes,
     weight: w, partners: (id) => [...(partners.get(id) || [])],
   };
 }

@@ -6,12 +6,14 @@
 // reborn walk back in.
 import * as THREE from "three";
 import { makeAvatar, applyPose, mixPose, POSES, generatedLook } from "./avatar.js";
+import { SPOT, CHAIR } from "./layout.js";
 import { box, ease, clamp01, lerp, hashStr, hueColor } from "./kit.js";
 import { WALK, LEAVE } from "../core/plan.js";
 
-const BLEND = 0.35;
+const BLEND = 0.55;   // seconds to ease from one pose to the next
+const REACT_GAP = 3.0; // a reaction plays once per event; events closer than this share one
 
-export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map()) {
+export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map(), desks = null) {
   const keyOf = (s) => `${s.x.toFixed(2)},${s.z.toFixed(2)}`;
   const V = (x, z) => new THREE.Vector3(x, 0, z);
   const door = V(plan.door.x + 0.3, plan.door.z);
@@ -41,13 +43,16 @@ export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map())
       seats.get(key).occ.push({ id: a.id, life: i, bornS, endS, kill, reason, path, outPath });
     });
   }
+  function lerpAngle(a, b, f) { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return a + d * clamp01(f); }
   function curve(pts) { const ded = pts.filter((q, i) => i === 0 || q.distanceTo(pts[i - 1]) > 0.3); if (ded.length < 2) ded.push(ded[0].clone().add(new THREE.Vector3(0.01, 0, 0.01))); return new THREE.CatmullRomCurve3(ded, false, "catmullrom", 0.1); }
   for (const s of seats.values()) {
     s.occ.sort((x, y) => x.bornS - y.bornS);
     const look = (id) => cfg.characters?.[id] || { ...generatedLook(id, sim.actor(id)?.chart, hashStr, hueColor), ...(id === plan.hub ? { accessory: "headset" } : {}) };
     s.avatar = makeAvatar(look(s.occ[0].id)); s.look = look;
     s.avatar.root.traverse((o) => { if (o.isMesh) o.userData.seatKey = s.key; });
-    const rec = box(0.1, 0.34, 0.08, "#1d1d1d"); rec.position.set(0, -0.05, 0.08); rec.visible = false; s.avatar.propL.add(rec); s.receiver = rec;
+    const rec = new THREE.Group(); { const h = box(0.07, 0.3, 0.07, "#1d1d1d"); h.position.set(0, 0.02, 0); rec.add(h); for (const y of [-0.12, 0.15]) { const c = box(0.1, 0.08, 0.1, "#1d1d1d"); c.position.set(0, y, 0.03); rec.add(c); } } rec.position.set(0, -0.01, 0.1); rec.visible = false; s.avatar.prop.add(rec); s.receiver = rec;
+    const clip = new THREE.Group(); { const b = box(0.24, 0.015, 0.3, "#8a6a3a"); clip.add(b); const pp = box(0.2, 0.004, 0.25, "#f6f0de"); pp.position.y = 0.01; clip.add(pp); } clip.visible = false; scene.add(clip); s.clip = clip;
+    s.desk = desks ? desks.desks.get(s.key) : null;
     scene.add(s.avatar.root);
   }
 
@@ -59,7 +64,7 @@ export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map())
     for (const st of Object.keys(map)) if (act.includes(st)) return { pose: map[st], since: 0, sit: sim.situationAt(id, t) };
     const sit = sim.situationAt(id, t); const since = s - W(sit.since);
     let pose = "idle";
-    if (sit.kind === "working") pose = sit.detail?.with && stationById.get(sit.detail.with)?.attachedTo === id ? "machine" : "typing";
+    if (sit.kind === "working") { const st = sit.detail?.with && stationById.get(sit.detail.with); pose = st && st.attachedTo === id && st.kind !== "user" ? "machine" : "typing"; }
     else if (sit.kind === "waiting") pose = sit.detail?.with === "timer" ? "wristwatch" : sim.actor(sit.detail?.with)?.external ? "phone" : since < 1.6 ? "post" : "wristwatch";
     else if (sit.kind === "exception") pose = "panic";
     else if (sit.kind === "done") pose = "doneWave";
@@ -71,49 +76,62 @@ export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map())
   const arrivals = new Map(), typing = new Map(), refusals = new Map();
   const userish = (id) => /user|stage|input|keyboard|operator/i.test(`${sim.actor(id)?.kind || ""} ${id}`) && sim.actor(id)?.external;
   for (const m of sim.messagesBetween(-1, sim.duration + 1)) { const s1 = sim.flight(m)[1]; for (const to of sim.recipients(m)) { if (!sim.actor(to) || sim.actor(to).external) continue; if (userish(m.from)) (typing.get(to) || typing.set(to, []).get(to)).push(s1); else if (!/log/i.test(m.name)) (arrivals.get(to) || arrivals.set(to, []).get(to)).push(s1); if (/reject|refus|denied|forbidden/i.test(m.name)) (refusals.get(to) || refusals.set(to, []).get(to)).push(s1); } }
+  const thin = (m) => { for (const [k, arr] of m) { arr.sort((a, b) => a - b); const kept = []; for (const x of arr) if (!kept.length || x - kept[kept.length - 1] >= REACT_GAP) kept.push(x); m.set(k, kept); } };
+  thin(arrivals); thin(refusals);
   const lastBefore = (arr, s) => { let best = -Infinity; if (arr) for (const x of arr) { if (x <= s) best = x; else break; } return best; };
 
   const occAt = (seat, s) => { let cur = null; for (const o of seat.occ) { const start = o.bornS === -Infinity ? -Infinity : o.bornS; const stop = o.endS === Infinity ? Infinity : o.endS + (o.kill ? 0.3 : LEAVE); if (s >= start && s < stop) cur = o; } return cur; };
   // who is at a seat now (present = sitting there, not walking)
   function occupantOf(key, s) { const seat = seats.get(key); if (!seat) return null; const o = occAt(seat, s); if (!o) return null; const present = s >= (o.bornS === -Infinity ? -Infinity : o.bornS + (o.path ? WALK : 0)) && s < o.endS; return { id: o.id, present, o }; }
 
+  // the pose a seat's furniture allows: a visitor's stool has no desk, a hub's exchange has a counter
+  const REACH = POSES.reach;
+  function adapt(pose, seat) { if (!seat.visitor) return pose; return { typing: "clipboard", watch: "clipboard", post: "idle", machine: "clipboard", phoneWrite: "phone" }[pose] || pose; }
+  const V3 = new THREE.Vector3();
   function update(s, amb, sel) {
     const t = sim.unwarp(s); const dark = darkAt(s);
     for (const seat of seats.values()) {
-      const av = seat.avatar; const o = occAt(seat, s);
-      if (!o || (o.kill && s >= o.endS + 0.25)) { av.root.visible = false; seat.current = null; continue; }
+      const av = seat.avatar; const o = occAt(seat, s); const S = seat.seat;
+      const chairAside = (k, turn = 0) => { const ch = seat.desk && seat.desk.chair; if (!ch) return; const f = S.facing || 0, c = Math.cos(f), sn = Math.sin(f); const x = CHAIR.aside[0] * k, z = CHAIR.aside[1] * k; ch.position.set(S.x + x * c + z * sn, 0, S.z - x * sn + z * c); ch.rotation.y = f + k * 0.5 + turn; }; // a swivel chair: it turns with its sitter
+      if (!o || (o.kill && s >= o.endS + 0.25)) { av.root.visible = false; seat.current = null; seat.clip.visible = false; chairAside(1); continue; }
       if (seat.current !== o) { seat.current = o; av.style(seat.look(o.id)); av.root.traverse((m) => { if (m.isMesh) m.userData.actorId = o.id; }); }
       av.root.visible = true;
-      const S = seat.seat; let pos = V(S.x, S.z), facing = S.facing || 0, walking = 0;
-      if (o.bornS > -Infinity && s < o.bornS + WALK) { const f = clamp01((s - o.bornS) / WALK); const u = ease(f); pos = o.path.getPointAt(u); const tg = o.path.getTangentAt(Math.min(0.999, u)); facing = Math.atan2(tg.x, tg.z); walking = f < 0.97 ? 1 : 0; }
+      let pos = V(S.x, S.z), facing = S.facing || 0, walking = 0;
+      if (o.bornS > -Infinity && s < o.bornS + WALK) { const f = clamp01((s - o.bornS) / WALK); const u = ease(f); pos = o.path.getPointAt(u); const tg = o.path.getTangentAt(Math.min(0.999, u)); facing = Math.atan2(tg.x, tg.z); walking = f < 0.97 ? 1 : 0; if (!walking) facing = lerpAngle(facing, S.facing || 0, (f - 0.97) / 0.03); }
       else if (s >= o.endS && !o.kill) {
-        const f = clamp01((s - o.endS - 0.4) / (LEAVE - 0.6)); const p = o.outPath || o.path; const reverse = !o.outPath; const u = reverse ? 1 - ease(f) : ease(f);
+        const f = clamp01((s - o.endS - 0.6) / (LEAVE - 0.8)); const p = o.outPath || o.path; const reverse = !o.outPath; const u = reverse ? 1 - ease(f) : ease(f);
         if (f > 0) { pos = p.getPointAt(u); const tg = p.getTangentAt(Math.min(0.999, Math.max(0.001, u))); facing = reverse ? Math.atan2(-tg.x, -tg.z) : Math.atan2(tg.x, tg.z); walking = 1; }
       }
       const tt = Math.min(t, o.endS === Infinity ? t : sim.unwarp(o.endS) - 1e-6);
-      let { pose, since, sit } = poseOf(o.id, tt, s);
+      let { pose, since, sit } = poseOf(o.id, tt, s); pose = adapt(pose, S);
       let P = POSES[pose] || POSES.idle;
-      if (since < BLEND) { const prev = poseOf(o.id, sim.unwarp(Math.max(0, s - since - 0.05)), s - since - 0.05).pose; if (POSES[prev] && prev !== pose) P = mixPose(POSES[prev], P, ease(since / BLEND)); }
+      if (since < BLEND) { const prev = adapt(poseOf(o.id, sim.unwarp(Math.max(0, s - since - 0.05)), s - since - 0.05).pose, S); if (POSES[prev] && prev !== pose) P = mixPose(POSES[prev], P, ease(since / BLEND)); }
+      // arriving: walk, then stand at the desk, then sit down (the chair comes in under them)
       if (walking) P = POSES.walk;
-      else if (o.bornS > -Infinity && s < o.bornS + WALK + BLEND) P = mixPose(POSES.walk, P, ease((s - o.bornS - WALK) / BLEND));
-      else if (s >= o.endS && !o.kill) P = mixPose(P, POSES.stand, clamp01((s - o.endS) / 0.4));
+      else if (o.bornS > -Infinity && s < o.bornS + WALK + 0.9) { const k = (s - o.bornS - WALK) / 0.9; P = mixPose(POSES.stand, P, ease(k)); }
+      else if (s >= o.endS && !o.kill) P = mixPose(P, POSES.stand, ease(clamp01((s - o.endS) / 0.6))); // leaving: stand up first
       if (!walking && pose !== "asleep" && s < o.endS) {
-        const ty = s - lastBefore(typing.get(o.id), s); if (ty >= 0 && ty < 1.0) P = mixPose(P, POSES.typing, Math.min(1, ty / 0.15) * (ty > 0.8 ? (1 - ty) / 0.2 : 1));
-        const ar = s - lastBefore(arrivals.get(o.id), s); if (ar >= 0 && ar < 0.55) { const k = Math.sin((ar / 0.55) * Math.PI); P = { ...P, aRx: lerp(P.aRx, -2.1, k), aRz: lerp(P.aRz, 0.35, k), headY: lerp(P.headY, -0.6, k * 0.7) }; }
-        const rf = s - lastBefore(refusals.get(o.id), s); if (rf >= 0 && rf < 1.8) P = mixPose(P, POSES.shrug, Math.min(1, rf / 0.2) * Math.min(1, (1.8 - rf) / 0.3));
+        const ty = s - lastBefore(typing.get(o.id), s); if (ty >= 0 && ty < 1.2 && !S.visitor) P = mixPose(P, POSES.typing, ease(Math.min(1, ty / 0.3)) * (ty > 0.9 ? 1 - ease((ty - 0.9) / 0.3) : 1));
+        const ar = s - lastBefore(arrivals.get(o.id), s); if (ar >= 0 && ar < 1.4 && !S.visitor && REACH) { const k = ar < 0.45 ? ease(ar / 0.45) : ar > 0.95 ? 1 - ease((ar - 0.95) / 0.45) : 1; P = mixPose(P, { ...REACH, sit: P.sit, chair: P.chair }, k); }
+        const rf = s - lastBefore(refusals.get(o.id), s); if (rf >= 0 && rf < 1.8) P = mixPose(P, POSES.shrug, ease(Math.min(1, rf / 0.3)) * ease(Math.min(1, (1.8 - rf) / 0.4)));
       }
-      seat.receiver.visible = pose === "phone" && !walking;
+      if (S.visitor && !walking) P = { ...P, sit: Math.max(P.sit, s >= o.endS ? P.sit : 1), chair: 0 };
+      seat.receiver.visible = (pose === "phone" || pose === "phoneWrite") && !walking;
+      av.root.position.copy(pos); av.root.rotation.y = facing;
       applyPose(av, P, amb, hashStr(o.id) % 7);
-      av.root.position.copy(pos); av.root.rotation.y = facing + (walking ? 0 : P.turn || 0);
-      const lift = sel && sel.id === o.id ? sel.lid : 0;
-      av.lid.position.y = av.headSize + lift * 0.28; av.lid.rotation.x = -lift * 0.9; av.lid.position.z = -lift * 0.12;
-      const hide = sel && sel.id === o.id && sel.skinHidden; av.hips.visible = !hide;
-      seat.pose = pose; seat.sit = sit;
+      chairAside(walking ? 1 : clamp01(P.chair), walking ? 0 : P.turn || 0);
+      seat.clip.visible = pose === "clipboard" && !walking; if (seat.clip.visible) { av.root.localToWorld(seat.clip.position.set(0, 0.7, 0.33)); seat.clip.rotation.set(0, facing, 0); }
+      const lift = sel && sel.lidOf ? sel.lidOf(o.id) : sel && sel.id === o.id ? sel.lid : 0;
+      av.setLid(ease(lift));
+      const hide = sel && sel.id === o.id && sel.skinHidden; av.body.visible = !hide; av.blob.visible = !hide;
+      seat.pose = pose; seat.sit = sit; seat.P = P;
     }
     return dark;
   }
+  // what the camera keeps out of: a box round everyone in the room now
+  function boxes(skipId) { const out = []; for (const seat of seats.values()) { const r = seat.avatar.root; if (!r.visible || !seat.current || seat.current.id === skipId) continue; const h = seat.P && seat.P.sit > 0.5 ? 1.95 : 2.35; /* head top plus a hand's width */ out.push([new THREE.Vector3(r.position.x - 0.36, 0, r.position.z - 0.36), new THREE.Vector3(r.position.x + 0.36, h, r.position.z + 0.36)]); } return out; }
   const seatOfActor = (id, s) => { for (const seat of seats.values()) { const o = occAt(seat, s); if (o && o.id === id) return seat; } return null; };
   function headCenter(id, s, out = new THREE.Vector3()) { const seat = seatOfActor(id, s); if (!seat) return null; seat.avatar.head.updateWorldMatrix(true, false); return seat.avatar.head.getWorldPosition(out); }
-  function facingOf(id, s) { const seat = seatOfActor(id, s); return seat ? seat.avatar.root.rotation.y : 0; }
-  return { seats, update, occupantOf, headCenter, facingOf, seatOfActor, blackouts, darkAt, roots: () => [...seats.values()].map((x) => x.avatar.root) };
+  function facingOf(id, s) { const seat = seatOfActor(id, s); return seat ? seat.avatar.root.rotation.y + (seat.avatar.body.rotation.y || 0) : 0; }
+  return { seats, update, occupantOf, headCenter, facingOf, seatOfActor, boxes, blackouts, darkAt, roots: () => [...seats.values()].map((x) => x.avatar.root) };
 }

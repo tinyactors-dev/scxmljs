@@ -119,6 +119,7 @@ export function prototypesIndex(): string {
   <p class="lede">Experiments built on scxmljs. They are not part of the library, have no documentation or API to rely on, and may change or vanish without notice.</p>
   <div class="demo-cards">
     <a class="card" href="/prototypes/office/"><h2>The Office</h2><p>A recorded run of the LLM chat example as an office you can walk through: every actor is a person at a desk, every message is mail in a pneumatic tube. Drag to look around, click a person to see inside their head, click mail to read it, touch the board to jump in time. Full screen, WebGL; best with a mouse.</p></a>
+    <a class="card" href="/prototypes/office/?live=microwave"><h2>The Office, live</h2><p>The same office with the charts running in the page: it stands still until you press its buttons, pull its levers or advance its wall clock. Also <code>?live=checkout</code>, <code>fulfillment</code>, <code>llm-chat</code> and <code>pi-durable</code>.</p></a>
   </div>
 </div>`;
 }

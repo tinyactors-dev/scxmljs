@@ -125,20 +125,20 @@ export function createSim(input, opts = {}) {
     let s = 0.8;
     // long runs: shrink per-hop and per-gap time so a loop stays watchable
     const nHops = gl.reduce((n, g) => n + (g.quiet ? 0.15 : Math.max(0.5, g.D)), 0);
-    const hopSec = Math.max(0.22, Math.min(HOP_SEC, 55 / Math.max(1, nHops)));
+    const hopSec = opts.live ? HOP_SEC : Math.max(0.22, Math.min(HOP_SEC, 55 / Math.max(1, nHops))); // live: a fixed pace, so earlier instants keep their playback times as the run grows
     const gapK = opts.gapK ?? 0.052 * Math.min(1, hopSec / HOP_SEC);
     for (let i = 0; i < gl.length; i++) {
       const g = gl[i];
-      if (i > 0) { const prevEnd = gl[i - 1].t + (gl[i - 1].D + 1) * HOP; const gap = g.t - prevEnd; s += Math.max(0.12, Math.min(2.8, gapK * Math.sqrt(Math.max(0, gap)))); }
+      if (i > 0) { const prevEnd = gl[i - 1].t + (gl[i - 1].D + 1) * HOP; const gap = g.t - prevEnd; s += opts.live ? (opts.live.gapSec?.(g.t) ?? 0.3) : Math.max(0.12, Math.min(2.8, gapK * Math.sqrt(Math.max(0, gap)))); } // live: the gap is when the visitor acted
       knotsT.push(g.t); knotsS.push(s);
-      s += g.quiet ? 0.12 : Math.max(0.35, g.D * hopSec);
+      s += opts.live?.spanSec?.(g.t, g) ?? (g.quiet ? 0.12 : Math.max(0.35, g.D * hopSec)); // live: a long chain of instants (a streamed answer) may be played faster
       knotsT.push(g.t + (g.D + 1) * HOP); knotsS.push(s);
     }
     const lastT = knotsT[knotsT.length - 1];
     duration = Math.max(trace.duration || 0, Math.ceil(lastT));
-    if (duration > lastT) { s += Math.max(0.6, Math.min(3, 0.11 * Math.sqrt(duration - lastT))); knotsT.push(duration); knotsS.push(s); }
+    if (!opts.live && duration > lastT) { /* live: no tail, the run is open-ended */ s += Math.max(0.6, Math.min(3, 0.11 * Math.sqrt(duration - lastT))); knotsT.push(duration); knotsS.push(s); }
     const CAP = opts.maxLoop ?? 100;
-    if (s > CAP) { const k = CAP / s; for (let i = 0; i < knotsS.length; i++) knotsS[i] *= k; s = CAP; }
+    if (!opts.live && s > CAP) { /* live: never rescaled */ const k = CAP / s; for (let i = 0; i < knotsS.length; i++) knotsS[i] *= k; s = CAP; }
     sim.playDuration = s + 2.0;
     sim.hopSec = hopSec;
     sim.duration = duration; sim.HOP = HOP;

@@ -13,6 +13,8 @@ Checks (node, no browser):
   share a seat at the same time or two groups overlap.
 
 Films: `node record.mjs --system <name>` writes `out/<name>.mp4` and `-small.mp4`.
+Stills of the live page: `node tools/shoot.mjs <system> <dir> '<json>'`; every system at once (overview,
+eye level, after a click, after leaving a head): `node tools/sweep.mjs <dir>`.
 `--test 12,40` writes stills. `SYSTEM=<name> node shots.mjs '[...]'` takes stills of the live page.
 
 ## The parts
@@ -26,7 +28,10 @@ Films: `node record.mjs --system <name>` writes `out/<name>.mp4` and `-small.mp4
 | `world/building.js` | Room, door, windows, wall clock (play control), board frame, directory. |
 | `world/stations.js` | Externals by kind. |
 | `world/desks.js` | A desk per seat; the hub's exchange; visitor stools; datamodel objects. |
-| `world/people.js` | Avatars pooled per seat, walking in and out, poses from situations. |
+| `world/people.js` | Avatars pooled per seat, walking in and out, poses from situations, one-shot reactions, the swivel chair. |
+| `world/avatar.js` | The rig (joint hierarchy, two-bone IK, a limited roll-free neck, the hinged lid) and the poses. |
+| `world/layout.js` | Where things are on a desk, in the seat frame: shared by the desk, the poses and the pose check. |
+| `world/camera.js` | Camera flights along paths, collision against furniture, walls and people, the conversational framing. |
 | `world/tubes.js` | The comb manifold, routes, instanced capsules, the slip. |
 | `film.js` | A visit planned from the run. |
 
@@ -83,15 +88,19 @@ Unused externals are not built.
 
 | Situation | Pose |
 |---|---|
-| idle | leaning back, hands behind the head |
-| working | typing, or cranking the machine beside the desk when the work is with it |
+| idle | leaning back, hands resting in the lap |
+| working | typing (eyes on the screen, which shows the state they are in), or cranking the machine beside the desk when the work is with it |
 | waiting on an external | on the phone (the receiver leaves the desk) |
-| waiting on an actor | turned to the tube mouth, then checking the wristwatch |
-| exception | on their feet, hands on the head |
-| done | standing and waving, then walking out |
+| waiting on an actor | turned to the in-basket under the tube's hatch, then checking the wristwatch |
+| exception | leaning back, hands thrown up beside the head (face visible); the desk's red alarm lamp lights |
+| done | standing (the chair slides aside) and waving, then walking out |
 
-Reactions are layered on top of the pose: a reach when a capsule arrives, typing when the people
-at the keyboards hand something in, a shrug at a refusal.
+Reactions play ONCE per event (events closer than 3 s share one) on top of the pose: a reach into the
+in-basket when a capsule arrives, typing when the people at the keyboards hand something in, a shrug
+at a refusal. Poses are hand targets for two-bone IK on fixed limb lengths (`world/avatar.js`); the
+furniture they reach for is `world/layout.js`. `node tools/inspect.mjs` renders one person in every
+pose from 8 angles at 1 m and 3 m (`out/inspect/`) and fails when a limb passes through the body or
+the furniture: run it after touching a pose, the rig or the desk.
 
 **Desk = datamodel.** Up to 4 variables per chart. Score = changes in the run + 2 x states that
 read it. Each becomes an object by type, with an engraved name plate:

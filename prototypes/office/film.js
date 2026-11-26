@@ -27,7 +27,7 @@ export function makeFilm({ THREE, api, sim, plan, step, render, setAmb, camera, 
   const bay = (pin.bay && plan.groups.find((g) => g.id === pin.bay)) || bays.sort((a, b) => lives(b) - lives(a) || b.members.length - a.members.length)[0] || plan.groups[0];
   const bayView = () => { const z1 = bay.z + bay.d / 2; return { pos: V(bay.x + 1.5, Math.max(3.4, bay.w * 0.33 + 2), z1 + Math.max(5.5, bay.w * 0.55)), tgt: V(bay.x, 0.9, bay.z + 0.4) }; };
   // playback rates by film time: [F0, rate]; the follow / reading / head windows are fitted below
-  const T = { arrive: 0, walk: 6.6, follow: 21, read: 24.2, readEnd: 28.0, head: 31.5, headIn: 36.0, deep: 39.0, out1: 43.0, out2: 44.6, out3: 46.0, board: 46.6, touch: 52.0, pull: 53.5, end: 84 };
+  const T = { arrive: 0, walk: 6.6, follow: 21, read: 24.2, readEnd: 28.0, head: 31.5, headIn: 36.0, deep: 39.0, out1: 43.0, out2: 44.6, out3: 46.0, board: 48.6, touch: 54.0, pull: 55.5, end: 84 };
   // the capsule to follow: from a seated actor, early enough, going far (to a station or the hub)
   const P9 = 3.0 + T.walk * 1.0 + 1.5;
   const msgs = api.tubes.flights.filter((f) => !f.dim && sim.actor(f.m.from) && !sim.actor(f.m.from).external && f.m.from !== f.to && f.s1 - f.s0 > 0.3);

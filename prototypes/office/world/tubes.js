@@ -10,9 +10,10 @@
 // Capsules are one InstancedMesh; the static tubes are one merged mesh plus instanced rings.
 import * as THREE from "three";
 import { mat, canvasTex, ease, clamp01, hueColor } from "./kit.js";
-import { MOUTH } from "./desks.js";
+import { MOUTH, seatPoint } from "./desks.js";
+import { SPOT, RISER_X } from "./layout.js";
 
-const Y1 = 3.3, Y2 = 3.95;
+const Y1 = 3.3, Y2 = 3.95, CEIL = 4.6; // CEIL: world/building.js's WALL_H
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 export function family(name) { const n = String(name || ""); if (/(^|\.)error(\.|$)|^error/.test(n)) return "error"; return n.split(/[.\s:/]/)[0] || "message"; }
@@ -47,14 +48,21 @@ export function buildTubes(scene, sim, plan, { desks, stations, clockMouth, cfg 
 
   // ---- static tubes ----
   const segs = []; const rings = [];
-  const tube = (pts, r) => { const c = roundedPath(pts.map((p) => p.clone())); segs.push(new THREE.TubeGeometry(c, Math.max(8, Math.ceil(c.getLength() * 3)), r, 8, false)); const L = c.getLength(); for (let d = 0.3; d < L; d += 1.6) rings.push([c.getPointAt(d / L), c.getTangentAt(d / L), r]); };
-  const deskUp = (d, g) => { const M = d.mouth; if (g.kind === "hub") return [M, V(M.x, Y2 - 0.5, M.z), H]; const J = junction(g); return [M, V(M.x, Y1, M.z), V(J.x, Y1, M.z), J]; }; // a comb: drop, row header, spine
+  // a tube, with a brass clamp at each end and, on its level runs, a clamp on a hanger rod up to the ceiling
+  const hangers = [];
+  const tube = (pts, r) => { const c = roundedPath(pts.map((p) => p.clone())); segs.push(new THREE.TubeGeometry(c, Math.max(8, Math.ceil(c.getLength() * 3)), r, 8, false)); const L = c.getLength();
+    rings.push([c.getPointAt(0), c.getTangentAt(0), r]); // a clamp where the tube starts (its end goes into a junction box or the manifold)
+    let lastH = -9; for (let d = 0.6; d < L - 0.3; d += 0.25) { const u = d / L, tg = c.getTangentAt(u); if (Math.abs(tg.y) > 0.05 || d - lastH < 2.4) continue; const p = c.getPointAt(u); rings.push([p, tg, r]); hangers.push([p.clone(), r]); lastH = d; } };
+  // a desk's riser: out of the hatch, sideways to the desk's outer corner, and up there, so the glass
+  // never stands between a visitor in front of the desk and the sitter's face, nor in the sitter's reach
+  const riser = (d) => { const M = d.mouth; const b = seatPoint(d.seat, [RISER_X, SPOT.hatch[1] + 0.12, SPOT.hatch[2]]); return { M, pts: [M, V(M.x, b.y, M.z), b], x: b.x, z: b.z }; };
+  const deskUp = (d, g) => { const r = riser(d); if (g.kind === "hub") return [...r.pts, V(r.x, Y2 - 0.5, r.z), H]; const J = junction(g); return [...r.pts, V(r.x, Y1, r.z), V(J.x, Y1, r.z), J]; }; // a comb: riser, row header, spine
   const seatGroup = new Map();
   for (const g of plan.groups) {
     const rows = new Map(); // mouth z -> [min x, max x]
     for (let k = 0; k < g.slots; k++) { const s = plan.seats.get(`${g.id}#${k}`); const d = s && desks.desks.get(keyOf(s)); if (!d) continue; seatGroup.set(d.key, g);
       if (g.kind === "hub") { tube(deskUp(d, g), 0.09); continue; }
-      const M = d.mouth; tube([M, V(M.x, Y1, M.z)], 0.085); const zk = M.z.toFixed(2); const r = rows.get(zk) || [M.x, M.x]; rows.set(zk, [Math.min(r[0], M.x), Math.max(r[1], M.x)]); }
+      const rs = riser(d); tube([...rs.pts, V(rs.x, Y1, rs.z)], 0.085); const zk = rs.z.toFixed(2); const r = rows.get(zk) || [rs.x, rs.x]; rows.set(zk, [Math.min(r[0], rs.x), Math.max(r[1], rs.x)]); }
     if (g.kind === "hub") continue;
     const J = junction(g); let zMax = J.z;
     for (const [zk, [x0, x1]] of rows) { const z = Number(zk); const a = Math.min(x0, J.x) - 0.09, b = Math.max(x1, J.x) + 0.09; if (b - a > 0.2) tube([V(a, Y1, z), V(b, Y1, z)], 0.1); zMax = Math.max(zMax, z); }
@@ -64,11 +72,13 @@ export function buildTubes(scene, sim, plan, { desks, stations, clockMouth, cfg 
   const stUp = (st) => [st.mouth, V(st.mouth.x, Y2, st.mouth.z), H];
   for (const st of stations.list) tube(stUp(st), 0.12);
   const clockUp = [clockMouth, V(clockMouth.x, Y2, clockMouth.z + 0.3), H]; tube(clockUp, 0.1);
-  const glass = new THREE.MeshPhongMaterial({ color: "#d9f2ff", transparent: true, opacity: 0.34, shininess: 90, specular: "#ffffff", depthWrite: false });
+  const glass = new THREE.MeshPhongMaterial({ color: "#b9dcea", transparent: true, opacity: 0.5, shininess: 90, specular: "#ffffff", depthWrite: false });
   const tubesMesh = new THREE.Mesh(mergeGeos(segs), glass); tubesMesh.renderOrder = 2; root.add(tubesMesh);
   const ringGeo = new THREE.TorusGeometry(1, 0.15, 6, 14); const ringsMesh = new THREE.InstancedMesh(ringGeo, mat("#c9a14a"), rings.length);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), zA = V(0, 0, 1), yA = V(0, 1, 0);
   rings.forEach(([p, tg, r], i) => { q.setFromUnitVectors(zA, tg); sc.setScalar(r + 0.015); m4.compose(p, q, sc); ringsMesh.setMatrixAt(i, m4); }); root.add(ringsMesh);
+  // hanger rods from the clamps up to the ceiling (one merged mesh)
+  { const rods = hangers.map(([p, r]) => { const h = CEIL - (p.y + r); const g = new THREE.BoxGeometry(0.025, h, 0.025); g.translate(p.x, p.y + r + h / 2, p.z); return g; }); for (const st of stations.list) { const h = CEIL - Y2; const g = new THREE.BoxGeometry(0.025, h, 0.025); g.translate(st.mouth.x, Y2 + h / 2, st.mouth.z); rods.push(g); } const hubRod = new THREE.BoxGeometry(0.05, CEIL - Y2, 0.05); hubRod.translate(H.x, Y2 + (CEIL - Y2) / 2, H.z); rods.push(hubRod); if (rods.length) { const m = new THREE.Mesh(mergeGeos(rods.map((g) => g.index ? g : g)), mat("#6b5a3a")); m.castShadow = false; root.add(m); } }
   // junction boxes and the manifold
   const brass = mat("#c9a14a");
   for (const g of plan.groups) if (g.kind !== "hub") { const J = junction(g); const b = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.34, 0.5), brass); b.position.copy(J); root.add(b); }
@@ -90,7 +100,7 @@ export function buildTubes(scene, sim, plan, { desks, stations, clockMouth, cfg 
     const d = desks.desks.get(keyOf(seat));
     if (!d) return { up: [H.clone().add(V(0, -0.3, 0)), H], mouth: H, kind: "none", gone };
     const gg = seatGroup.get(d.key);
-    return { up: deskUp(d, gg || { kind: "hub" }), mouth: d.mouth, timer: d.timer, kind: "desk", gone, group: gg?.id, key: d.key };
+    return { up: deskUp(d, gg || { kind: "hub" }), mouth: d.mouth, basket: d.basket, timer: d.timer, kind: "desk", gone, group: gg?.id, key: d.key };
   }
 
   // ---- flights ----
@@ -114,27 +124,34 @@ export function buildTubes(scene, sim, plan, { desks, stations, clockMouth, cfg 
     const A = endpoint(f.m.from, f.m.at), B = endpoint(f.to, f.m.at);
     let pts;
     if (!A || !B) pts = [H, H.clone().add(V(0, -1, 0))];
-    else if ((timerKind(f.m.from) || fromTimer(f.m)) && B.kind === "desk" && B.timer) { const T = B.timer.getWorldPosition(new THREE.Vector3()).add(V(0, 0.2, 0)); pts = [T, T.clone().add(V(0, 0.5, 0)), B.mouth.clone().add(V(0, 0.3, 0)), B.mouth.clone().add(V(0, -0.36, 0))]; }
+    else if ((timerKind(f.m.from) || fromTimer(f.m)) && B.kind === "desk" && B.timer) { const T = B.timer.getWorldPosition(new THREE.Vector3()).add(V(0, 0.25, 0)); pts = [T, T.clone().add(V(0, 0.45, 0)), B.mouth.clone().add(V(0, 0.4, 0)), B.mouth.clone()]; }
     else if (f.m.from === f.to && A.kind === "desk") { const M = A.mouth; pts = [M, V(M.x, M.y + 1.1, M.z), V(M.x + 0.6, M.y + 1.3, M.z), V(M.x + 0.6, M.y + 0.4, M.z), M.clone().add(V(0, 0.05, 0))]; }
     else if (A.kind === "desk" && B.kind === "desk" && A.group && A.group === B.group && A.group !== "hub") pts = [...A.up, ...B.up.slice(0, -1).reverse()];
     else { const a = A.up, b = B.up; pts = [...a, ...b.slice(0, -1).reverse()]; }
-    f.route = roundedPath(pts.map((p) => p.clone())); f.dropAt = B ? B.mouth.clone() : H.clone();
+    // mail leaves from the sender's in-basket and lands in the receiver's (through the hatch)
+    if (A && A.kind === "desk" && A.basket && pts[0].distanceTo(A.mouth) < 1e-3) pts.unshift(A.basket.clone());
+    if (B && B.kind === "desk" && B.basket && !(f.dead)) pts.push(B.basket.clone());
+    f.destKey = B && B.kind === "desk" ? B.key : null;
+    f.route = roundedPath(pts.map((p) => p.clone()), 0.3); f.dropAt = B ? B.mouth.clone() : H.clone();
     return f.route;
   }
 
   // ---- capsules: one instanced mesh ----
   const MAX = 600;
-  const capGeo = new THREE.CapsuleGeometry(1, 2.2, 3, 8);
+  const CAP_R = 0.055; // a capsule is 0.11 m across and 0.24 m long: fits the tube (r 0.085) and the basket
+  const capGeo = new THREE.CapsuleGeometry(1, 2.4, 3, 8);
   const capMat = new THREE.MeshLambertMaterial({ color: "#ffffff", emissive: "#222222" });
   const caps = new THREE.InstancedMesh(capGeo, capMat, MAX); caps.instanceMatrix.setUsage(THREE.DynamicDrawUsage); caps.count = 0; caps.frustumCulled = false; root.add(caps);
   caps.setColorAt(0, new THREE.Color()); caps.instanceColor.setUsage(THREE.DynamicDrawUsage);
-  const active = []; const tmpC = new THREE.Color();
+  const active = []; const tmpC = new THREE.Color(); const GREY = new THREE.Color("#9aa0aa"), WHITE = new THREE.Color("#ffffff"); const restDir = V(1, 0, 0.35).normalize();
+  const dropping = new Map(); // desk key -> 0..1 while a capsule drops through its hatch
   // resting: the last capsule each desk/station received lies in its basket
   const restKey = (f) => { const e = endpoint(f.to, f.m.at); return e ? (e.key || f.to) : f.to; };
   let lo = 0;
   function update(s, highlight) {
-    active.length = 0; let n = 0, traffic = 0;
-    const place = (f, p, tg, scale, resting) => { if (n >= MAX) return; const big = highlight && highlight.has(f.m.id) ? 1.6 : 1; const r = (f.dim ? 0.042 : 0.085) * scale * big; q.setFromUnitVectors(yA, tg || V(1, 0, 0)); sc.set(r, r * (f.dim ? 0.8 : 1), r); m4.compose(p, q, sc); caps.setMatrixAt(n, m4); tmpC.copy(f.color); if (f.dim) tmpC.lerp(new THREE.Color("#9aa0aa"), 0.7); caps.setColorAt(n, tmpC); active.push({ f, msg: f.m, pos: p.clone(), resting, index: n }); n++; };
+    active.length = 0; let n = 0, traffic = 0; dropping.clear();
+    // ONE capsule size everywhere (CAP_R): log traffic is grey, a highlighted capsule glows, none grows
+    const place = (f, p, tg, scale, resting) => { if (n >= MAX) return; const lit = highlight && highlight.has(f.m.id); const r = CAP_R * scale; q.setFromUnitVectors(yA, tg || restDir); sc.set(r, r, r); m4.compose(p, q, sc); caps.setMatrixAt(n, m4); tmpC.copy(f.color); if (f.dim) tmpC.lerp(GREY, 0.7); if (lit) tmpC.lerp(WHITE, 0.45); caps.setColorAt(n, tmpC); active.push({ f, msg: f.m, pos: p.clone(), resting, index: n }); n++; };
     // flights in the air (a window of the sorted list)
     while (lo > 0 && flights[lo - 1].s0 > s - maxFlight) lo--; while (lo < flights.length && flights[lo].s0 < s - maxFlight) lo++;
     const lastAt = new Map();
@@ -142,15 +159,15 @@ export function buildTubes(scene, sim, plan, { desks, stations, clockMouth, cfg 
       const f = flights[i]; if (f.s0 > s) break;
       if (!f.dim && f.s1 <= s) lastAt.set(restKey(f), f);
       if (i < lo) continue;
-      if (s <= f.s1) { const r = routeOf(f); const k = f.s1 > f.s0 ? clamp01((s - f.s0) / (f.s1 - f.s0)) : 1; const u = ease(k) * 0.96 + k * 0.04; const p = r.getPointAt(Math.min(1, u)); if (p.distanceTo(H) < 1.2) traffic++; place(f, p, r.getTangentAt(Math.min(0.999, u)), 1, false); }
+      if (s <= f.s1) { const r = routeOf(f); const k = f.s1 > f.s0 ? clamp01((s - f.s0) / (f.s1 - f.s0)) : 1; const u = ease(k) * 0.96 + k * 0.04; const p = r.getPointAt(Math.min(1, u)); if (p.distanceTo(H) < 1.2) traffic++; if (f.destKey && u > 0.82) dropping.set(f.destKey, Math.max(dropping.get(f.destKey) || 0, Math.min(1, (u - 0.82) / 0.08, (1 - u) / 0.04 + 0.2))); place(f, p, u > 0.985 ? null : r.getTangentAt(Math.min(0.999, u)), 1, false); }
       else if (f.dead && s < f.s1 + 2.2) { routeOf(f); const k = clamp01((s - f.s1) / 0.7); const p = f.dropAt.clone(); p.y = Math.max(0.09, p.y - 0.4 - k * k * (p.y - 0.09)); place(f, p, null, 1 - clamp01((s - f.s1 - 1.6) / 0.6), false); }
     }
-    for (const [k, f] of lastAt) { if (f.dead || s - f.s1 > 25) continue; const e = endpoint(f.to, f.m.at); if (!e || e.kind === "none" || e.kind === "clock") continue; if (e.kind === "desk") { const occ = people.occupantOf(e.key, s); if (!occ || occ.id !== f.to) continue; } const p = e.mouth.clone().add(V(0, -0.36, 0)); place(f, p, null, 1, true); }
+    for (const [k, f] of lastAt) { if (f.dead || s - f.s1 > 25) continue; const e = endpoint(f.to, f.m.at); if (!e || e.kind === "none" || e.kind === "clock") continue; if (e.kind === "desk") { const occ = people.occupantOf(e.key, s); if (!occ || occ.id !== f.to) continue; } const p = (e.basket || e.mouth).clone(); place(f, p, null, 1, true); }
     caps.count = n; caps.instanceMatrix.needsUpdate = true; caps.instanceColor.needsUpdate = true; caps.boundingSphere = null; caps.boundingBox = null;
     wheel.rotation.y = s * (traffic ? 6 : 0.4); hubLampM.emissiveIntensity = traffic ? 1.6 : 0.2;
     return active;
   }
-  return { root, update, active, caps, flights, endpoint, routeOf, H };
+  return { root, update, active, caps, flights, endpoint, routeOf, H, dropping: (k) => dropping.get(k) || 0 };
 }
 
 // the slip of paper inside a capsule: event name, who to whom, the summary

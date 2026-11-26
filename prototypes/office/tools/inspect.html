@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Office: one person, close up</title>
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #20242c; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<!-- tools/inspect.html: ONE person at a desk, the furniture and the poses the world uses, for close-up
+     contact sheets and the intersection check (tools/inspect.mjs drives it).
+     ?pose=<name>&phase=<seconds>&angle=<0..7>&dist=<m> shows one; window.inspect is the API. -->
+<canvas id="gl"></canvas>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
+<script type="module">
+import * as THREE from "three";
+import { makeAvatar, applyPose, mixPose, POSES, bodyParts, RIG } from "../world/avatar.js";
+import { deskFurniture } from "../world/desks.js";
+import { deskBoxes, chairBoxes, CHAIR } from "../world/layout.js";
+import { BoxBatch } from "../world/kit.js";
+
+const canvas = document.getElementById("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight, false); renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.background = new THREE.Color("#c9d6dc");
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.03, 100);
+scene.add(new THREE.HemisphereLight("#fff3dc", "#6b5a48", 1.35));
+const sun = new THREE.DirectionalLight("#ffe2b8", 1.5); sun.position.set(-4, 8, 5); scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshLambertMaterial({ color: "#c79a64" })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const seat = { x: 0, z: 0, facing: 0 };
+const furn = new THREE.Group(); scene.add(furn); const grp = new THREE.Group(); furn.add(grp);
+const batch = new BoxBatch(); const desk = deskFurniture(batch, grp, seat, { machine: false }); furn.add(batch.mesh());
+desk.screen("cooking", true);
+const av = makeAvatar({ shirt: "#5fbf8f", pants: "#3a3f55", skin: "#e2ae86", hair: "#3b2a20", hairStyle: "short" });
+scene.add(av.root);
+const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 0.07), new THREE.MeshLambertMaterial({ color: "#1d1d1d" })); receiver.position.set(0, 0.01, 0.1); av.prop.add(receiver);
+
+// the poses the world shows, by name: situations, reactions and transitions (with a blend k)
+const S = (name) => POSES[name];
+const CASES = {
+  idle: () => S("idle"), working: () => S("typing"), watching: () => S("watch"), "waiting-actor": () => S("post"), "waiting-external": () => S("phone"),
+  "waiting-clock": () => S("wristwatch"), exception: () => S("panic"), done: () => S("doneWave"), asleep: () => S("asleep"), absent: () => null,
+  reach: () => S("reach"), "reach-half": () => mixPose(S("typing"), S("reach"), 0.5), typing: () => S("typing"), shrug: () => S("shrug"), walk: () => S("walk"),
+  machine: () => S("machine"), clipboard: () => S("clipboard"), phoneWrite: () => S("phoneWrite"),
+  "sit-down-25": () => mixPose(S("stand"), S("idle"), 0.25), "sit-down-50": () => mixPose(S("stand"), S("idle"), 0.5), "sit-down-75": () => mixPose(S("stand"), S("idle"), 0.75),
+  "stand-up-50": () => mixPose(S("typing"), S("stand"), 0.5), "typing-to-exception": () => mixPose(S("typing"), S("panic"), 0.5), "idle-to-phone": () => mixPose(S("idle"), S("phone"), 0.5),
+};
+let current = null;
+function setPose(name, phase = 0) {
+  const P = CASES[name] ? CASES[name]() : null; current = { name, P, phase };
+  av.root.visible = !!P; receiver.visible = !!P && /phone|external/i.test(name);
+  const chairK = P ? Math.max(0, Math.min(1, P.chair || 0)) : 1;
+  desk.chair.position.set(CHAIR.aside[0] * chairK, 0, CHAIR.aside[1] * chairK); desk.chair.rotation.y = chairK * 0.5 + (P ? P.turn || 0 : 0);
+  if (P) applyPose(av, P, phase, 3);
+  desk.alarmM.emissiveIntensity = P && P.alarm > 0.5 ? 1.4 : 0; desk.alarmLight.intensity = P && P.alarm > 0.5 ? 1.8 : 0;
+  scene.updateMatrixWorld(true);
+  return current;
+}
+// 8 angles round the person, at a distance, a little above their eye level
+function setView(angle = 0, dist = 3) {
+  const head = new THREE.Vector3(0, 1.3, 0.25); const a = (angle / 8) * Math.PI * 2;
+  camera.position.set(Math.sin(a) * dist, 1.3 + dist * 0.28, 0.25 + Math.cos(a) * dist); camera.lookAt(dist < 1.5 ? new THREE.Vector3(0, 1.25, 0.3) : head.clone().add(new THREE.Vector3(0, -0.2, 0.15)));
+  camera.near = dist < 1.5 ? 0.02 : 0.05; camera.updateProjectionMatrix();
+}
+
+// ---- the intersection check: oriented boxes (SAT), limbs against the body and the furniture
+function obbOfMesh(mesh, margin) {
+  const g = mesh.geometry; if (!g.boundingBox) g.computeBoundingBox(); const bb = g.boundingBox; const m = mesh.matrixWorld;
+  const c = bb.getCenter(new THREE.Vector3()).applyMatrix4(m); const half = bb.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+  const ax = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]; m.extractBasis(ax[0], ax[1], ax[2]);
+  const h = [half.x * ax[0].length(), half.y * ax[1].length(), half.z * ax[2].length()].map((x) => Math.max(0.001, x - margin)); ax.forEach((v) => v.normalize());
+  return { c, ax, h };
+}
+function obbOfBox(b, margin) { const ry = b.ry || 0; const ax = [new THREE.Vector3(Math.cos(ry), 0, -Math.sin(ry)), new THREE.Vector3(0, 1, 0), new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry))]; return { c: new THREE.Vector3(...b.c), ax, h: b.s.map((x) => Math.max(0.001, x / 2 - margin)) }; }
+function overlap(A, B) {
+  const T = B.c.clone().sub(A.c); const axes = [...A.ax, ...B.ax];
+  for (const a of A.ax) for (const b of B.ax) { const x = a.clone().cross(b); if (x.lengthSq() > 1e-8) axes.push(x.normalize()); }
+  let minPen = Infinity;
+  for (const L of axes) { const ra = A.h.reduce((s, h, i) => s + h * Math.abs(A.ax[i].dot(L)), 0), rb = B.h.reduce((s, h, i) => s + h * Math.abs(B.ax[i].dot(L)), 0); const d = Math.abs(T.dot(L)); const pen = ra + rb - d; if (pen <= 0) return 0; minPen = Math.min(minPen, pen); }
+  return minPen;
+}
+// which pairs are tested, and how much contact is allowed (metres): a hand rests on a keyboard, a
+// thigh sits on the seat; nothing passes through a head, a body, a monitor or another arm
+const SOFT = { keyboard: 0.03, basket: 0.04, "chair seat": 0.05, "chair back": 0.03, thigh: 0.03 };
+function check() {
+  if (!current || !current.P) return { violations: [], short: [] };
+  const parts = bodyParts(av); const by = Object.fromEntries(parts.map((p) => [p.name, p.mesh]));
+  const arms = ["upperL", "foreL", "handL", "upperR", "foreR", "handR"], legs = ["thighL", "shinL", "thighR", "shinR"];
+  const pairs = [];
+  for (const a of arms) { for (const b of ["head", "neck"]) pairs.push([a, b, 0.01]); pairs.push([a, "torso", a.startsWith("upper") ? 0.05 : 0.012]); for (const l of legs) pairs.push([a, l, a.startsWith("upper") ? 0.015 : 0.035]); /* a hand or forearm may rest on a thigh */ }
+  for (const [a, b] of [["foreL", "foreR"], ["handL", "handR"], ["foreL", "handR"], ["foreR", "handL"], ["upperL", "foreR"], ["upperR", "foreL"]]) pairs.push([a, b, 0.015]);
+  const out = [];
+  for (const [a, b, m] of pairs) { const pen = overlap(obbOfMesh(by[a], m), obbOfMesh(by[b], m)); if (pen > 0) out.push({ a, b, pen: +pen.toFixed(3) }); }
+  const furniture = [...deskBoxes(), ...chairBoxes(Math.max(0, Math.min(1, current.P.chair || 0)), current.P.turn || 0)];
+  for (const p of parts) for (const f of furniture) {
+    let m = 0.012; if (f.soft || SOFT[f.name]) m = SOFT[f.name] || 0.025; if (/thigh|shin/.test(p.name) && /chair seat/.test(f.name)) m = 0.06; if (/torso/.test(p.name) && /chair back/.test(f.name)) m = 0.04;
+    const pen = overlap(obbOfMesh(p.mesh, m), obbOfBox(f, 0)); if (pen > 0) out.push({ a: p.name, b: f.name, pen: +pen.toFixed(3) });
+  }
+  // stretch: a hand is never farther from its shoulder than the arm is long; a target it could not reach is reported
+  const short = []; const sw = new THREE.Vector3(), hw = new THREE.Vector3();
+  for (const arm of av.arms) { arm.shoulder.getWorldPosition(sw); arm.hand.getWorldPosition(hw); const d = sw.distanceTo(hw); if (d > RIG.reach + 0.01) out.push({ a: arm.sx > 0 ? "armL" : "armR", b: "stretch", pen: +(d - RIG.reach).toFixed(3) }); }
+  av.reached.forEach((x, i) => { if (x > 0.03) short.push({ arm: i ? "R" : "L", by: +x.toFixed(3) }); });
+  // the face: the head's front must face the camera's side of the room within the neck's limit (no roll)
+  const q = new THREE.Quaternion(); av.head.getWorldQuaternion(q); const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q); const roll = Math.asin(Math.min(1, Math.abs(new THREE.Vector3(1, 0, 0).applyQuaternion(q).y)));
+  if (roll > 0.08) out.push({ a: "head", b: "roll", pen: +roll.toFixed(3) });
+  if (up.y < Math.cos(RIG.pitchDown + 0.35)) out.push({ a: "head", b: "pitch", pen: +(Math.acos(up.y)).toFixed(3) });
+  return { violations: out, short };
+}
+function render() { renderer.render(scene, camera); }
+window.inspect = { cases: Object.keys(CASES), setPose, setView, check, render, resize: (w, h) => { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); } };
+const q = new URLSearchParams(location.search);
+setPose(q.get("pose") || "typing", Number(q.get("phase") || 0)); setView(Number(q.get("angle") || 0), Number(q.get("dist") || 3)); render();
+window.ready = true;
+</script>
+</body>
+</html>

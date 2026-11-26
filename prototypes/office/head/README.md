@@ -7,8 +7,9 @@ engraved plates. Nothing in it knows a system: everything comes from the chart a
 Pages and tools (not used by WORLD):
 
 - `inspect.html` + `inspect.mjs`: **the inspection harness**. It mounts a head the way `main.js` does
-  (no tone mapping, the world's lights, fov 42, the entry camera of `enterHead`: direction (0, 0.3, 1),
-  0.6 world units = 14.3 head units from the head's centre, and `detail = (1 - dist) / 0.7`) and shoots,
+  (in the machine room of `world/machineroom.js`, no tone mapping, fov 42) and views it from the `ENTRY`
+  camera: direction (0, 0.3, 1), 14.3 head units from the head's centre, `detail = (1 - dist) / 0.7` with
+  `dist` in units of 14.3 / 0.6 (`main.js` frames the whole machine from that direction instead), and shoots,
   per chart, the full entry frame (1440 x 900) and a contact sheet of 3 details (0.1 = just inside the
   skull, 0.57 = entry, 1) x 7 visitor angles (entry, left, right, above, low side, high left, behind).
   It measures every plate on screen: overlaps (from the front), the smallest text of open machines at
@@ -186,31 +187,22 @@ resume), else from `bornAt`/`diedAt`:
 
 Missing `cause`, snapshots or datamodel are fine.
 
-## The room (for WORLD to mount)
+## The machine room (where WORLD shows a head)
 
-`head.room` is a `THREE.Group` in the head's own units, **not** added to `group`: an attic under the
-skull's dome. A lathe-shaped plaster dome over wood panelling with brass ribs like sutures, a plank
-floor at y = -4.6, a green lamp hanging from the crown with a warm halo, and **two round windows at the
-front, where the eyes are**, cut out of the wall: looking forward from inside (orbit round to the back)
-you see the office through them. It is drawn from inside only (`BackSide`), so a camera outside it (the
-world's entry camera is 14.3 head units from the centre, outside the 9.2-unit dome) sees in through the
-cut-away near side, from any angle. The machines stand on a wooden **table** (part of `group`, fitted
-to whatever is shown) whose legs reach that floor; the mail **inlet** pipe (also in `group`) reaches the
-dome. `options.room === false` builds no room.
+A head is never mounted in the office. Entering a person's machines (a click on the selected person or their
+desk model) takes the visitor to a **machine room** (`world/machineroom.js`): a `THREE.Scene` of its own, with
+a plank floor at y = -4.6 (`ROOM_FLOOR`: the table's legs reach it), a panelled round wall, its own lights, and
+the mail pipe running from the inlet back to the wall, where a plate says the mail comes from the office.
+`main.js` stands the head's `group` at the room's centre at scale 1 (one head unit is one unit there), draws
+the room instead of the office while the visitor is in it, and frames the whole machine from the `ENTRY`
+direction. A chart of up to 80 states is opened fully at once (`MIN_PLATE` keeps its plates legible at that
+framing); a bigger one opens at the entry detail (0.57) and further as the camera comes closer or a machine is
+focused. Going in and out is an iris (`engine/overlay.js`) of about half a second; the office keeps running,
+and the exit (a control at the top left, or Escape) gives back exactly the office view the visitor left.
 
-What WORLD changes in `main.js` (`headFor` and the frame loop):
-
-```js
-// headFor(id): drop the skull box (lines 121-122) and mount the room in its place
-h.group.scale.setScalar(HEAD_SCALE); h.group.visible = false; scene.add(h.group);
-if (h.room) { h.group.add(h.room); h.room.visible = false; h.skull = h.room; }   // replaces the BoxGeometry skull
-// step(): unchanged: `h.skull.visible = sel.skinHidden` now shows the room while the skin is hidden
-```
-
-The room spans x and z of +-9.2 and y from -4.6 to 7.8 head units (+-0.39 x -0.19..0.33 world units at
-HEAD_SCALE 0.042): bigger than the avatar's 0.46 head, so keep it hidden until the skin is (as the skull
-was). The content itself may now reach x +-7.5 (it is fitted to the entry camera's frame, not to the
-10-unit box: a two-machine head fills the view as a twelve-machine one does).
+The head builds no room of its own any more: until 2026-11-26 it had an attic under the skull's dome
+(`room`), mounted inside the person's head in the office behind a hinged lid; the owner found the lid could
+stay open and office geometry showing through, and asked for a separate place to enter and leave.
 
 ## Fitting to the view
 
@@ -245,8 +237,7 @@ measures them).
 
 ## API (CONTRACT.md, plus)
 
-- `room` (a Group, or null with `options.room === false`), `affordances()`, `plates()`, `options.interactive`:
-  above.
+- `affordances()`, `plates()`, `options.interactive`: above.
 
 - `focusBounds` (getter) `{center, radius, box, object}`, in world coordinates, as it will be once
   settled.
@@ -279,9 +270,6 @@ measures them).
   are under 9 px. It relies on the stage (focus), as before.
 - A capsule is visible in flight from the inlet for 0.55 s before it drops; in a paused frame it is in
   the air, on its way (the inlet and the funnel are both visible).
-- The room is seen from outside at detail ~0.1 (a dome on a table, the office around it); WORLD shows
-  the skin until 0.95, so a visitor meets it only briefly.
-
 - Wide machines with nested machines in a back row: the nested housings of the front rows can hide
   the pads of the rows behind them, seen from low angles.
 - A wide machine's tracks between distant pads (skipping rows) arc high and cross. They stay

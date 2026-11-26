@@ -32,10 +32,12 @@ eye level, after a click, after leaving a head): `node tools/sweep.mjs <dir>`.
 | `world/stations.js` | Externals by kind. |
 | `world/desks.js` | A desk per seat; the hub's exchange; visitor stools; datamodel objects. |
 | `world/people.js` | Avatars pooled per seat, walking in and out, poses from situations, one-shot reactions, the swivel chair. |
-| `world/avatar.js` | The rig (joint hierarchy, two-bone IK, a limited roll-free neck, the hinged lid) and the poses. |
+| `world/avatar.js` | The rig (joint hierarchy, two-bone IK, a limited roll-free neck) and the poses. |
 | `world/layout.js` | Where things are on a desk, in the seat frame: shared by the desk, the poses and the pose check. |
 | `world/camera.js` | Camera flights along paths, collision against furniture, walls and people, the conversational framing. |
-| `world/tubes.js` | The comb manifold, routes, instanced capsules, the slip. |
+| `world/tubes.js` | The comb manifold, routes, instanced capsules, what a capsule carries (`summaryText`). |
+| `world/machineroom.js` | The machine room: a scene of its own where a person's machines (`head/head.js`) stand when the visitor enters them; floor, wall, lights, the mail pipe, the camera's bounds there. Nothing of it is in the office, nothing of the office in it. |
+| `engine/overlay.js` | What is drawn over the view in screen pixels: the iris between the office and a machine room, an opened capsule's card (on screen, on top, with a close stamp), the machine room's exit control and plaque. |
 | `film.js` | A visit planned from the run. |
 
 ## Generic rules

@@ -9,7 +9,7 @@
 // errors, a small grey bead for log traffic; office.json "capsules": {family: colour} overrides.
 // Capsules are one InstancedMesh; the static tubes are one merged mesh plus instanced rings.
 import * as THREE from "three";
-import { mat, canvasTex, ease, clamp01, hueColor } from "./kit.js";
+import { mat, ease, clamp01, hueColor } from "./kit.js";
 import { MOUTH, seatPoint } from "./desks.js";
 import { SPOT, RISER_X } from "./layout.js";
 
@@ -170,26 +170,8 @@ export function buildTubes(scene, sim, plan, { desks, stations, clockMouth, cfg 
   return { root, update, active, caps, flights, endpoint, routeOf, H, dropping: (k) => dropping.get(k) || 0 };
 }
 
-// the slip of paper inside a capsule: event name, who to whom, the summary
-export function makeSlip() {
-  const tex = canvasTex(512, 320, () => {});
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.94), new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide }));
-  m.renderOrder = 5; m.visible = false;
-  m.userData.draw = (msg, names, color) => {
-    const g = tex.userData.ctx; g.clearRect(0, 0, 512, 320);
-    g.fillStyle = "#fbf5e2"; g.beginPath(); g.moveTo(8, 14); g.lineTo(504, 6); g.lineTo(500, 306); g.lineTo(12, 314); g.closePath(); g.fill();
-    g.strokeStyle = color || "#888"; g.lineWidth = 10; g.beginPath(); g.moveTo(12, 18); g.lineTo(500, 10); g.stroke();
-    g.fillStyle = "#2b2418"; let fs = 40; g.font = `bold ${fs}px 'DejaVu Sans Mono', monospace`; while (g.measureText(msg.name).width > 470 && fs > 18) { fs -= 2; g.font = `bold ${fs}px 'DejaVu Sans Mono', monospace`; } g.fillText(msg.name, 28, 70);
-    g.font = "24px Georgia, serif"; g.fillStyle = "#6b5a3a"; g.fillText(`${names(msg.from)}  →  ${names(msg.to)}`.slice(0, 44), 28, 108);
-    g.font = "22px 'DejaVu Sans Mono', monospace"; g.fillStyle = "#2b2418";
-    const text = summaryText(msg.summary); let line = "", y = 150;
-    for (const ch of text) { if (g.measureText(line + ch).width > 456) { const cut = line.lastIndexOf(" "); const keep = cut > 20 ? line.slice(0, cut) : line; g.fillText(keep, 28, y); y += 30; line = (cut > 20 ? line.slice(cut + 1) : "") + ch; if (y > 290) { line = ""; break; } } else line += ch; }
-    if (y <= 290 && line) g.fillText(line, 28, y);
-    tex.needsUpdate = true;
-  };
-  return m;
-}
-function summaryText(s) {
+// what a capsule carries, as one line of plain words (the opened card shows it: main.js openCapsule)
+export function summaryText(s) {
   if (s === undefined || s === null || s === "") return "(no data)";
   if (typeof s !== "string") return flat(s);
   try { return flat(JSON.parse(s)); } catch { return String(s).replace(/[{}\[\]"]/g, "").replace(/,/g, " · ").replace(/:/g, ": ").replace(/\\n/g, " "); }

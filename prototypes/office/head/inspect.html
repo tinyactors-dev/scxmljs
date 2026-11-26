@@ -16,38 +16,28 @@
 <script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
 <script type="module">
 // head/inspect.html: what a visitor of the WORLD sees inside a head, as contact sheets (driven by head/inspect.mjs).
-// It copies main.js's mounting: the renderer (no tone mapping, sRGB), the lights, fov 42, the head at HEAD_SCALE
-// 0.042 (here the head stays at scale 1 and the camera is placed in head-local units: dist / 0.042), the entry
-// camera (enterHead: dir (0, 0.3, 1), 0.6 world units from the head centre), the distance -> detail mapping
-// (detail = (1 - dist) / 0.7) and camera.near. `?mod=` loads another head module (a "before" copy).
+// It mounts the head as main.js does, in the machine room (world/machineroom.js: its own scene, floor, wall and
+// lights; the renderer with no tone mapping, sRGB), and views it from head.js's ENTRY camera (dir (0, 0.3, 1),
+// 0.6 / 0.042 head units from the centre, fov 42) with the distance -> detail mapping (detail = (1 - dist) / 0.7,
+// dist in units of that 0.6 / 0.042). main.js frames the whole machine from that direction and opens charts of up
+// to 80 states fully. `?mod=` loads another head module (a "before" copy).
 import * as THREE from "three";
 import { loadSystem, busyTime } from "./bench.js";
+import { createMachineRoom } from "../world/machineroom.js";
 const q = new URLSearchParams(location.search);
 const { createHead } = await import(q.get("mod") || "./head.js");
-const HEAD_SCALE = 0.042;
+const UNIT = 0.042; // head.js ENTRY is 0.6 / UNIT head units from the centre: distances here are in those "entry" units
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setPixelRatio(1); renderer.setScissorTest(true);
 document.body.prepend(renderer.domElement);
-const scene = new THREE.Scene(); scene.background = new THREE.Color("#c9d6dc");
-scene.add(new THREE.HemisphereLight("#fff3dc", "#6b5a48", 1.35));
-const sun = new THREE.DirectionalLight("#ffe2b8", 1.7); sun.position.set(-14, 26, 16); scene.add(sun);
-const fill = new THREE.DirectionalLight("#cfe0ff", 0.35); fill.position.set(20, 10, -10); scene.add(fill);
-// the world's office around the head, roughly: a floor and a few desks far away, so windows show something
-{ const fl = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: "#b9a98e" })); fl.rotation.x = -Math.PI / 2; fl.position.y = -32; scene.add(fl);
-  for (let i = 0; i < 14; i++) { const d = new THREE.Mesh(new THREE.BoxGeometry(30, 18, 16), new THREE.MeshLambertMaterial({ color: i % 2 ? "#8a6a4a" : "#d0c8b8" })); const a = i * 0.9; d.position.set(Math.sin(a) * (60 + i * 9), -23, Math.cos(a) * (60 + i * 9)); scene.add(d); } }
+const machineRoom = createMachineRoom(); const scene = machineRoom.scene;
 const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 4000);
-let sim = null, head = null, skull = null, sys = null, actor = null;
-window.load = async ({ system, actorId, interactive = false, room = true }) => {
+let sim = null, head = null, sys = null, actor = null;
+window.load = async ({ system, actorId, interactive = false }) => {
   if (sys !== system) { sim = await loadSystem(system); sys = system; }
-  if (head) { head.dispose(); if (head.room) head.room.removeFromParent(); }
-  if (skull) skull.removeFromParent();
+  if (head) head.dispose();
   actor = actorId || sim.actors.find((a) => !a.external && sim.chartOf(a.id)).id;
-  head = createHead({ THREE, sim, actorId: actor, options: { interactive } }); scene.add(head.group);
-  if (head.room && room) head.group.add(head.room);
-  else { // the world's skull box (main.js) for a head that brings no room
-    skull = new THREE.Mesh(new THREE.BoxGeometry(14.5, 12.5, 14.5), new THREE.MeshLambertMaterial({ color: "#6a3a40", side: THREE.BackSide, emissive: "#2a1214", emissiveIntensity: 0.6 }));
-    skull.position.y = 0.5; head.group.add(skull);
-  }
+  head = createHead({ THREE, sim, actorId: actor, options: { interactive } }); machineRoom.mount(head.group);
   return { actor, busy: busyTime(sim, actor), duration: sim.duration, levels: head.levels, stats: head.stats() };
 };
 // a view: detail d (the world's distance), or an explicit distance; az/el around the head centre (az 0 = the
@@ -58,12 +48,12 @@ function place(v, aspect) {
   const distW = v.distW ?? (1 - 0.7 * d); // world units
   let tgt = new THREE.Vector3();
   if (v.focus) { const fb = head.focusBounds; tgt = fb.center.clone(); }
-  const dist = (v.focus ? Math.max(0.09, Math.min(0.35, head.focusBounds.radius * HEAD_SCALE * 2.0)) : distW) / HEAD_SCALE;
+  const dist = (v.focus ? Math.max(0.09, Math.min(0.35, head.focusBounds.radius * UNIT * 2.0)) : distW) / UNIT;
   const el = v.el ?? ENTRY_EL, az = v.az ?? 0;
   camera.position.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(dist).add(tgt);
   camera.up.set(0, 1, 0); camera.lookAt(tgt); camera.aspect = aspect;
-  camera.near = Math.max(0.004, Math.min(0.05, (dist * HEAD_SCALE) * 0.05)) / HEAD_SCALE; camera.far = 4000; camera.updateProjectionMatrix();
-  return { d: v.focus ? Math.max(clamp01((1 - dist * HEAD_SCALE) / 0.7), 0.9) : d, dist };
+  camera.near = Math.max(0.004, Math.min(0.05, (dist * UNIT) * 0.05)) / UNIT; camera.far = 4000; camera.updateProjectionMatrix();
+  return { d: v.focus ? Math.max(clamp01((1 - dist * UNIT) / 0.7), 0.9) : d, dist };
 }
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 function settle(t, d, focus) {

@@ -4,7 +4,7 @@
 //    └ body (turns in the chair)
 //       └ hips ─ legs: thigh ─ knee ─ shin, shoe
 //          └ torso (lean, twist) ─ body block, shoulder caps, belt, tie
-//              ├ neck (a visible neck) ─ head (look-at, limited) ─ face, hair, the lid (a hinged hatch)
+//              ├ neck (a visible neck) ─ head (look-at, limited) ─ face, hair (its top and the hats ride on `lid`)
 //              └ shoulder ─ upper arm ─ elbow ─ forearm ─ wrist ─ hand (prop)
 //
 // Arms are placed with two-bone IK onto hand targets and never stretch: limb lengths are fixed, a
@@ -88,12 +88,10 @@ export function makeAvatar(spec = {}) {
   const neckBlock = B(0.18, RIG.neckH + 0.04, 0.17, M.skin, "neck"); neckBlock.position.y = RIG.neckH / 2 - 0.02; neck.add(neckBlock);
   const headG = new THREE.Group(); headG.position.y = RIG.neckH; neck.add(headG);
   const faceM = new THREE.MeshLambertMaterial();
-  // the top of the skull is its own face, hidden while the lid is open (you look INTO the head)
-  const topM = new THREE.MeshLambertMaterial(); topM.color = M.skin.color;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(HS, HS, HS), [M.skin, M.skin, topM, M.skin, faceM, M.skin]); head.name = "head";
-  const hollow = new THREE.Mesh(new THREE.BoxGeometry(HS - 0.02, HS - 0.02, HS - 0.02), new THREE.MeshLambertMaterial({ color: "#5a2a30", side: THREE.BackSide })); hollow.position.y = HS / 2; hollow.visible = false; hollow.name = "hollow";
-  head.position.y = HS / 2; headG.add(head); headG.add(hollow);
-  // the lid: the top of the hair, hinged at the back of the head; it swings open when someone looks inside
+  const head = new THREE.Mesh(new THREE.BoxGeometry(HS, HS, HS), [M.skin, M.skin, M.skin, M.skin, faceM, M.skin]); head.name = "head";
+  head.position.y = HS / 2; headG.add(head);
+  // the top of the hair and whatever is worn on it (a person's machines are a room of their own: world/machineroom.js;
+  // the head never opens)
   const lid = new THREE.Group(); lid.position.set(0, HS, -HS / 2 - 0.02); headG.add(lid);
   const lidMesh = new THREE.Group(); lidMesh.position.set(0, 0, HS / 2 + 0.02); lid.add(lidMesh);
   const parts = {};
@@ -124,11 +122,9 @@ export function makeAvatar(spec = {}) {
   // a soft round shadow under the person (instead of a shadow map that does not match a pose)
   const blob = new THREE.Mesh(new THREE.CircleGeometry(0.42, 20), new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.22, depthWrite: false }));
   blob.rotation.x = -Math.PI / 2; blob.position.y = 0.012; blob.renderOrder = 1; root.add(blob);
-  const a = { root, body, hips, torso, neck, headG, head, topM, hollow, lid, lidMesh, legs, arms, armL, armR, prop: armR.prop, propL: armL.prop, faceM, faceMap: null, sleepMap: null, headSize: HS, M, parts, styleKey: null, blob, reached: [0, 0] };
+  const a = { root, body, hips, torso, neck, headG, head, lid, lidMesh, legs, arms, armL, armR, prop: armR.prop, propL: armL.prop, faceM, faceMap: null, sleepMap: null, headSize: HS, M, parts, styleKey: null, blob, reached: [0, 0] };
   a.style = (sp) => styleAvatar(a, sp);
   a.style(spec);
-  // open the head: 0 closed .. 1 the lid swung right back on its hinge
-  a.setLid = (k) => { a.lid.rotation.x = -k * 1.95; const open = k > 0.02; a.topM.visible = !open; a.hollow.visible = open; };
   return a;
 }
 
@@ -139,7 +135,7 @@ export function styleAvatar(a, { shirt = "#5b7bd5", pants = "#3a3f55", skin = "#
   a.M.shirt.color.set(shirt); a.M.pants.color.set(pants); a.M.skin.color.set(skin); a.M.hair.color.set(hair);
   a.M.hat.color.set(hatColor || (hat === "cap" ? "#2d4e8a" : "#e0663a")); a.M.acc.color.set(accessory === "headphones" ? "#1f8a5a" : "#222");
   const P = a.parts; const bald = hairStyle === "bald", long = hairStyle === "long";
-  // a bald head still has a lid: a skin-coloured cap (so opening the head looks the same for everyone)
+  // a bald head's top is a thin skin-coloured cap
   P.top.visible = true; P.top.material = bald ? a.M.skin : a.M.hair; P.top.scale.y = bald ? 0.04 : 0.1;
   P.backShort.visible = !bald && !long; P.backLong.visible = long; P.sidesShort.forEach((x) => (x.visible = !bald && !long)); P.sidesLong.forEach((x) => (x.visible = long));
   P.beanie.visible = hat === "beanie"; P.cap.visible = hat === "cap"; P.headset.visible = P.headsetBand.visible = accessory === "headset" || accessory === "headphones"; P.tie.visible = accessory === "tie";

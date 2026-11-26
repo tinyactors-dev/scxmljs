@@ -18,7 +18,8 @@
 //   event arriving  -> a mail capsule comes in at the inlet (top back), flies to the funnel of the machine that
 //                      takes it and drops in; only machines that take mail have a funnel
 //   variable        -> a gauge on the back rail of the machine that reads it (tube of balls, dial, lever, lamp)
-// `room` is an optional room (an attic under the skull's dome) for WORLD to mount; `affordances()` lists the
+// WORLD stands the group in a machine room of its own (world/machineroom.js: its floor at ROOM_FLOOR, where the
+// table's legs reach); `affordances()` lists the
 // events that would move the actor now (for click-driven use); `{interactive: true}` adds push-buttons for them.
 // `{desk: true}` builds the same machines as a tabletop model (README "The desk model"): no room, inlet, capsules,
 // gauges or buttons, not fitted to the entry camera (one machine unit = one group unit, standing on y = 0, centred),
@@ -48,9 +49,9 @@ const BIG_STATIONS = 80;  // beyond this many states, only the active path opens
 const PLATE_H = 0.2;      // station plate height (machine units)
 const EVENT_H = 0.16;     // event plate height (a line)
 const MIN_PLATE = 0.23;   // no plate of an open machine is shorter than this in head units (legible at the entry camera)
-const ROOM_FLOOR = -4.6;  // the room's floor (head units)
+const ROOM_FLOOR = -4.6;  // the machine room's floor (head units; world/machineroom.js ROOM.floor)
 const INLET = [0, 4.3, -4.6];
-// where WORLD's camera is when it enters a head (main.js: enterHead), in head units: dir (0, 0.3, 1), 0.6 / 0.042
+// where WORLD's camera stands in the machine room (world/machineroom.js ROOM.entry), in head units: dir (0, 0.3, 1), 0.6 / 0.042
 const ENTRY = { dist: 0.6 / 0.042, el: Math.atan2(0.3, 1), fov: 42, aspect: 1.45, fillW: 0.9, fillH: 0.72 };
 
 const HUES = [0x4fa39a, 0xd9a93f, 0xd46f62, 0x8a80c6, 0x5f97d4, 0x8db85c, 0xc77bb0, 0x6fb3c9, 0xc98f5a];
@@ -1101,59 +1102,6 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     const mouth = new THREE.Mesh(geo.funnel, mat.funnel); mouth.rotation.x = Math.PI; mouth.scale.setScalar(1.1); mouth.position.y = -0.1; inlet.add(mouth);
     const ring = new THREE.Mesh(geo.ring, mat.brass); ring.rotation.x = Math.PI / 2; ring.scale.setScalar(0.6); ring.position.y = 0.4; inlet.add(ring); }
 
-  // ---------- the room (optional; WORLD mounts it: README "The room") ----------
-  const room = options.room === false || DESK ? null : buildRoom();
-  function buildRoom() {
-    const R = new THREE.Group(); R.name = `head-room:${actorId}`;
-    // a skull-shaped attic: a lathe, drawn from inside only (BackSide), so a camera outside sees in through the near side
-    const prof = []; const N = 28;
-    for (let j = 0; j < N; j++) { const a = (j / (N - 1)) * Math.PI * 0.5; const y = ROOM_FLOOR + 3.2 * Math.min(1, j / 6) + (j >= 6 ? 9.2 * Math.sin(((j - 6) / (N - 7)) * Math.PI / 2) : 0); prof.push(new THREE.Vector2(j >= 6 ? 9.2 * Math.cos(((j - 6) / (N - 7)) * Math.PI / 2) + 0.001 : 9.0 + 0.2 * (j / 6), y)); void a; }
-    const lathe = G(new THREE.LatheGeometry(prof, 72));
-    const tex = roomTexture(prof); owned.texs.add(tex);
-    const wall = new THREE.Mesh(lathe, M(new THREE.MeshStandardMaterial({ map: tex, side: THREE.BackSide, roughness: 0.85, alphaTest: 0.5, emissive: 0x3a2412, emissiveIntensity: 0.35 })));
-    R.add(wall);
-    // the floor: planks
-    const fc = document.createElement("canvas"); fc.width = fc.height = 512; const fx = fc.getContext("2d");
-    for (let i = 0; i < 16; i++) { fx.fillStyle = i % 2 ? "#6e4b30" : "#7b5536"; fx.fillRect(0, i * 32, 512, 32); fx.fillStyle = "#4a301e"; fx.fillRect(0, i * 32, 512, 2); fx.fillRect(((i * 197) % 400) + 40, i * 32, 2, 32); }
-    const ft = new THREE.CanvasTexture(fc); ft.colorSpace = THREE.SRGBColorSpace; ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(2, 2); owned.texs.add(ft);
-    const floor = new THREE.Mesh(G(new THREE.CircleGeometry(9.1, 64)), M(new THREE.MeshStandardMaterial({ map: ft, roughness: 0.9 })));
-    floor.rotation.x = -Math.PI / 2; floor.position.y = ROOM_FLOOR; R.add(floor);
-    // a lamp hanging from the crown: warm light painted on everything near it is the walls' own glow; the bulb is unlit
-    const lamp = new THREE.Group(); lamp.position.set(0, 6.2, 1.6); R.add(lamp);
-    const cord = new THREE.Mesh(geo.rod, mat.iron); cord.scale.set(0.6, 2.2, 0.6); cord.position.y = 1.1; lamp.add(cord);
-    const shade = new THREE.Mesh(G(new THREE.CylinderGeometry(0.22, 0.75, 0.55, 24, 1, true)), M(new THREE.MeshStandardMaterial({ color: 0x2f5a46, roughness: 0.5, metalness: 0.4, side: THREE.DoubleSide, emissive: 0xffc070, emissiveIntensity: 0.06 }))); lamp.add(shade);
-    const bulb = new THREE.Mesh(G(new THREE.SphereGeometry(0.2, 16, 10)), M(new THREE.MeshBasicMaterial({ color: 0xfff1c4 }))); bulb.position.y = -0.2; lamp.add(bulb);
-    const gc = document.createElement("canvas"); gc.width = gc.height = 128; const gx = gc.getContext("2d"); const gr = gx.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, "rgba(255,215,140,0.55)"); gr.addColorStop(1, "rgba(255,200,120,0)"); gx.fillStyle = gr; gx.fillRect(0, 0, 128, 128);
-    const gt = new THREE.CanvasTexture(gc); owned.texs.add(gt);
-    const halo = new THREE.Sprite(M(new THREE.SpriteMaterial({ map: gt, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }))); halo.scale.setScalar(3.2); halo.position.y = -0.35; lamp.add(halo);
-    return R;
-  }
-  function roomTexture(prof) { // plaster above wood panelling, brass ribs like the skull's sutures, two round eyes cut out at the front
-    const W = 2048, H = 1024; const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
-    const vOf = (y) => { for (let j = 1; j < prof.length; j++) if (prof[j].y >= y) { const u = (y - prof[j - 1].y) / (prof[j].y - prof[j - 1].y || 1); return (j - 1 + u) / (prof.length - 1); } return 1; };
-    const py = (v) => (1 - v) * H; // canvas y of texture v (flipY)
-    const g = x.createLinearGradient(0, py(vOf(ROOM_FLOOR + 3)), 0, 0); g.addColorStop(0, "#c9a27a"); g.addColorStop(0.55, "#dcbf98"); g.addColorStop(1, "#ecd7b4");
-    x.fillStyle = g; x.fillRect(0, 0, W, H);
-    const yPanel = py(vOf(ROOM_FLOOR + 2.2));
-    x.fillStyle = "#6a4a30"; x.fillRect(0, yPanel, W, H - yPanel);
-    for (let i = 0; i < 48; i++) { x.fillStyle = "#57391f"; x.fillRect((i / 48) * W, yPanel, 4, H - yPanel); }
-    x.fillStyle = "#b8913f"; x.fillRect(0, yPanel - 8, W, 10);
-    x.strokeStyle = "rgba(160,120,58,0.45)"; x.lineWidth = 4;
-    for (let i = 0; i < 12; i++) { const u = (i + 0.5) / 12 * W; x.beginPath(); x.moveTo(u, yPanel - 8); for (let v = vOf(ROOM_FLOOR + 2.3); v <= 0.995; v += 0.01) x.lineTo(u + Math.sin(v * 23 + i * 1.7) * 3, py(v)); x.stroke(); }
-    for (const yy of [1.2, 4.3]) { x.beginPath(); x.moveTo(0, py(vOf(yy))); x.lineTo(W, py(vOf(yy))); x.stroke(); }
-    // the eyes: at the front (lathe u = 0 is +z), cut out with a brass rim
-    const ve = vOf(1.6), rr = 1.25;
-    for (const a of [0.42, -0.42]) {
-      const u = ((a / (Math.PI * 2)) + 1) % 1; const cxp = u * W, cyp = py(ve);
-      const ru = rr / (2 * Math.PI * 9.2) * W, rv = rr / (prof[prof.length - 1].y - prof[0].y) * H * 0.85;
-      for (const du of [0, W, -W]) {
-        x.save(); x.fillStyle = "#c9a44c"; x.beginPath(); x.ellipse(cxp + du, cyp, ru * 1.18, rv * 1.18, 0, 0, Math.PI * 2); x.fill();
-        x.globalCompositeOperation = "destination-out"; x.beginPath(); x.ellipse(cxp + du, cyp, ru, rv, 0, 0, Math.PI * 2); x.fill(); x.restore();
-      }
-    }
-    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; return tex;
-  }
-
   // capsule pool
   const capPool = [];
   for (let i = 0; i < (DESK ? 0 : 8); i++) { const c = new THREE.Mesh(geo.capsule, mat.capsule); c.visible = false; group.add(c); capPool.push(c); }
@@ -1490,12 +1438,12 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
   }
   function setDetail(d) { detail = Math.min(1, Math.max(0, d)); }
   function dispose() {
-    group.removeFromParent(); if (room) room.removeFromParent();
+    group.removeFromParent();
     for (const g of owned.geos) g.dispose(); for (const m of owned.mats) m.dispose(); for (const t of owned.texs) t.dispose(); for (const im of owned.inst) im.dispose();
   }
 
   const api = {
-    group, update, setDetail, pick, focus, dispose, room, refresh, desk: DESK,
+    group, update, setDetail, pick, focus, dispose, refresh, desk: DESK,
     /** the pointer is over this event button (a pick result) or none: a dim one shows why it would do nothing (options.whyNot) */
     hoverButton(hit) { hoverB = hit && hit.button ? hit.button : null; },
     /** a press of a dim button: it shows why (as on hover) until the pointer moves on */

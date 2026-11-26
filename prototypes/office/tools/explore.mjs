@@ -14,7 +14,8 @@
 //   lost       taps empty floor and walls, drags a little, presses keys at random
 //   script     --script <file.json>: a list of steps done in order with real input (a visit to reproduce, e.g. the
 //              owner's own from a log): {do: "key", key, ms} holds a key for ms of app time; {do: "tap", control: id}
-//              | {actor: id} | {headEvent: event} | {headState: id}; {do: "wait", ms}; {do: "esc"}; {do: "export"}
+//              | {actor: id} | {headEvent: event} | {headState: id} | {exit: true} (the machine room's exit control)
+//              | {cardClose: true} (the opened card's close stamp); {do: "wait", ms}; {do: "esc"}; {do: "export"}
 // Software rendering makes frame rates meaningless here; the log says it ran on SwiftShader and the
 // analyser excludes feel findings and scales app-paced thresholds by the measured slowdown.
 import { createRequire } from "node:module"; import http from "node:http"; import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs"; import path from "node:path"; import { gzipSync } from "node:zlib"; import { spawnSync } from "node:child_process";
@@ -84,8 +85,9 @@ const inHead = (m) => m && /entering|inside/.test(m.stage);
 const personas = {
   async clicker() {
     const { v, mode } = await view();
-    if (inHead(mode)) { // inside a head: tap the middle of what is there, now and then go back out
-      if (rnd() < 0.3) { await key("Escape"); return 1800; }
+    if (inHead(mode)) { // in a machine room: tap the middle of what is there, now and then go back out (Escape or its exit)
+      if (rnd() < 0.15) { await key("Escape"); return 1800; }
+      const ex = things(v, ["exit"])[0]; if (ex && rnd() < 0.2) { await hover(ex.cx, ex.cy); await tap(ex.cx, ex.cy); return 1800; }
       await tap(vw / 2 + jit(vw * 0.25), vh / 2 + jit(vh * 0.2)); return 1800;
     }
     if (mode && mode.stage === "approach" && rnd() < 0.6) { const me = things(v, ["actor"]).find((t) => t.id === mode.id); if (me) { await hover(me.cx, me.cy); await tap(me.cx + jit(4), me.cy - (me.y1 - me.y0) * 0.25); return 3500; } }
@@ -129,6 +131,8 @@ async function where(step) {
     const api = window.api, cam = api.camera, W = innerWidth, H = innerHeight; const V = (p) => { const q = p.clone().project(cam); return q.z > 1 || Math.abs(q.x) > 1 || Math.abs(q.y) > 1 ? null : { x: (q.x + 1) / 2 * W, y: (1 - q.y) / 2 * H }; };
     cam.updateMatrixWorld();
     if (st.control) { const c = window.live.screen().find((x) => x.id === st.control); return c && c.x != null ? { x: c.x, y: c.y } : null; }
+    const r = api.overlay.rects(); if (st.exit) return r.exit ? { x: (r.exit[0] + r.exit[2]) / 2, y: (r.exit[1] + r.exit[3]) / 2 } : null;
+    if (st.cardClose) return r.card ? { x: r.card[2] - 30, y: r.card[1] + 28 } : null;
     if (st.actor) { const c = api.people.headCenter(st.actor, api.getPlay()); return c ? V(c.clone().add({ x: 0, y: -0.05, z: 0 })) : null; }
     const h = window.state().sel && api.heads.get(window.state().sel.id); if (!h) return null;
     if (st.headEvent) { const a = h.affordances().find((x) => x.event === st.headEvent && x.object); if (!a) return null; const p = a.object.getWorldPosition(cam.position.clone()); return V(p); }

@@ -88,7 +88,7 @@ export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map(),
   const REACH = POSES.reach;
   function adapt(pose, seat) { if (!seat.visitor) return pose; return { typing: "clipboard", watch: "clipboard", post: "idle", machine: "clipboard", phoneWrite: "phone" }[pose] || pose; }
   const V3 = new THREE.Vector3();
-  function update(s, amb, sel) {
+  function update(s, amb) {
     const t = sim.unwarp(s); const dark = darkAt(s);
     for (const seat of seats.values()) {
       const av = seat.avatar; const o = occAt(seat, s); const S = seat.seat;
@@ -121,9 +121,6 @@ export function buildPeople(scene, sim, plan, cfg = {}, stationById = new Map(),
       applyPose(av, P, amb, hashStr(o.id) % 7);
       chairAside(walking ? 1 : clamp01(P.chair), walking ? 0 : P.turn || 0);
       seat.clip.visible = pose === "clipboard" && !walking; if (seat.clip.visible) { av.root.localToWorld(seat.clip.position.set(0, 0.7, 0.33)); seat.clip.rotation.set(0, facing, 0); }
-      const lift = sel && sel.lidOf ? sel.lidOf(o.id) : sel && sel.id === o.id ? sel.lid : 0;
-      av.setLid(ease(lift));
-      const hide = sel && sel.id === o.id && sel.skinHidden; av.body.visible = !hide; av.blob.visible = !hide;
       seat.pose = pose; seat.sit = sit; seat.P = P;
     }
     return dark;

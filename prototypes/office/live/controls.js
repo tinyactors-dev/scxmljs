@@ -164,7 +164,7 @@ export function createControls({ scene, live, still = false }) {
     const { plan } = world;
     const R = plan.room;
     // the time console under the wall clock
-    const tc = makeConsole(4, { cols: 2, title: "NO TIMER SET", height: 1.0, tilt: 0.6 }); // its title plate says what is pending
+    const tc = makeConsole(4, { cols: 4, title: "NO TIMER SET", height: 1.0, tilt: 0.6 }); // its title plate says what is pending
     tc.group.position.set(plan.clock.x, 0, R.z0 + 1.3); root.add(tc.group);
     const timeCs = [
       { id: "time:advance", kind: "button", label: "ADVANCE TIME", color: "#e2b33c", press: () => (live.viewingPast ? live.returnToNow() : live.advance()) },

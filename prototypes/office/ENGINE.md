@@ -15,9 +15,9 @@ place instead of in each builder's copy.
 
 | # | Piece | What it owns | Replaces |
 |---|---|---|---|
-| 1 | `modes` | The app's own modes as a statechart run by scxmljs itself: overview → person → head → machine focus → reading a slip → board time travel; live vs replay. Events in: pick, escape, arrive. Actions out: camera goals, what is pickable, what is lit. | `sel.stage` flags and the click/back/key code in `main.js` |
+| 1 | `modes` | The app's own modes as a statechart run by scxmljs itself: overview → person → machine room → machine focus → reading a card → board time travel; live vs replay. Events in: pick, escape, arrive. Actions out: camera goals, what is pickable, what is lit. | `sel.stage` flags and the click/back/key code in `main.js` |
 | 2 | `pick` | A registry: anything clickable registers `{object, kind, id, hover(), click(), cursor}`; one raycast path for world, head and board; hover and cursor state. | the hand-kept `cands` list, the head's and live controls' separate picking |
-| 3 | `camera` | A director: goals ("frame this person and their desk", "inside this head", "this machine", "home"), eased moves, collision against registered boxes, minimum distance from any surface, no motion without a goal or input. | `flyTo`, `walkTo`, `enterHead`, `homeView`, per-film camera paths |
+| 3 | `camera` | A director: goals ("frame this person and their desk", "this person's machine room", "this machine", "home"), eased moves, collision against registered boxes, minimum distance from any surface, no motion without a goal or input. | `flyTo`, `walkTo`, `roomEntryView`, `homeView`, per-film camera paths |
 | 4 | `rig` | Jointed figures: fixed limb lengths, joint limits, two-bone reach, look-at; poses declared as goals (sit, type, reach socket X, look at Y), one-shot reactions on a track; intersection check as a test. | joint-angle tables in `world/avatar.js`, pose blending in `world/people.js` |
 | 5 | `sockets` | Named attachment points on props and people (desk.tray, desk.tubeMouth, desk.timer, head.crown, station.panel); things attach to sockets, never to coordinates; tubes are routed socket to socket. | hand-placed offsets in desks, tubes, stations, live controls |
 | 6 | `plates` | One text-on-objects kit: canvas textures with mipmaps, a minimum legible size per viewing distance, fit/wrap rules, a screen-space overlap check for tests. | each builder's own label drawing (world, head, directory, live controls) |
@@ -50,4 +50,17 @@ replays them); the camera rig reports flights, arrivals, interruptions and pushe
 callback (`camera` adopts it as is); the recorder keeps the app's clock (`appNow`) beside the wall
 clock (`clock` replaces both); `?replay=1` takes time and pose from outside, which is the `clock`
 and `camera` interface a director will need anyway.
+
+## The machine room (2026-11-26)
+
+Owner: "when we're inside someones head, it can just be kind of a separate scene to enter and leave and doesn't
+need to be physically located in the person's head." A person's machines now stand in a scene of their own
+(`world/machineroom.js`); `main.js` draws either the office or that room (`render`), and swaps the camera's pose
+between them in the middle of an iris (`engine/overlay.js`, `enterHead` / `leaveHead` / `stepTrans`), giving back
+exactly the office view the visitor left. What went with the walk-in head: the hinged lid and the hollow in the
+avatar, `skinHidden` (hiding the selected person's body), the head's own attic room and the skull box, the head
+scaled to 0.042 and anchored to a moving person, the near-plane and field-of-view easing for a camera inside a
+head, and the walk limits under the dome. The overlay is also where the opened capsule's card is drawn: always on
+top, always on screen, closed by its stamp, a tap on the floor or Escape. Both belong to the future `plates` and
+`modes` pieces; the swap is the first place where `camera` needs a goal in another scene.
 

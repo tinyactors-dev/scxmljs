@@ -36,7 +36,7 @@ node tools/explore.mjs --live microwave --script tools/scripts/owner1.json --out
 ```
 
 A script (`--script`) is a list of steps done with real input, in order: hold a key for some app
-milliseconds, tap a control, a person, a head's event button or a machine, wait, Escape. Its taps go
+milliseconds, tap a control, a person, an event button or a machine in a machine room, its exit (`exit: true`) or an opened card's stamp (`cardClose: true`), wait, Escape. Its taps go
 to the screen points the page reports for what each step names, so a script survives layout changes.
 `tools/scripts/owner1.json` is the owner's first logged visit (2026-11-26), step for step.
 
@@ -80,11 +80,11 @@ it. Events `session/start`, `ready` (ms to first frame), `resize`, `visibility`,
 | `frame` | `long {dt, work, tags, sev}` for dt > 32 ms, with what the previous frame did (`flight:*`, `act:*`, `rebuild`, `head-built`, `board`, `shader`, `view`, `log-save`, `first-frame`); `sec {fps, p50, p95, max, calls, tris, work}` each second |
 | `input` | `down/up {x, y, type, id}`, `cancel`, `wheel {x, y, dy, dx, mode}`, `key {key, down}`, `gesture {kind: tap, hold, drag, orbit, zoom, pan, pinch, board-tap, board-drag, ...}` (what the app made of it) |
 | `pick` | `tap {x, y, hit: [kind, id] or null, act, near: [[kind, id, px, %screen]...]}` (`near`: subjects whose screen outline is within 40 px; 0 = inside it); `hover {x, y, hit, cursor}` on every change of target or cursor |
-| `act` | one per action (`perform` in main.js), replayable: `select {id}`, `enter`, `focus {state, point}`, `back`, `slip {id}`, `walk {point}`, `press {id}`, `headSend`, `advance`, `now`, `pause`, `speed {i}`, `seek {s}`, `home`, `deselect`, `board {type, u, v, extra}`, `ticker {u, v}` (a tap on the printer's tape), `system {id}`, `export`; `src` input or replay |
-| `camera` | `walk {keys, head}` (twice a second at most while walking), `fly {kind, dur, from, to, tgt, via}` (`kind: reveal`: turned to show what a press caused), `arrive {kind}`, `interrupt {kind, k, by}`, `push {n, box, person, axis, d, by}` (out of furniture), `limit {which}` (orbit limits while dragging) |
-| `mode` | `change {from, to, cause}`: `overview`, `person:<id>`, `station:<id>`, `entering:<id>`, `head:<id>`, `machine:<id>`, `leaving:<id>`, plus ` +slip`, ` +paused`, and in live mode ` +rest`, ` +playing`, ` +past` |
-| `world` | `press {id, ok, why, queued, stepping, pending}` (also `head:<event>` for a dim button in a head, refused with its reason) (a refusal's reason as the control shows it; `queued`: pressed while the last press still played), `consequence {id, actors, seen, control, flew}` 2 s after a press (the people it changed and which were on screen and unhidden; inside a head `{head: true, machines, seen}`), `ticker {key, actors, text}` (a printed line selected), `head {id, how: built or refreshed}`, `tick {playS, t, rate}` each second, `people {arrive, leave}`, `lid {id, open}`, `detail {id, d}` (a head's detail as it changes), `rebuild {ms, events, actors}` (live) |
-| `view` | `frame` twice a second: `in [[kind, id, x0, y0, x1, y1, %screen]...]` (largest first; kinds include `model`, a desk model), `n {kind: count}`, `sel {id, on, pct, occ}`, `plates`, `readable` (glyph >= 9 px), `bestGlyph`, `pickable`; inside a head `head {focus, inside, clipped, shown}` (the machine the camera is inside of, if any; plates of what is in focus cut by the frame's edge) |
+| `act` | one per action (`perform` in main.js), replayable: `select {id}`, `enter` (into the selected person's machine room), `exit` (its exit control), `focus {state, point}`, `back`, `slip {id}` (open a capsule's card), `closeCard {how: x, floor}` (its stamp; a tap on the floor, a wall or nothing), `walk {point}`, `press {id}`, `headSend`, `advance`, `now`, `pause`, `speed {i}`, `seek {s}`, `home`, `deselect`, `board {type, u, v, extra}`, `ticker {u, v}` (a tap on the printer's tape), `system {id}`, `export`; `src` input or replay |
+| `camera` | `walk {keys, head}` (`head`: in a machine room; twice a second at most while walking), `fly {kind, dur, from, to, tgt, via}` (`kind: reveal`: turned to show what a press caused; `enter` / `leave`: the iris into and out of a machine room: `from`/`to` are office points and the camera jumps between the two places in its middle), `arrive {kind}`, `interrupt {kind, k, by}`, `push {n, box, person, axis, d, by}` (out of furniture), `limit {which}` (orbit limits while dragging) |
+| `mode` | `change {from, to, cause}`: `overview`, `person:<id>`, `station:<id>`, `entering:<id>` (the iris closing on the person), `head:<id>` (in their machine room), `machine:<id>` (a machine of it in focus), `leaving:<id>`, plus ` +slip`, ` +paused`, and in live mode ` +rest`, ` +playing`, ` +past` |
+| `world` | `press {id, ok, why, queued, stepping, pending}` (also `head:<event>` for a dim button in a machine room, refused with its reason) (a refusal's reason as the control shows it; `queued`: pressed while the last press still played), `consequence {id, actors, seen, control, flew}` 2 s after a press (the people it changed and which were on screen and unhidden; in a machine room `{head: true, machines, seen}`), `ticker {key, actors, text}` (a printed line selected), `head {id, how: built or refreshed}`, `tick {playS, t, rate}` each second, `people {arrive, leave}`, `room {id, in}` (the visitor arrives in a machine room, or leaves it: the swap in the iris's middle), `card {id, open, how}` (a capsule's card opened, or closed: `x` its stamp, `floor`, `esc`, `enter`, `home`), `detail {id, d}` (a head's detail as it changes), `rebuild {ms, events, actors}` (live) |
+| `view` | `frame` twice a second: `in [[kind, id, x0, y0, x1, y1, %screen]...]` (largest first; kinds include `model`, a desk model), `n {kind: count}`, `sel {id, on, pct, occ}`, `plates`, `readable` (glyph >= 9 px), `bestGlyph`, `pickable`; `card [x0, y0, x1, y1]` while a capsule's card is open; in a machine room the subjects are its parts (`machine`, the first 120) and the `exit` control, plus `room` (whose) and `head {focus, inside, clipped, shown}` (the machine the camera is inside of, if any; plates of what is in focus cut by the frame's edge) |
 | `error` | `error`, `rejection`, `resource`, `console {level, msg}`, `fetch {url, status or msg}`, `webgl-lost`, `webgl-restored` |
 
 ## The analyser's findings
@@ -103,14 +103,15 @@ checked against the owner's first real log.
 | `camera.ends-inside`, `camera.sel-offscreen`, `-occluded`, `-tiny` | where a flight left the camera |
 | `camera.orbit-pushed`, `camera.limits`, `camera.zoom-bounce` | dragging into furniture; orbit limits hit again and again; zooming in and out |
 | `camera.nothing`, `view.no-plates`, `view.readable-share` | looking at nothing pickable; nothing readable |
+| `view.card-offscreen`, `view.card-closed` | an opened card reached past the screen; how each card was closed (information) |
 | `tap.dead`, `tap.near-miss`, `tap.other`, `tap.repeat`, `tap.rage`, `tap.scenery`, `tap.head-miss` | taps that did nothing, missed something close, hit the wrong thing, repeated, clustered, landed on desks, or hit nothing inside a head |
 | `hover.cursor-only`, `hover.touch`, `input.hold` | feedback before a tap |
 | `comp.first-success`, `comp.head-bounce`, `comp.regret`, `comp.lost`, `comp.modes` | comprehension proxies |
-| `live.consequence-offscreen` | a press whose consequence was off screen: the people it changed not in view (or hidden) 2 s later, or inside a head no machine whose marble moved; older logs: the driven person (`in:<actor>:...`) missing from the view 1 to 2.5 s after |
+| `live.consequence-offscreen` | a press whose consequence was off screen: the people it changed not in view (or hidden) 2 s later, or in a machine room no machine whose marble moved; older logs: the driven person (`in:<actor>:...`) missing from the view 1 to 2.5 s after |
 | `live.refused`, `live.queued` | a refused press with no reason shown (older builds) or with one (info); a press made while the last still played |
 | `selection.lost-walking` | a walking key deselected the selected person, or left their mode for the overview |
-| `head.camera-inside`, `head.plate-clipped`, `head.too-near` | inside a head: the camera inside a machine; plates of the focused machine cut by the frame's edge; older logs: a plate over a tenth of the screen tall while a machine is in focus |
-| `head.rebuilt-on-press` | a press inside a head built the head again (its marbles jumped back) |
+| `head.camera-inside`, `head.plate-clipped`, `head.too-near` | in a machine room: the camera inside a machine; plates of the focused machine cut by the frame's edge; older logs: a plate over a tenth of the screen tall while a machine is in focus |
+| `head.rebuilt-on-press` | a press in a machine room built the head again (its marbles jumped back) |
 | `error.*` | every error the page reported |
 
 ## Adding a channel

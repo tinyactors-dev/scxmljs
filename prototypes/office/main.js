@@ -11,7 +11,7 @@ import { buildBuilding } from "./world/building.js";
 import { buildStations } from "./world/stations.js";
 import { buildDesks } from "./world/desks.js";
 import { buildPeople } from "./world/people.js";
-import { buildTubes, makeSlip, family } from "./world/tubes.js";
+import { buildTubes, summaryText, family } from "./world/tubes.js";
 import { ease, clamp01, box } from "./world/kit.js";
 import { makeCameraRig } from "./world/camera.js";
 import { WALL_H } from "./world/building.js";
@@ -23,6 +23,8 @@ import { buildTicker, TAPE_W } from "./world/ticker.js";
 import { seatPoint } from "./world/desks.js";
 import { createModels } from "./world/models.js";
 import { DESK, MODEL } from "./world/layout.js";
+import { createMachineRoom, ROOM, fovFor } from "./world/machineroom.js";
+import { createOverlay } from "./engine/overlay.js";
 
 // the flight recorder (engine/log.js, LOGGING.md): always on, from the first line, so boot errors are in it too
 const log = createLog(); log.attachErrors(); window.officeLog = log;
@@ -131,7 +133,9 @@ function tickerSpot() {
 }
 function placeTicker(s = 0) { const a = tickerSpot(); ticker.root.position.set(a.x, 0, a.z); ticker.root.rotation.y = a.ry; ticker.setLift(a.lift || 0); ticker.update(s, 0); ticker.root.updateMatrixWorld(true); } // drawn at once: the start view frames the tape as long as it is
 buildWorld(); placeTicker();
-const slip = makeSlip(); scene.add(slip);
+// what is drawn over the view (engine/overlay.js): the iris between the office and a machine room, the opened
+// capsule's card with its close stamp, the machine room's exit and its plaque
+const overlay = createOverlay();
 const recentIn = (arr, s, w) => { if (!arr) return false; for (const x of arr) { if (x > s) break; if (s - x < w) return true; } return false; };
 
 // spotlight rings (what the board asked to show)
@@ -174,24 +178,19 @@ try {
 // ---------------------------------------------------------------- heads (HEAD's machines, or a placeholder)
 let createHead = null, headStatus = "missing";
 try { createHead = (await import("./head/head.js")).createHead; headStatus = "ok"; } catch (err) { console.warn("head unavailable:", err.message); headStatus = "broken: " + err.message; }
-const HEAD_SCALE = 0.042;
 // each person's machines also stand on their desk as a live tabletop model (world/models.js: the same createHead)
 const models = createHead ? createModels({ scene, sim, createHead }) : null;
 let frameN = 0;
+// a person's machines, built once and kept; shown only in the machine room (world/machineroom.js), never in the office
 const heads = new Map();
+const machineRoom = createMachineRoom();
 function headFor(id) {
   if (heads.has(id)) return heads.get(id);
   let h;
   log.note("head-built"); // log: building a head can take a while
   log.ev("world", "head", { id, how: "built" }); // log:
-  if (createHead && sim.chartOf(id)) { try { h = createHead({ THREE, sim, actorId: id, ...(live ? { options: { interactive: true, judge: (ev) => !live.busy && !live.viewingPast && live.accepts(id, ev), whyNot: (ev) => (live.viewingPast ? "looking back" : live.whyNot(id, ev)) } } : {}) }); } catch (err) { console.warn("createHead", id, err.message); } }
-  if (!h) { const group = new THREE.Group(); group.add(box(6, 6, 6, "#c86b5a")); h = { group, update() {}, setDetail() {}, pick: () => null, focus() {}, dispose() {}, placeholder: true }; }
-  h.group.scale.setScalar(HEAD_SCALE); h.group.visible = false; scene.add(h.group);
-  // the head's own room (head/head.js: an attic under the skull's dome), shown only while the skin is hidden;
-  // a plain dark box for a placeholder head
-  if (h.room) { h.group.add(h.room); h.room.visible = false; h.skull = h.room; }
-  else { const skull = new THREE.Mesh(new THREE.BoxGeometry(14.5, 12.5, 14.5), new THREE.MeshLambertMaterial({ color: "#6a3a40", side: THREE.BackSide, emissive: "#2a1214", emissiveIntensity: 0.6 })); skull.position.y = 0.5; h.group.add(skull); h.skull = skull; }
-  const glow = new THREE.PointLight("#fff0d8", 1.2, 1.6, 1.2); glow.position.set(0, 4, 4); h.group.add(glow);
+  if (createHead && sim.chartOf(id)) { try { h = createHead({ THREE, sim, actorId: id, options: { ...(live ? { interactive: true, judge: (ev) => !live.busy && !live.viewingPast && live.accepts(id, ev), whyNot: (ev) => (live.viewingPast ? "looking back" : live.whyNot(id, ev)) } : {}) } }); } catch (err) { console.warn("createHead", id, err.message); } }
+  if (!h) { const group = new THREE.Group(); group.add(box(6, 6, 6, "#c86b5a")); h = { group, update() {}, setDetail() {}, pick: () => null, focus() {}, dispose() {}, placeholder: true, boundsOf: () => ({ box: new THREE.Box3().setFromObject(group) }), states: () => [], movesOf: () => [], plates: () => [] }; }
   heads.set(id, h); return h;
 }
 
@@ -262,10 +261,17 @@ function startView() {
 function home(dur = 1.6) { const h = live ? startView() : homeView(); flyTo(h.pos, h.tgt, dur); }
 const headPos = (id) => people.headCenter(id, playS);
 const facing = (id) => people.facingOf(id, playS);
-const hideHeads = () => heads.forEach((o) => (o.group.visible = false));
-// a lid closes on its own when its person is no longer selected (half a second)
-const lids = new Map(); const lidOf = (id) => lids.get(id) || 0;
+// the machine room (world/machineroom.js) is a place of its own: inRoom while it is what is drawn and what the
+// camera stands in; trans while the iris closes on one place and opens on the other; officePose: the office view
+// the visitor left, given back exactly on the way out; officeCam: that view, for what in the office looks at the
+// camera while the visitor is away (the desk models, the ceiling)
+let inRoom = false, trans = null, officePose = null, roomEntry = null;
+const officeCam = new THREE.PerspectiveCamera();
 const inHead = () => sel && sel.head && ["entering", "inside", "leaving"].includes(sel.stage);
+const xyz = (p) => [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)];
+// a world point on screen (px), or null behind the camera
+const screenPt = (p) => { camera.updateMatrixWorld(); const q = p.clone().project(camera); return q.z > 1 ? null : { x: ((q.x + 1) / 2) * innerWidth, y: ((1 - q.y) / 2) * innerHeight }; };
+const clampPt = (q) => (q ? { x: Math.min(innerWidth, Math.max(0, q.x)), y: Math.min(innerHeight, Math.max(0, q.y)) } : { x: innerWidth / 2, y: innerHeight / 2 });
 // the conversational view of a person: 2.5-3 m, a little above eye level, them and their desk in frame,
 // from the side that puts the board behind them when it can
 function frameOf(id) {
@@ -280,60 +286,117 @@ function select(id) {
   if (board) board.highlight({ actorId: id });
   const a = sim.actor(id);
   if (a && !a.external && headPos(id)) {
-    const h = headFor(id); hideHeads(); h.focus(null);
-    sel = { id, at: amb, lid: 0, skinHidden: false, focusId: null, head: h, stage: "approach" };
+    const h = headFor(id); h.focus(null);
+    sel = { id, at: amb, focusId: null, head: h, stage: "approach" };
     const v = frameOf(id); if (v) flyTo(v.pos, v.tgt, 1.4);
   } else {
-    sel = { id, at: amb, lid: 0, skinHidden: false, focusId: null, head: null, stage: "close" };
+    sel = { id, at: amb, focusId: null, head: null, stage: "close" };
     const st = stations.byId.get(id);
     if (st) { const p = st.group.getWorldPosition(new THREE.Vector3()); const fwd = new THREE.Vector3(Math.sin(st.group.rotation.y), 0, Math.cos(st.group.rotation.y)); const tgt = p.clone().add(v3(0, 1.2, 0)); flyTo(rig.resolve(p.clone().addScaledVector(fwd, 3.2).add(v3(0.9, 1.9, 0))), tgt, 1.4); }
     else if (/timer|clock/i.test(`${a?.kind} ${id}`)) flyTo(rig.resolve(v3(plan.clock.x, 2.6, R.z0 + 4)), v3(plan.clock.x, 2.6, R.z0), 1.4);
   }
 }
-// into a head: rise over the person, the lid lifts, descend into the head (one continuous move)
-// the view inside a head, which head/head.js fits its layout to: along (0, 0.3, 1) in the head's frame,
-// 14.3 head units (HEAD_SCALE) from its centre, fov 42
-const FOV = 42, REF_TAN = Math.tan((FOV / 2) * Math.PI / 180) * 1.6;
-const insideFov = () => Math.min(90, Math.max(FOV, (2 * Math.atan(REF_TAN / camera.aspect) * 180) / Math.PI));
-// stand back only for what a 90 degree view still misses of 85 % of the width (the camera must stay under the dome)
-const headK = () => Math.max(1, (0.85 * REF_TAN) / (Math.tan((insideFov() / 2) * Math.PI / 180) * camera.aspect)); // 1 on a landscape screen
-const insideView = (c, f) => c.clone().addScaledVector(v3(Math.sin(f), 0, Math.cos(f)), 0.575 * headK()).add(v3(0, 0.1725 * headK(), 0));
+// into a person's machines: a short push toward their head while the iris closes on it, then the machine room
+// opens round their machines (ENTER_S + OPEN_S <= 0.6 s); out: the iris closes on the room and opens on the office
+// view the visitor left, the person in its middle. Each is logged as a camera flight (fly ... arrive)
+const ENTER_S = 0.26, LEAVE_S = 0.22, OPEN_S = 0.3;
 function enterHead() {
-  if (!sel || !sel.head || inHead()) return;
-  const c = headPos(sel.id); if (!c) return; const f = facing(sel.id); const fw = v3(Math.sin(f), 0, Math.cos(f));
-  sel.anchor = c.clone(); sel.anchorF = f; sel.stage = "entering";
-  const over = c.clone().addScaledVector(fw, 0.6).add(v3(0, 1.2, 0)), above = c.clone().addScaledVector(fw, 0.2).add(v3(0, 0.62, 0));
-  const me = sel;
-  rig.fly([over, above, insideView(c, f)], [c, c, c], 2.6, { kind: "enter", onProgress: (k) => { me.lid = clamp01((k - 0.22) / 0.3); }, onDone: () => { if (sel === me) { me.stage = "inside"; me.lid = 1; } } });
+  if (!sel || !sel.head || inHead() || trans) return;
+  const c = headPos(sel.id); if (!c) return;
+  rig.stop("enter"); closeCard("enter");
+  officePose = { pos: camera.position.clone(), tgt: controls.target.clone(), fov: camera.fov }; officeCam.copy(camera);
+  sel.stage = "entering";
+  trans = { kind: "enter", t: 0, me: sel, from: camera.position.clone(), tgtFrom: controls.target.clone(), c: c.clone(), sp: clampPt(screenPt(c)), swapped: false };
+  log.ev("camera", "fly", { kind: "enter", dur: ENTER_S + OPEN_S, from: xyz(camera.position), to: xyz(c), tgt: xyz(c), via: 0 }); log.note("flight:enter"); // log:
 }
-// a machine in focus is framed whole: every part and plate of it in the frame, seen from the head's front and a
-// little above, as near as the field of view allows (the bounds are the head's layout after the focus, in world units)
-function focusHead(stateId) {
-  if (!sel || !sel.head) return;
-  const c0 = sel.anchor || headPos(sel.id); if (!c0) return;
-  sel.focusId = stateId; const fb = sel.head.focus(stateId);
-  if (!stateId || !fb) { sel.focusPoint = null; flyTo(insideView(c0, sel.anchorF ?? facing(sel.id)), c0, 1.1); return; }
-  const f = sel.anchorF ?? facing(sel.id); const dir = v3(Math.sin(f), 0, Math.cos(f));
-  const b = fb.box.clone(); const sz = b.getSize(v3(0, 0, 0)); b.expandByVector(sz.multiplyScalar(0.06)); // plates stand a little proud of the parts
-  const v = frameAll(boxPts(b), { dir, el: 0.5, margin: 1.1, minD: 0.04, free: true });
-  sel.focusDist = v.dist; flyTo(v.pos, v.tgt, 1.2); sel.focusPoint = v.tgt.clone();
-}
-// out of a head: the reverse, rising out through the top, the lid closing behind, ending in conversation
 function leaveHead(then) {
-  const c = sel.anchor || headPos(sel.id); const f = sel.anchorF ?? facing(sel.id); const fw = v3(Math.sin(f), 0, Math.cos(f));
-  const above = c.clone().addScaledVector(fw, 0.2).add(v3(0, 0.62, 0)), over = c.clone().addScaledVector(fw, 0.6).add(v3(0, 1.2, 0));
-  const v = frameOf(sel.id) || { pos: c.clone().add(v3(1, 0.6, 2.6)), tgt: c.clone().add(v3(0, -0.35, 0.6)) };
-  const me = sel; me.stage = "leaving"; me.focusId = null; me.focusPoint = null; me.head.focus(null);
-  const from = camera.position.distanceTo(c) < 0.75 * headK() ? [insideView(c, f)] : [];
-  rig.fly([...from, above, over, v.pos], [...from.map(() => c), c, c, v.tgt], 2.8, { kind: "leave", onProgress: (k) => { me.lid = 1 - clamp01((k - 0.42) / 0.3); }, onDone: () => { if (sel === me) { me.stage = "approach"; me.lid = 0; } if (then) then(); } });
+  if (!inRoom || trans) { if (then) then(); return; }
+  const me = sel; if (me) me.stage = "leaving";
+  rig.stop("leave");
+  trans = { kind: "leave", t: 0, me, then, swapped: false };
+  log.ev("camera", "fly", { kind: "leave", dur: LEAVE_S + OPEN_S, from: xyz(camera.position), to: xyz(officePose.pos), tgt: xyz(officePose.tgt), via: 0 }); log.note("flight:leave"); // log:
 }
+// the machine room's entry view: the whole machine (at its entry detail) filling the frame, seen from the front and a
+// little above, as head/head.js fits it (along (0, 0.3, 1)). A chart of up to 80 states is all open from the start
+// (head.js keeps every plate of an open machine legible at that framing); a bigger one opens its active path, the
+// rest as the visitor comes closer or focuses a machine (roomDetail: the detail follows the distance from there)
+const ENTRY_DETAIL = (1 - 0.6) / 0.7;
+const entryDetail = (h) => (h.states().length > 80 ? ENTRY_DETAIL : 1);
+function roomEntryView(h) {
+  camera.fov = fovFor(camera.aspect); camera.updateProjectionMatrix();
+  h.setDetail(entryDetail(h)); h.update(tNow(), 0, playS);
+  const b = h.boundsOf(null).box.clone(); b.expandByVector(b.getSize(v3(0, 0, 0)).multiplyScalar(0.04));
+  // from the elevation head.js fits to, unless a higher one brings a deep machine clearly nearer
+  let v = null; for (const el of [Math.atan2(0.3, 1), 0.42, 0.55]) { const w = frameAll(boxPts(b), { dir: v3(0, 0, 1), el, margin: 1.06, minD: ROOM.minDist, free: true }); if (!v || w.dist < v.dist * 0.9) v = w; }
+  return { pos: machineRoom.contain(v.pos), tgt: v.tgt, dist: v.dist };
+}
+const roomDetail = (h, focused) => { const kd = (0.6 * camera.position.distanceTo(roomEntry.tgt)) / roomEntry.dist; const d = Math.max(entryDetail(h) === 1 ? 1 : 0, clamp01((1 - kd) / 0.7)); return focused ? Math.max(d, 0.9) : d; };
+// the swap itself: the head's group stands in the machine room only while the visitor is there
+function swapIn(me) {
+  inRoom = true; me.focusId = null; me.focusPoint = null; me.head.focus(null);
+  machineRoom.mount(me.head.group);
+  const v = roomEntry = roomEntryView(me.head);
+  camera.position.copy(v.pos); controls.target.copy(v.tgt); camera.near = 0.1; camera.far = 200; camera.updateProjectionMatrix(); camera.lookAt(controls.target);
+  Object.assign(controls, { enablePan: false, maxPolarAngle: Math.PI * 0.56, minDistance: Math.min(ROOM.minDist, v.dist * 0.4), maxDistance: Math.max(ROOM.maxDist, v.dist * 1.3) });
+  const seat = people.seatOfActor(me.id, playS), av = seat && seat.avatar;
+  overlay.setExit({ title: nameOf(me.id), sub: `their machines (${sim.actor(me.id)?.chart || "chart"}) · the office runs on`, face: av?.faceMap?.image || null, accent: av ? "#" + av.M.shirt.color.getHexString() : null });
+  log.ev("world", "room", { id: me.id, in: true }); // log:
+}
+function swapOut() {
+  const me = trans ? trans.me : sel; inRoom = false; machineRoom.unmount(); overlay.setExit(null);
+  if (me) { me.focusId = null; me.focusPoint = null; if (me.head) me.head.focus(null); }
+  const p = officePose || homeView(); camera.position.copy(p.pos); controls.target.copy(p.tgt); camera.fov = p.fov || 42; camera.near = 0.05; camera.far = 400; camera.updateProjectionMatrix(); camera.lookAt(controls.target);
+  Object.assign(controls, { enablePan: true, maxPolarAngle: Math.PI * 0.495, minDistance: 0.9, maxDistance: 160 });
+  log.ev("world", "room", { id: me ? me.id : null, in: false }); // log:
+}
+function finishTrans() {
+  const tr = trans; trans = null; overlay.setIris(0);
+  if (tr.me && sel === tr.me) tr.me.stage = tr.kind === "enter" ? "inside" : "approach";
+  log.ev("camera", "arrive", { kind: tr.kind }); // log:
+  if (tr.kind === "leave" && sel && sel.head && !headPos(sel.id)) sel = null; // the person left the office meanwhile
+  if (tr.then) tr.then();
+}
+function stepTrans(dt) {
+  const tr = trans; if (!tr) return; tr.t += dt;
+  const W = innerWidth, H = innerHeight;
+  if (!tr.swapped) {
+    const k = clamp01(tr.t / (tr.kind === "enter" ? ENTER_S : LEAVE_S)), e = ease(k);
+    if (tr.kind === "enter") { camera.position.lerpVectors(tr.from, tr.c, 0.45 * e); controls.target.lerpVectors(tr.tgtFrom, tr.c, e); camera.lookAt(controls.target); overlay.setIris(e, tr.sp.x, tr.sp.y); }
+    else overlay.setIris(e, W / 2, H / 2);
+    if (k >= 1) {
+      tr.swapped = true; tr.t0 = tr.t;
+      if (tr.kind === "enter") { swapIn(tr.me); tr.sp = { x: W / 2, y: H / 2 }; }
+      else { swapOut(); tr.sp = clampPt(tr.me && headPos(tr.me.id) ? screenPt(headPos(tr.me.id)) : null); }
+    }
+  } else {
+    const k = clamp01((tr.t - tr.t0) / OPEN_S); overlay.setIris(1 - ease(k), tr.sp.x, tr.sp.y);
+    if (k >= 1) finishTrans();
+  }
+}
+// a machine in focus is framed whole: every part and plate of it in the frame, seen from the front of the room and a
+// little above, as near as the field of view allows (the bounds are the head's layout after the focus)
+function focusHead(stateId) {
+  if (!sel || !sel.head || !inRoom || trans) return;
+  sel.focusId = stateId; const fb = sel.head.focus(stateId);
+  if (!stateId || !fb) { sel.focusId = null; sel.focusPoint = null; const v = roomEntry = roomEntryView(sel.head); flyTo(v.pos, v.tgt, 1.1); return; }
+  const b = fb.box.clone(); const sz = b.getSize(v3(0, 0, 0)); b.expandByVector(sz.multiplyScalar(0.06)); // plates stand a little proud of the parts
+  const v = frameAll(boxPts(b), { dir: v3(0, 0, 1), el: 0.5, margin: 1.1, minD: 1, free: true });
+  sel.focusDist = v.dist; flyTo(machineRoom.contain(v.pos), v.tgt, 1.2); sel.focusPoint = v.tgt.clone();
+}
+// the opened capsule's card (engine/overlay.js): on top of everything, on screen, closed by its stamp, the floor or Escape
+function closeCard(how) {
+  if (!slipMsg) return; log.ev("world", "card", { id: slipMsg.id, open: false, how }); // log:
+  slipMsg = null; overlay.closeCard();
+}
+// something asked for while the iris moves is done once it is open again, from where the move ends
+function afterTrans(fn) { if (!trans) return fn(); const tr = trans, prev = tr.then; tr.then = () => { if (prev) prev(); afterTrans(fn); }; }
 function back() {
-  if (rig.flight && rig.flight.kind === "leave") { const f = rig.flight, prev = f.onDone; f.onDone = () => { if (prev) prev(); back(); }; return; } // queued until we are out
-  if (slipMsg) { slipMsg = null; return; }
+  if (trans) return afterTrans(back);
+  if (slipMsg) { closeCard("esc"); return; }
   if (boardBack && !sel) { const v = boardBack; boardBack = null; flyTo(v.pos, v.tgt, 1.3); return; } // from in front of the board: back where we were
-  if (sel && sel.focusId) { sel.focusId = null; sel.head.focus(null); sel.focusPoint = null; const c = sel.anchor || headPos(sel.id); if (c) flyTo(insideView(c, sel.anchorF ?? facing(sel.id)), c, 1.1); return; }
-  if (sel && (sel.stage === "inside" || sel.stage === "entering")) { leaveHead(); return; }
-  if (sel) { const id = sel.id; sel = null; hideHeads(); if (board) board.highlight({}); const c = headPos(id); if (c) { const off = camera.position.clone().sub(controls.target); off.setLength(Math.min(9, Math.max(4.5, off.length() * 1.7))); const tgt = controls.target.clone(); flyTo(rig.resolve(tgt.clone().add(off)), tgt, 1.3); return; } }
+  if (sel && inRoom && sel.focusId) { focusHead(null); return; }
+  if (sel && inRoom) { leaveHead(); return; }
+  if (sel) { const id = sel.id; sel = null; if (board) board.highlight({}); const c = headPos(id); if (c) { const off = camera.position.clone().sub(controls.target); off.setLength(Math.min(9, Math.max(4.5, off.length() * 1.7))); const tgt = controls.target.clone(); flyTo(rig.resolve(tgt.clone().add(off)), tgt, 1.3); return; } }
   spot = null; home();
 }
 // live: after a press, what it caused must be in view from where the visitor stands: the control and the people
@@ -384,7 +447,13 @@ function checkConsequence() { // log: was what the press caused in view, two sec
   const cs = subs.find((x) => x.kind === "control" && x.id === c.id); const control = !!(cs && viewer.rect(cs.min, cs.max, camera, innerWidth, innerHeight));
   log.ev("world", "consequence", { id: c.id, actors: c.actors, seen, control, flew: c.flew });
 }
-function openCapsule(id) { const a = tubes.active.find((x) => x.msg.id === id); slipMsg = { id, at: amb }; const m = a ? a.msg : sim.messagesBetween(-1, sim.duration + 1).find((x) => x.id === id); if (!m) return; slip.userData.draw(m, nameOf, a ? "#" + a.f.color.getHexString() : null); if (board) board.highlight({ messageId: id }); }
+function openCapsule(id) {
+  const a = tubes.active.find((x) => x.msg.id === id); const m = a ? a.msg : sim.messagesBetween(-1, sim.duration + 1).find((x) => x.id === id); if (!m) return;
+  slipMsg = { id, at: amb };
+  overlay.openCard({ title: String(m.name), sub: `${nameOf(m.from)}  →  ${[].concat(m.to ?? []).map(nameOf).join(", ")}`, body: summaryText(m.summary), accent: a ? "#" + a.f.color.getHexString() : null }, amb);
+  log.ev("world", "card", { id, open: true }); // log:
+  if (board) board.highlight({ messageId: id });
+}
 // a click on the floor walks there: the view keeps its direction, at a standing distance, out of furniture
 function walkTo(point) {
   const tgt = v3(point.x, 1.0, point.z); const off = camera.position.clone().sub(controls.target); const hz = v3(off.x, 0, off.z); if (hz.lengthSq() < 1e-4) hz.set(0.4, 0, 0.9);
@@ -398,8 +467,10 @@ function goSystem(id) { if (id && id !== SYSTEM) { const u = new URL(location.hr
 // ---------------------------------------------------------------- picking
 const raycaster = new THREE.Raycaster(); const ndc = new THREE.Vector2();
 function pickAt(x, y) {
+  const o = overlay.hit(x, y); if (o) return { kind: o }; // the overlay first: it is drawn over everything
+  if (trans) return null; // between the office and a machine room
   ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1); raycaster.setFromCamera(ndc, camera);
-  if (sel && sel.head && sel.stage === "inside") { const hp = sel.head.pick(raycaster); if (hp) return { kind: "head", hit: hp }; }
+  if (inRoom) { const hp = sel && sel.head ? sel.head.pick(raycaster) : null; return hp ? { kind: "head", hit: hp } : null; } // nothing of the office is here
   if (liveControls) { const c = liveControls.pick(raycaster); if (c) return { kind: "control", id: c.id }; } // live: the controls
   const nearC = liveControls ? liveControls.near(x, y, camera, innerWidth, innerHeight) : null; // live: within a thumb's reach
   const cands = [boardMesh, ticker.tape, tubes.caps, ...people.roots().filter((r) => r.visible), ...stations.list.map((s) => s.group), ...building.pick.map((p) => p.object), ...recorder.pick.map((p) => p.object), ...building.occluders, desks.root, ...(models ? [models.root] : [])];
@@ -435,8 +506,13 @@ function nearSubject(x, y) {
 // a click becomes an action (what the visitor meant), and perform() does it: the one place where
 // intent becomes behaviour, so the recorder logs it once and the replay can do it again
 function intentOf(p) {
+  // an opened card closes on a tap on empty floor, a wall, furniture or nothing (its stamp and Escape close it too)
+  if (slipMsg && !inRoom && (!p || ["floor", "wall", "furniture"].includes(p.kind))) return { do: "closeCard", how: "floor" };
   if (!p) return null;
   switch (p.kind) {
+    case "card-close": return { do: "closeCard", how: "x" };
+    case "card": return null; // the card's paper: nothing (a tap there must not fall through to the room)
+    case "exit": return { do: "exit" };
     case "control": return { do: "press", id: p.id };
     case "head":
       if (live && p.hit.kind === "event") return { do: "headSend", actor: sel.id, event: p.hit.event }; // live: a brass button on a track in the head
@@ -476,6 +552,8 @@ function perform(a, src = "input") {
     case "board": boardHot = true; if (board) { if (a.type === "tap") { board.pointer("down", a.u, a.v); board.pointer("up", a.u, a.v); } else board.pointer(a.type, a.u, a.v, a.extra); } break;
     case "slip": openCapsule(a.id); break;
     case "enter": enterHead(); break;
+    case "exit": afterTrans(() => { if (inRoom) leaveHead(); }); break;
+    case "closeCard": closeCard(a.how || "act"); break;
     case "select": select(a.id); break;
     case "advance": if (live) { log.ev("world", "press", { id: "clock", ok: live.pendingTimers().length > 0, stepping: !!live.stepping, pending: live.pendingTimers().length }); live.advance(); } break; // log:
     case "now": live && live.returnToNow(); break;
@@ -486,8 +564,8 @@ function perform(a, src = "input") {
     case "export": if (!REPLAY) recorder.press(() => log.download()); break;
     case "walk": walkTo(v3(...a.point)); break; // walking never changes the selection
     case "back": back(); break;
-    case "home": sel = null; slipMsg = null; hideHeads(); home(); break;
-    case "deselect": sel = null; hideHeads(); break;
+    case "home": closeCard("home"); afterTrans(() => { if (inRoom) leaveHead(() => { sel = null; home(); }); else { sel = null; home(); } }); break;
+    case "deselect": afterTrans(() => { if (inRoom) leaveHead(() => { sel = null; }); else sel = null; }); break;
   }
 }
 function click(x, y) {
@@ -509,17 +587,18 @@ if (!REC && !REPLAY) {
     if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); }
     const p = pickAt(e.clientX, e.clientY);
     if (p && p.kind === "board" && pointers.size === 1) { controls.enabled = false; down.board = true; perform({ do: "board", type: "down", u: p.uv.x, v: 1 - p.uv.y }); }
-    if (!(rig.flight && ["enter", "leave"].includes(rig.flight.kind))) rig.stop("pointerdown"); // a drag never interrupts going into or out of a head
+    if (!trans) rig.stop("pointerdown"); // a drag never interrupts going into or out of a machine room
   });
   canvas.addEventListener("pointermove", (e) => {
     if (pointers.has(e.pointerId)) pointers.set(e.pointerId, [e.clientX, e.clientY]);
     const p = (down && down.board) || !down ? pickAt(e.clientX, e.clientY) : null;
     if (p && p.kind === "board" && board) { if (down && down.board) perform({ do: "board", type: "move", u: p.uv.x, v: 1 - p.uv.y }); else { board.pointer("move", p.uv.x, 1 - p.uv.y); boardHot = true; } } else if (board && !down) board.pointer("leave", 0, 0);
-    const cur = p && !["floor", "wall", "furniture"].includes(p.kind) ? "pointer" : "default";
+    if (!down) overlay.hover(e.clientX, e.clientY); // the card's close stamp and the room's exit brighten under the pointer
+    const cur = p && !["floor", "wall", "furniture", "card"].includes(p.kind) ? "pointer" : "default";
     if (!down) { const key = p ? `${p.kind}:${p.id ?? p.hit?.id ?? ""}` : ""; if (key !== hoverKey || cur !== cursorNow) log.ev("pick", "hover", { x: Math.round(e.clientX), y: Math.round(e.clientY), hit: p ? [p.kind, p.id ?? p.hit?.id ?? null] : null, cursor: cur }); hoverKey = key; } // log: hover target and cursor changes
     canvas.style.cursor = cursorNow = cur; if (!down && !(p && p.kind === "board")) hoverId = p && p.kind === "actor" ? p.id : null; // a board row hovered keeps the room's hover
     if (liveControls && !down) liveControls.hover(p && p.kind === "control" ? p.id : null); // live: a dim control says why
-    if (sel && sel.head && sel.head.hoverButton && !down) sel.head.hoverButton(p && p.kind === "head" && p.hit.kind === "event" ? p.hit : null); // live: so does a dim button in a head
+    if (inRoom && sel && sel.head && sel.head.hoverButton && !down) sel.head.hoverButton(p && p.kind === "head" && p.hit.kind === "event" ? p.hit : null); // live: so does a dim button in a head
   });
   const end = (e) => {
     pointers.delete(e.pointerId); if (!down) return; const d = down; down = null; controls.enabled = true;
@@ -547,12 +626,12 @@ if (!REC && !REPLAY) {
   addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
   addEventListener("blur", () => keys.clear()); // a key held while the window lost focus must not walk on
   window.__keys = keys;
-  addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+  addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; if (inRoom) camera.fov = fovFor(camera.aspect); camera.updateProjectionMatrix(); overlay.resize(innerWidth, innerHeight); });
 }
 let orbiting = false, orbitFrom = null; // log: an orbit gesture in progress (OrbitControls' start/end)
-// walking: WASD or the arrows at a steady pace (Shift: faster), Q/E turn on the spot; the same in the room and
-// inside a head (there in the head's own scale, kept under its dome); the camera slides along furniture and walls
-// (it never snaps) and the selection stays as it is
+// walking: WASD or the arrows at a steady pace (Shift: faster), Q/E turn on the spot; the same in the office and
+// in a machine room (there at the room's own scale, kept inside its wall); the camera slides along furniture and
+// walls (it never snaps) and the selection stays as it is
 const WALK_MPS = 2.2, TURN_RPS = 1.5;
 let walkLogAt = -1;
 function walkKeys(dt) {
@@ -561,19 +640,17 @@ function walkKeys(dt) {
   const sideK = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
   const turnK = (keys.has("q") ? 1 : 0) - (keys.has("e") ? 1 : 0);
   if (!fwdK && !sideK && !turnK) return;
-  if (rig.flight && ["enter", "leave"].includes(rig.flight.kind)) return; // never strand the camera between the lid and the head
+  if (trans) return; // never strand the camera between the office and a machine room
   rig.stop("keys");
-  const head = inHead() || (sel && sel.focusId);
-  const scale = head ? 0.12 * headK() : 1; // inside a head: its own pace (about a head's width a second)
+  const head = inRoom;
+  const scale = head ? roomEntry.dist / 3.5 : 1; // in a machine room: its own pace (the entry distance in about 1.6 s)
   const fast = keys.has("shift") ? 2 : 1;
   if (turnK) { const off = controls.target.clone().sub(camera.position); off.applyAxisAngle(v3(0, 1, 0), turnK * TURN_RPS * dt); controls.target.copy(camera.position).add(off); }
   if (fwdK || sideK) {
     const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize(); const r = v3(-f.z, 0, f.x);
     const step = f.multiplyScalar(fwdK).addScaledVector(r, sideK).normalize().multiplyScalar(WALK_MPS * scale * fast * dt);
     let want = camera.position.clone().add(step);
-    if (head) { // keep under the dome: no farther from the head's centre than the view one enters with, above its floor
-      const c = sel.anchor || headPos(sel.id); if (c) { const k = headK(); const h = want.clone().sub(c); const hz = v3(h.x, 0, h.z); const lim = 0.62 * k; if (hz.length() > lim) hz.setLength(lim); want = v3(c.x + hz.x, Math.max(c.y - 0.12 * k, Math.min(c.y + 0.3 * k, want.y)), c.z + hz.z); }
-    } else want = rig.resolve(want, { skip: sel && sel.id });
+    want = head ? machineRoom.contain(want) : rig.resolve(want, { skip: sel && sel.id }); // inside the room's wall; out of the office's furniture
     const moved = want.clone().sub(camera.position); camera.position.add(moved); controls.target.add(moved);
   }
   if (amb - walkLogAt > 0.5) { walkLogAt = amb; log.ev("camera", "walk", { keys: [...keys].join(""), head: !!head }); } // log: walking (twice a second at most)
@@ -594,46 +671,43 @@ function step(dt) {
   amb += dt; if (moving) wamb += dt;
   const wa = live ? wamb : amb; // live: what the world animates with
   const t = tNow(); sitCache.clear();
-  for (const [id, v] of lids) { const want = sel && sel.id === id ? sel.lid : 0; lids.set(id, want >= v ? want : Math.max(want, v - dt / 0.5)); if (!lids.get(id) && !(sel && sel.id === id)) lids.delete(id); }
-  if (sel && sel.head && !lids.has(sel.id)) lids.set(sel.id, sel.lid);
-  const dark = people.update(playS, wa, { id: sel && sel.id, skinHidden: !!(sel && sel.skinHidden), lidOf });
-  if (models) models.update({ people, playS, t, dt: moving ? dt : 0, camera, selected: sel && sel.id, frame: frameN++ }); // the desk models: built near the camera, their marbles at t
+  // the office goes on while the visitor is in a machine room; what in it looks at the camera sees the view they left
+  const viewCam = inRoom ? officeCam : camera;
+  const dark = people.update(playS, wa);
+  if (models) models.update({ people, playS, t, dt: moving ? dt : 0, camera: viewCam, selected: sel && sel.id, frame: frameN++ }); // the desk models: built near the camera, their marbles at t
   // a blackout (everyone ended at once): the lights go out
   const k = 1 - 0.85 * dark; hemi.intensity = 1.35 * k; sun.intensity = 1.7 * k; fill.intensity = 0.35 * k; scene.background.copy(SKY).lerp(NIGHT, dark); scene.fog.color.copy(scene.background);
-  building.update(playS, t, wa, { paused: live ? !moving : displayPaused ?? paused, speedIndex, duration: sim.duration, clockRing: recentIn(clockRings, playS, 0.9), camera });
+  building.update(playS, t, wa, { paused: live ? !moving : displayPaused ?? paused, speedIndex, duration: sim.duration, clockRing: recentIn(clockRings, playS, 0.9), camera: viewCam });
   stations.update(playS, wa);
   desks.update(playS, t, wa, people.occupantOf, { dark: dark > 0.3, situation: (id) => sitCache.get(id) || sitCache.set(id, sim.situationAt(id, t)).get(id), timerRing: (id) => recentIn(timerRings.get(id), playS, 0.9), timerSet: (id) => (timerPending.get(id) || []).some(([a, b]) => playS >= a && playS < b), talking: (a, b) => recentIn(talkSpans.get([a, b].sort().join("|")), playS, 0.8), dropping: (k) => tubes.dropping(k) });
   const active = tubes.update(playS, spot && spot.messages.size ? spot.messages : null);
   ticker.update(playS, wa);
   if (revealNext) { const pw = revealNext; revealNext = null; revealConsequence(pw); }
-  if (board && (REC || boardHot || (amb - boardAt >= 1 / 15 && boardSeen()))) { boardAt = amb; boardHot = false; board.update(t); if (board.dirty) { boardTex.needsUpdate = true; board.dirty = false; log.note("board"); } }
+  if (board && (REC || boardHot || (amb - boardAt >= 1 / 15 && !inRoom && boardSeen()))) { boardAt = amb; boardHot = false; board.update(t); if (board.dirty) { boardTex.needsUpdate = true; board.dirty = false; log.note("board"); } }
   for (const r of Object.values(rings)) r.visible = false;
   hoverRing.visible = false; if (hoverId && !(sel && sel.id === hoverId) && !inHead()) { const seat = people.seatOfActor(hoverId, playS); const pos = seat && seat.avatar.root.visible ? seat.avatar.root.position : stations.byId.get(hoverId)?.group.position; if (pos) { hoverRing.visible = true; hoverRing.position.set(pos.x, 0.035, pos.z); } }
   if (spot) for (const id of spot.actors) { let pos = null; const seat = people.seatOfActor(id, playS); if (seat && seat.avatar.root.visible) pos = seat.avatar.root.position; else { const st = stations.byId.get(id); if (st) pos = st.group.position; } if (!pos) continue; const r = ringFor(id); r.visible = true; r.position.set(pos.x, 0.03, pos.z); r.scale.setScalar(1 + 0.08 * Math.sin(amb * 5)); }
   rig.update(dt); // the camera moves only along a flight someone started (no drift)
-  walkKeys(dt); applyExt();
-  if (sel && sel.head) {
-    const live_c = headPos(sel.id);
-    if (!live_c) { sel = null; hideHeads(); }
-    else {
-      const anchored = inHead() || sel.focusId; const c = anchored && sel.anchor ? sel.anchor : live_c;
-      const dist = camera.position.distanceTo(c);
-      const kd = dist / headK(); sel.skinHidden = kd < 0.95 && sel.stage !== "approach";
-      const h = sel.head; h.group.visible = sel.skinHidden || lidOf(sel.id) > 0.02; h.group.position.copy(c); h.group.rotation.y = anchored ? sel.anchorF ?? facing(sel.id) : facing(sel.id);
-      detailNow = sel.focusId ? Math.max(clamp01((1.0 - kd) / 0.7), 0.9) : clamp01((1.0 - kd) / 0.7); h.setDetail(detailNow); h.skull.visible = sel.skinHidden;
-      h.update(t, live && !moving ? 0 : dt, playS); // the playhead itself: past a live run's last instant warp(t) stops
-      camera.near = anchored ? Math.max(0.004, Math.min(0.05, dist * 0.05)) : 0.05;
-    }
-  } else camera.near = 0.05;
-  { const want = sel && sel.head && sel.skinHidden ? insideFov() : FOV; if (Math.abs(want - camera.fov) > 0.01) camera.fov += (want - camera.fov) * Math.min(1, dt * 5); } // narrow screens: a wider view inside a head
+  walkKeys(dt); stepTrans(dt); applyExt();
+  if (inRoom && sel && sel.head) {
+    // the machine room: the head's detail follows the camera's distance as the walk-in head's did (its entry view at 0.57)
+    const h = sel.head; const dist = camera.position.distanceTo(controls.target);
+    detailNow = roomDetail(h, !!sel.focusId); h.setDetail(detailNow);
+    h.update(t, live && !moving ? 0 : dt, playS); // the playhead itself: past a live run's last instant warp(t) stops
+    camera.near = Math.max(0.02, Math.min(0.3, dist * 0.02));
+    // the free camera cannot be dragged into the machines: a machine in focus keeps half its framing distance
+    controls.minDistance = sel.focusId ? Math.max(0.5, 0.55 * (sel.focusDist || 1)) : Math.min(ROOM.minDist, roomEntry.dist * 0.4);
+  } else if (!inRoom) {
+    if (sel && sel.head && !trans && !headPos(sel.id)) sel = null; // the person left the office
+    camera.near = 0.05; controls.minDistance = 0.9;
+  }
   camera.updateProjectionMatrix();
-  if (slipMsg) { const a = active.find((x) => x.msg.id === slipMsg.id); if (a) { slip.visible = true; slip.position.copy(a.pos).add(v3(0, 0.62, 0)); slip.quaternion.copy(camera.quaternion); const e = ease(clamp01((amb - slipMsg.at) / 0.35)); const d = camera.position.distanceTo(slip.position); const sc = Math.max(0.55, Math.min(1.6, d / 5)) * e; slip.scale.set(sc, sc, 1); } else if (!(slip.visible && amb - slipMsg.at > 0.4)) slip.visible = false; } else slip.visible = false;
-  // the free camera inside a head cannot be dragged into its machines: a machine in focus keeps half its framing
-  // distance, the whole head a quarter of the entry view's
-  controls.minDistance = sel && sel.focusId ? Math.max(0.03, 0.55 * (sel.focusDist || 0.1)) : inHead() ? 0.14 * headK() : 0.9;
-  if (!REC && !ext) controls.update();
-  // nothing cuts through the frame: out of furniture, walls and people (not while inside a head)
-  if (!ext && !inHead() && !(sel && sel.focusId) && !(rig.flight && rig.flight.kind === "enter")) { pushes.length = 0; const q = rig.resolve(camera.position, { skip: sel && sel.id, out: pushes }); if (q.distanceToSquared(camera.position) > 1e-8) { camera.position.copy(q); camera.lookAt(controls.target); if (amb - pushLogAt > 0.3) { pushLogAt = amb; log.ev("camera", "push", { n: pushes.length, ...pushes[0], by: rig.flight ? rig.flight.kind : orbiting ? "orbit" : "other" }); } } } // log: collision pushes
+  // the opened capsule's card follows its capsule on screen (it stays where it was once the capsule has arrived)
+  if (slipMsg && !inRoom) { const a = active.find((x) => x.msg.id === slipMsg.id); overlay.pinCard(a ? screenPt(a.pos) : null, amb); }
+  if (!REC && !ext && !trans) controls.update();
+  if (inRoom && !ext) { const p0 = camera.position.clone(); machineRoom.contain(camera.position); if (p0.distanceToSquared(camera.position) > 1e-10) camera.lookAt(controls.target); } // inside the room's wall
+  // nothing cuts through the frame: out of furniture, walls and people (the office only)
+  if (!ext && !inRoom && !trans) { pushes.length = 0; const q = rig.resolve(camera.position, { skip: sel && sel.id, out: pushes }); if (q.distanceToSquared(camera.position) > 1e-8) { camera.position.copy(q); camera.lookAt(controls.target); if (amb - pushLogAt > 0.3) { pushLogAt = amb; log.ev("camera", "push", { n: pushes.length, ...pushes[0], by: rig.flight ? rig.flight.kind : orbiting ? "orbit" : "other" }); } } } // log: collision pushes
   applyExt();
   if (liveControls) { if (amb - liveSyncAt > 0.4) { liveSyncAt = amb; liveControls.sync(); } liveControls.update(amb); } // live
   recorder.update();
@@ -642,7 +716,7 @@ function step(dt) {
 
 // ---------------------------------------------------------------- what the flight recorder samples each frame (engine/log.js)
 const pushes = []; let pushLogAt = -1, detailNow = 0;
-let viewMs = 0, modeLast = "", worldAt = -1, viewAt = -1, limitHit = "", lastT = null, lidOpen = false, detailLogged = -1, progs = 0;
+let viewMs = 0, modeLast = "", worldAt = -1, viewAt = -1, limitHit = "", lastT = null, detailLogged = -1, progs = 0;
 function modeNow(moving) {
   let m = !sel ? "overview" : sel.focusId ? `machine:${sel.id}` : inHead() ? `${sel.stage === "inside" ? "head" : sel.stage}:${sel.id}` : sel.head ? `person:${sel.id}` : `station:${sel.id}`;
   if (slipMsg) m += " +slip";
@@ -653,7 +727,7 @@ function observe(moving) {
   log.camera(camera.position, controls.target, camera.fov, playS);
   const m = modeNow(moving); if (m !== modeLast) { log.ev("mode", "change", { from: modeLast, to: m, cause: lastAct }); modeLast = m; }
   if (orbiting) { const lim = controls.getPolarAngle() >= controls.maxPolarAngle - 0.002 ? "polar" : controls.getDistance() <= controls.minDistance + 0.005 ? "min-distance" : controls.getDistance() >= controls.maxDistance - 0.01 ? "max-distance" : ""; if (lim && lim !== limitHit) log.ev("camera", "limit", { which: lim }); limitHit = lim; } else limitHit = "";
-  if (sel && sel.head) { const lo = lidOf(sel.id) > 0.5; if (lo !== lidOpen) { log.ev("world", "lid", { id: sel.id, open: lo }); lidOpen = lo; } if (Math.abs(detailNow - detailLogged) > 0.15 || (detailNow !== detailLogged && (detailNow === 0 || detailNow === 1))) { log.ev("world", "detail", { id: sel.id, d: +detailNow.toFixed(2) }); detailLogged = detailNow; } } else { if (lidOpen) log.ev("world", "lid", { open: false }); lidOpen = false; detailLogged = -1; }
+  if (inRoom && sel) { if (Math.abs(detailNow - detailLogged) > 0.15 || (detailNow !== detailLogged && (detailNow === 0 || detailNow === 1))) { log.ev("world", "detail", { id: sel.id, d: +detailNow.toFixed(2) }); detailLogged = detailNow; } } else detailLogged = -1;
   if (amb - worldAt >= 1) {
     worldAt = amb; const t = tNow();
     log.ev("world", "tick", { playS: +playS.toFixed(2), t: Math.round(t), rate: live ? (moving ? SPEEDS[speedIndex] : 0) : paused ? 0 : SPEEDS[speedIndex] });
@@ -667,6 +741,7 @@ function observe(moving) {
 const viewer = createViewSampler(THREE); let viewBoxes = null;
 const B3 = (o) => new THREE.Box3().setFromObject(o);
 function subjects() {
+  if (inRoom) return roomSubjects();
   if (!viewBoxes) {
     scene.updateMatrixWorld();
     viewBoxes = stations.list.map((st) => { const b = B3(st.group); return { kind: "station", id: st.id, min: b.min, max: b.max }; });
@@ -682,17 +757,30 @@ function subjects() {
   if (models) for (const m of models.stats().models) { const b = models.boxOf(m.id); if (b) out.push({ kind: "model", id: m.id, min: b.min, max: b.max }); }
   return out;
 }
+// in a machine room: its parts, machines and stations alike (the first 120), nothing of the office
+function roomSubjects() {
+  const h = sel && sel.head; if (!h) return [];
+  return h.states().slice(0, 120).map((id) => { const b = h.boundsOf(id).box; return { kind: "machine", id, min: b.min, max: b.max }; });
+}
 let platesKept = null, platesN = -1;
 const attached = (o) => { let q = o; while (q.parent) q = q.parent; return q === scene; };
 function viewSample() {
+  if (inRoom) return roomSample();
   const subs = subjects(); let selected = null;
   if (sel && !inHead() && !sel.focusId) selected = subs.find((x) => x.id === sel.id && (x.kind === "actor" || x.kind === "station")) || null;
   if (!platesKept || platesN !== PLATES.size) { platesKept = []; for (const p of PLATES) { if (!attached(p)) PLATES.delete(p); else platesKept.push(p); } platesN = PLATES.size; } // the world's plates change only when it is built
   const plates = [...platesKept];
-  if (sel && sel.head && sel.head.plates && sel.head.group.visible) for (const x of sel.head.plates()) plates.push(x.mesh);
-  if (models && !inHead()) plates.push(...models.plates());
+  if (models) plates.push(...models.plates());
   const out = viewer.sample({ camera, W: innerWidth, H: innerHeight, subjects: subs, plates, selected, occluded: (id) => occludedFrom(camera.position, id) });
-  if (sel && sel.head && sel.skinHidden && (inHead() || sel.focusId)) out.head = headView(sel.head);
+  if (slipMsg) out.card = overlay.rects().card; // the opened card's rectangle on screen (it is kept inside it)
+  return out;
+}
+// a machine room's view: its machines and plates, the exit control (always on screen), what is in focus
+function roomSample() {
+  const h = sel.head;
+  const out = viewer.sample({ camera, W: innerWidth, H: innerHeight, subjects: roomSubjects(), plates: h.plates ? h.plates().map((x) => x.mesh) : [] });
+  const ex = overlay.rects().exit; if (ex) { out.in.unshift(["exit", "exit", ...ex, Math.round(((ex[2] - ex[0]) * (ex[3] - ex[1]) * 1000) / (innerWidth * innerHeight)) / 10]); out.n.exit = 1; out.pickable++; }
+  out.room = sel.id; out.head = headView(h);
   return out;
 }
 // inside a head: is the camera inside a machine or a station (geometry within the near plane), and how many plates
@@ -752,8 +840,8 @@ if (live) {
     // or a head that cannot refresh is built again
     if (info.reset) pressLabels.length = 0;
     if (models) { models.reseat(); if (info.reset) models.clear(); else models.refresh(); } // the desk models: refreshed in place (their marbles keep their places), found again at their new seats
-    for (const [id, h] of [...heads]) { if (!info.reset && h.refresh && sim.chartOf(id)) { try { if (h.refresh() !== false) { log.ev("world", "head", { id, how: "refreshed" }); continue; } } catch (err) { console.warn("head refresh", id, err.message); } } scene.remove(h.group); try { h.dispose(); } catch {} heads.delete(id); }
-    if (sel && sel.head && !heads.has(sel.id)) { const h = headFor(sel.id); h.focus(sel.focusId || null); sel.head = h; }
+    for (const [id, h] of [...heads]) { if (!info.reset && h.refresh && sim.chartOf(id)) { try { if (h.refresh() !== false) { log.ev("world", "head", { id, how: "refreshed" }); continue; } } catch (err) { console.warn("head refresh", id, err.message); } } h.group.removeFromParent(); try { h.dispose(); } catch {} heads.delete(id); }
+    if (sel && sel.head && !heads.has(sel.id)) { const h = headFor(sel.id); h.focus(sel.focusId || null); sel.head = h; if (inRoom) machineRoom.mount(h.group); }
     liveControls.rebuild(worldRefs()); placeTicker(playS);
     if (window.api) Object.assign(window.api, { plan, people, stations, desks, tubes, building });
     liveSyncAt = -1; // the controls' lit and dim at the next frame (the driver is no longer busy then)
@@ -761,37 +849,40 @@ if (live) {
   };
   live.on("change", rebuildWorld);
   liveControls.rebuild(worldRefs()); placeTicker(playS);
-  if (!REPLAY && !REC) { people.update(playS, 0, { id: null, skinHidden: false, lidOf }); const v = startView(); /* the people at their seats first: the view frames them */ camera.position.copy(v.pos); controls.target.copy(v.tgt); controls.update(); } // live: start where the inputs and the person they drive are
+  if (!REPLAY && !REC) { people.update(playS, 0); const v = startView(); /* the people at their seats first: the view frames them */ camera.position.copy(v.pos); controls.target.copy(v.tgt); controls.update(); } // live: start where the inputs and the person they drive are
   window.live = live;
   live.screen = () => liveControls.screenPositions(camera, innerWidth, innerHeight);
   live.pressControl = (id) => liveControls.press(id);
 }
 
+// ---------------------------------------------------------------- drawing: the office or a machine room, then the overlay over it
+function render() { renderer.render(inRoom ? machineRoom.scene : scene, camera); overlay.render(renderer); }
+
 // ---------------------------------------------------------------- live loop / film hooks
 window.DURATION = LOOP * 1000;
-window.state = () => ({ system: SYSTEM, playS, t: tNow(), paused, speedIndex, sel: sel && { id: sel.id, stage: sel.stage, focusId: sel.focusId }, slip: slipMsg, boardStatus, headStatus, loop: LOOP, actors: sim.actors.length, hub: plan.hub, room: [RW, RD] });
-window.api = { sim, plan, cfg, scene, camera, controls, people, stations, desks, tubes, building, board: () => board, heads, headFor, HEAD_SCALE, ticker, models,
+window.state = () => ({ system: SYSTEM, playS, t: tNow(), paused, speedIndex, sel: sel && { id: sel.id, stage: sel.stage, focusId: sel.focusId }, machineRoom: inRoom ? sel && sel.id : null, slip: slipMsg, card: overlay.rects().card, boardStatus, headStatus, loop: LOOP, actors: sim.actors.length, hub: plan.hub, room: [RW, RD] });
+window.api = { sim, plan, cfg, scene, camera, controls, people, stations, desks, tubes, building, board: () => board, heads, headFor, machineRoom, overlay, ticker, models,
   select, enterHead, focusHead, frameAll, startView, personPts, boxPts, inFrame, hiddenPerson, back, openCapsule, walkTo, flyTo, home, homeView, togglePause, setSpeed, click, pickAt, perform, intentOf, recorder: () => recorder,
   setPlay: (s) => (playS = s), getPlay: () => playS, setPaused: (b) => (paused = b), setDisplayPaused: (b) => (displayPaused = b), clearSpot: () => (spot = null),
-  reset: () => { sel = null; slipMsg = null; spot = null; flight = null; rig.stop(); lids.clear(); hideHeads(); board && board.highlight({}); }, rig, frameOf, leaveHead,
+  reset: () => { if (inRoom) swapOut(); trans = null; overlay.setIris(0); sel = null; slipMsg = null; overlay.closeCard(); spot = null; flight = null; rig.stop(); board && board.highlight({}); }, rig, frameOf, leaveHead, inRoom: () => inRoom, render,
   getActive: () => tubes.active, tick: (sec) => { for (let i = 0; i < Math.round(sec * 30); i++) step(1 / 30); } };
 if (REC) {
   const { makeFilm } = await import("./film.js");
-  const film = makeFilm({ THREE, api: window.api, sim, plan, step, render: () => renderer.render(scene, camera), setAmb: (a) => (amb = a), camera, controls, cfg });
+  const film = makeFilm({ THREE, api: window.api, sim, plan, step, render, setAmb: (a) => (amb = a), camera, controls, cfg });
   window.DURATION = film.duration * 1000; window.setTime = (ms) => film.setTime(ms / 1000); window.filmScript = film.script;
   window.ready = true;
 } else {
   let last = performance.now();
   // ?noloop: tools/shoot.mjs steps the world itself (api.tick) and renders with api.render, so stills are exact
-  if (params.has("noloop") || REPLAY) window.api.render = () => renderer.render(scene, camera);
+  if (params.has("noloop") || REPLAY) window.api.render = render;
   else renderer.setAnimationLoop(() => {
     log.frameStart(); // log: every frame's dt
-    const now = performance.now(); const dt = Math.min(0.1, (now - last) / 1000); last = now; step(dt); renderer.render(scene, camera);
+    const now = performance.now(); const dt = Math.min(0.1, (now - last) / 1000); last = now; step(dt); render();
     const np = renderer.info.programs?.length || 0; if (np !== progs) { if (progs) log.note("shader"); progs = np; } // log: a shader compiled in this frame
     log.frameEnd(renderer.info.render);
   });
   // ?replay=1: tools/replay.mjs steps the world by the log's time and sets the camera and the playhead from it
-  if (REPLAY) window.api.replay = { step: (dt, e, render = true) => { ext = e; step(dt); if (render) renderer.render(scene, camera); }, perform: (a) => perform(a, "replay"), mode: () => modeNow(true), view: () => viewSample() };
+  if (REPLAY) window.api.replay = { step: (dt, e, render = true) => { ext = e; step(dt); if (render) window.api.render(); }, perform: (a) => perform(a, "replay"), mode: () => modeNow(true), view: () => viewSample() };
   if (params.get("log") === "1") log.arm(); // a crash copy in sessionStorage, exported with the next session
   log.ev("session", "ready", { ms: Math.round(performance.now() - log.origin) }); log.note("first-frame");
   window.ready = true;

@@ -8,60 +8,62 @@
   :root { --bg: #1b1d22; --fg: #e9e2cf; --mute: #9a968a; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px ui-monospace, Menlo, monospace; overflow: hidden; }
   canvas { display: block; }
-  #bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: #0008; }
-  #bar input[type=range] { flex: 1; }
-  #bar select, #bar button { background: #2a2d35; color: var(--fg); border: 1px solid #444; border-radius: 4px; padding: 3px 6px; font: inherit; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: #0008; flex-wrap: wrap; }
+  #bar input[type=range] { flex: 1; min-width: 120px; }
+  #bar select, #bar button, #bar a { background: #2a2d35; color: var(--fg); border: 1px solid #444; border-radius: 4px; padding: 3px 6px; font: inherit; text-decoration: none; }
   #info { color: var(--mute); min-width: 230px; }
   body.rec #bar { display: none; }
 </style>
 </head>
 <body>
 <div id="bar">
+  <select id="system"></select>
   <select id="actor"></select>
   <button id="play">pause</button>
   <input id="scrub" type="range" min="0" max="1000" value="0">
   <span id="info"></span>
+  <a id="gal" href="gallery.html">gallery</a>
 </div>
-<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/jsm/" } }</script>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { createHead } from "./head.js";
+import { listSystems, loadSystem, lights, busyTime } from "./bench.js";
 
 const q = new URLSearchParams(location.search);
 const REC = q.has("rec"); if (REC) document.body.classList.add("rec");
-import { loadSim } from "../core/sim.js";
-const sim = await loadSim(new URL("../data/llm-chat/trace.json", location.href).href);
+const SYSTEM = q.get("system") || "llm-chat";
+const sim = await loadSystem(SYSTEM);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: REC });
 renderer.setPixelRatio(REC ? 1 : Math.min(2, devicePixelRatio));
-renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = false;
+renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 document.body.prepend(renderer.domElement);
-const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b1d22);
-scene.add(new THREE.HemisphereLight(0xfff3dd, 0x30343e, 1.25));
-const sun = new THREE.DirectionalLight(0xffffff, 1.7); sun.position.set(4, 10, 7); scene.add(sun);
-const fill = new THREE.DirectionalLight(0x9fc3ff, 0.5); fill.position.set(-6, 3, -4); scene.add(fill);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b1d22); lights(THREE, scene);
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.01, 200);
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableZoom = false; controls.enableDamping = !REC; controls.target.set(0, 0, 0);
-camera.position.set(0, 7, 13);
+controls.enableZoom = false; controls.enableDamping = !REC;
 
-// the person's head, as WORLD would mount it
-const ids = ["host", "ada", "bo", "terminal", "python", "workspace", ...sim.actors.filter((a) => a.id.startsWith("package:")).map((a) => a.id), "director"];
-const sel = document.getElementById("actor");
-for (const id of ids) { const o = document.createElement("option"); o.value = o.textContent = id; sel.append(o); }
-let head = null, detail = 0, focusId = null, playing = !REC, sec = 0;
-const view = { az: 0, el: 0.5, dist: null };
+const sysSel = document.getElementById("system"), sel = document.getElementById("actor");
+for (const s of await listSystems()) { const o = document.createElement("option"); o.value = o.textContent = s; sysSel.append(o); }
+sysSel.value = SYSTEM; sysSel.onchange = () => { location.search = `?system=${encodeURIComponent(sysSel.value)}`; };
+document.getElementById("gal").href = `gallery.html?system=${encodeURIComponent(SYSTEM)}`;
+const ids = sim.actors.filter((a) => !a.external && sim.chartOf(a.id)).map((a) => a.id);
+for (const id of ids) { const o = document.createElement("option"); o.value = id; o.textContent = `${id} (${sim.actor(id).chart})`; sel.append(o); }
+let head = null, detail = Number(q.get("detail") ?? 0), focusId = null, playing = !REC, sec = 0;
+const view = { az: 0.25, el: 0.55, dist: null };
 function mount(id) {
   if (head) head.dispose();
   head = createHead({ THREE, sim, actorId: id }); scene.add(head.group);
   sel.value = id; focusId = null; head.focus(null); head.setDetail(detail);
 }
-mount(q.get("actor") || "host");
-sel.onchange = () => mount(sel.value);
+const first = q.get("actor") || ids[0];
+mount(first);
+if (q.has("t")) sec = sim.warp(Number(q.get("t"))); else sec = sim.warp(busyTime(sim, first));
+sel.onchange = () => { mount(sel.value); sec = sim.warp(busyTime(sim, sel.value)); };
 
-// camera: wheel = detail; distance and target follow detail and focus
 function camGoal() {
   const fb = head.focusBounds;
   const far = 17, near = Math.max(0.5, fb.radius * 2.3);
@@ -86,18 +88,16 @@ renderer.domElement.addEventListener("pointerup", (e) => {
   ptr.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
   const hit = head.pick(ray);
   console.log("pick", hit && hit.kind, hit && hit.id);
-  if (hit && hit.kind === "state") { focusId = hit.id === focusId ? null : hit.id; head.focus(focusId); placeCamera(); }
+  if (hit && hit.kind === "state") { focusId = hit.id === focusId ? null : hit.id; head.focus(focusId); if (focusId) detail = Math.max(detail, 0.9); head.setDetail(detail); placeCamera(); }
   else if (!hit) { focusId = null; head.focus(null); placeCamera(); }
 });
 addEventListener("keydown", (e) => { if (e.key === "Escape") { focusId = null; head.focus(null); detail = 0; head.setDetail(0); placeCamera(); } if (e.key === " ") playing = !playing; });
 
-// time: playback seconds through the sim's warp, looping
 const PLAY = sim.playDuration || sim.duration / 1000;
 const scrub = document.getElementById("scrub"), info = document.getElementById("info"), playBtn = document.getElementById("play");
 scrub.oninput = () => { sec = (scrub.value / 1000) * PLAY; };
 playBtn.onclick = () => { playing = !playing; playBtn.textContent = playing ? "pause" : "play"; };
 const tOf = (s) => (sim.unwarp ? sim.unwarp(s) : s * 1000);
-
 function frame(dt) {
   const t = tOf(sec);
   head.update(t, dt);
@@ -109,12 +109,12 @@ let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (playing) sec = (sec + dt) % PLAY;
-  controls.update(); frame(dt);
+  controls.update(); placeCameraIfFocusMoving(); frame(dt);
   requestAnimationFrame(loop);
 }
+let settle = 0; function placeCameraIfFocusMoving() { if (settle > 0) { settle--; placeCamera(); } }
 addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 
-// film/test hooks: everything from (actor, playback second, detail, focus, camera angles)
 window.PLAY = PLAY; window.DURATION = sim.duration; window.sim = sim;
 window.setView = (v) => {
   if (v.actor && v.actor !== sel.value) mount(v.actor);
@@ -122,9 +122,9 @@ window.setView = (v) => {
   if ("focus" in v) { focusId = v.focus; head.focus(focusId); }
   if (v.az != null) view.az = v.az; if (v.el != null) view.el = v.el; view.dist = v.dist ?? null;
   if (v.move) { const [mid, to, u] = v.move; const mv = head.movesOf(mid).find((x) => x.to === to); if (mv) sec = mv.start + u * (mv.end - mv.start); }
-  else if (v.sec != null) sec = v.sec; else if (v.t != null) sec = sim.warp ? sim.warp(v.t) : v.t / 1000;
+  else if (v.sec != null) sec = v.sec; else if (v.t != null) sec = sim.warp(v.t); else if (v.busy) sec = sim.warp(busyTime(sim, sel.value));
   placeCamera(); frame(0);
-  return { t: tOf(sec), focus: head.focusBounds.center.toArray(), radius: head.focusBounds.radius };
+  return { t: tOf(sec), stage: head.stageId, focus: head.focusBounds.center.toArray(), radius: head.focusBounds.radius, stats: head.stats() };
 };
 window.head = () => head;
 window.pickAt = (x, y) => { ptr.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1); ray.setFromCamera(ptr, camera); const h = head.pick(ray); return h && { kind: h.kind, id: h.id }; };

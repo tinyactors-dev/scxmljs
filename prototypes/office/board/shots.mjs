@@ -27,32 +27,41 @@ await page.goto(`http://127.0.0.1:${port}/office/board/test.html?film=1`);
 await page.waitForFunction(() => window.READY === true, null, { timeout: 60000 });
 
 if (!film) {
-  const flat = page.locator("#flat");
-  const shot = async (name, fn, arg) => {
-    if (fn) await page.evaluate(fn, arg);
-    await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
-    await page.evaluate(() => window.blit());
-    await flat.screenshot({ path: path.join(out, `${name}.png`) });
-    console.log("shot", name);
-  };
-  const tapAt = async (q) => page.evaluate((q) => { const p = window.board.locate(q); window.board.pointer("down", p.u, p.v); window.board.pointer("up", p.u, p.v); }, q);
-  await shot("1-overview", () => window.setT(7400));
-  await tapAt({ storyId: "send-message" }); await shot("2-behaviour-send", () => window.setT(7400));
-  await tapAt({ storyId: "send-message" });
-  await tapAt({ storyId: "stop" }); await shot("2b-behaviour-stop", () => window.setT(2960.5));
-  await tapAt({ storyId: "stop" });
-  await page.evaluate(() => window.board.selectMessage("e630")); await shot("3-message-chain", () => window.setT(7000));
-  await page.evaluate(() => { window.board.highlight({}); window.board.resetView(); });
-  await page.evaluate(() => window.board.selectWorld("model-fails")); await shot("4-whatif-model-fails", () => window.setT(15000));
-  await page.evaluate(() => window.board.selectWorld("stop-mid-answer")); await shot("5-whatif-stop-mid-answer", () => window.setT(7600));
-  await page.evaluate(() => window.board.selectWorld("client-offline-during-tool")); await shot("5b-whatif-python-drops", () => window.setT(30000));
-  await page.evaluate(() => window.board.selectWorld(null)); await page.evaluate(() => window.setT(6900));
-  await page.evaluate(() => window.board.zoom(4, 0.45)); await shot("6-zoomed");
-  await page.evaluate(() => { window.board.resetView(); window.board.selectStory("tools"); window.setT(7200); });
-  await page.evaluate(() => window.blit());
-  await page.locator("#wall").screenshot({ path: path.join(out, "7-third-size-skewed.png") });
-  await page.screenshot({ path: path.join(out, "8-test-page.png") });
-  console.log("shot 7, 8");
+  // node board/shots.mjs [system...]  (default: every ../data/<system> and fixtures/<name>, plus llm-chat without stories)
+  const sysArgs = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+  const list = sysArgs.length ? sysArgs : [
+    ...fs.readdirSync(path.join(here, "../data")).filter((d) => fs.existsSync(path.join(here, "../data", d, "trace.json"))),
+    ...fs.readdirSync(path.join(here, "fixtures")).filter((d) => fs.existsSync(path.join(here, "fixtures", d, "trace.json"))),
+    "llm-chat?stories=0",
+  ];
+  for (const sys of list) {
+    const [name, q] = sys.split("?"); const tag = q ? `${name}-nostories` : name;
+    const dir = path.join(out, tag); fs.mkdirSync(dir, { recursive: true });
+    await page.goto(`http://127.0.0.1:${port}/office/board/test.html?film=1&system=${name}${q ? "&" + q : ""}`);
+    await page.waitForFunction(() => window.READY === true, null, { timeout: 60000 });
+    const flat = page.locator("#flat");
+    const shot = async (file) => { await page.evaluate(() => new Promise((r) => setTimeout(r, 30))); await page.evaluate(() => window.blit()); await flat.screenshot({ path: path.join(dir, `${file}.png`) }); };
+    const info = await page.evaluate(() => ({ lanes: window.board.lanes, beh: window.board.behaviours, mass: window.board.massEvents, d: window.board.duration }));
+    console.log(tag, "lanes:", info.lanes.map((l) => `${l.type}:${l.label}${l.swarm ? "(swarm " + l.actors.length + ")" : ""}`).join(", "), "| behaviours:", info.beh.length, "| deaths:", info.mass.deaths.length, "births:", info.mass.births.length);
+    await page.evaluate((d) => window.setT(d * 0.55), info.d); await shot("1-overview");
+    if (info.beh.length) {
+      const i = info.beh.reduce((bi, b, j, arr) => (b.a1 - b.a0 > arr[bi].a1 - arr[bi].a0 ? j : bi), 0);
+      await page.evaluate((i) => { window.board.selectEpisode(i); }, i);
+      await page.evaluate((b) => window.setT(b.a0 + (b.a1 - b.a0) * 0.6), info.beh[i]); await shot("2-behaviour");
+      await page.evaluate(() => window.board.selectEpisode(null));
+    }
+    const sw = info.lanes.find((l) => l.swarm);
+    if (sw) { await page.evaluate((k) => window.board.expand(k, true), sw.key); await page.evaluate((d) => window.setT(d * 0.45), info.d); await shot("3-swarm-expanded"); await page.evaluate((k) => window.board.expand(k, false), sw.key); }
+    if (info.mass.deaths.length) {
+      const dth = info.mass.deaths[0];
+      await page.evaluate((a) => { const b = window.board; b.resetView(); const s = b.warp(a); const u = 0.15 + 0.85 * 0; b.zoom(1, 0.5); }, dth.at);
+      await page.evaluate((a) => { const b = window.board; const p = b.locate({ t: a }); b.zoom(3, p.u); }, dth.at);
+      await page.evaluate((a) => window.setT(a + 1), dth.at); await shot("4-mass-death");
+      await page.evaluate(() => window.board.resetView());
+    }
+    await page.evaluate((d) => { window.board.resetView(); window.setT(d * 0.6); }, info.d);
+    await page.locator("#wall").screenshot({ path: path.join(dir, "9-third-size-skewed.png") });
+  }
 } else {
   const total = await page.evaluate(() => window.FILM_FRAMES);
   const ff = spawn("/usr/bin/ffmpeg", ["-y", "-f", "image2pipe", "-framerate", "30", "-c:v", "mjpeg", "-i", "-", "-vf", "scale=1280:-2:flags=lanczos", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "medium", "-movflags", "+faststart", path.join(out, "board.mp4")], { stdio: ["pipe", "ignore", "inherit"] });

@@ -33,15 +33,23 @@
   </div>
 </div>
 <script type="module">
-import { loadSim, createSim } from "../core/sim.js";
+import { createSim } from "../core/sim.js";
 import { createBoard } from "./board.js";
 
 const params = new URLSearchParams(location.search);
 const FILM = params.has("film");
-const sim = await loadSim(new URL("../data/llm-chat/trace.json", location.href));
+// ?system=<name>: ../data/<name>/trace.json, else fixtures/<name>/trace.json; ?stories=0 drops stories and worlds
+const SYSTEM = params.get("system") || "llm-chat";
+let traceUrl = new URL(`../data/${SYSTEM}/trace.json`, location.href);
+let res = await fetch(traceUrl);
+if (!res.ok) { traceUrl = new URL(`fixtures/${SYSTEM}/trace.json`, location.href); res = await fetch(traceUrl); }
+const trace = await res.json();
+if (params.get("stories") === "0") { delete trace.stories; delete trace.worlds; }
+const sim = createSim(trace);
+document.title = `Board: ${SYSTEM}`;
 let filmClock = 0;
 const flat = document.getElementById("flat");
-const board = createBoard({ sim, width: 1600, height: 900, createSim, now: FILM ? () => filmClock : undefined });
+const board = createBoard({ sim, width: 1600, height: 900, createSim, baseUrl: new URL(".", traceUrl).href, now: FILM ? () => filmClock : undefined });
 // the board draws on its own canvas; this page shows it twice, as WORLD would upload it to a texture
 const fctx = flat.getContext("2d");
 const skewed = document.getElementById("skewed"), kctx = skewed.getContext("2d");
@@ -140,13 +148,13 @@ window.frame = async (i) => {
   }
   lastFrame = i; showCursor(); blit();
 };
-window.board = board;
+window.board = board; window.sim = sim;
 window.setT = (tt) => { s = board.warp(tt); board.update(tt); blit(); };
 window.blit = blit;
 
 if (FILM) {
-  playing = true; plan();
-  await Promise.all(["model-fails", "stop-mid-answer"].map((id) => board.loadWorld(id)));
+  playing = true; if (SYSTEM === "llm-chat" && trace.stories) plan();
+  await Promise.all((trace.worlds || []).map((w) => board.loadWorld(w.id)));
   board.update(0); blit();
 } else {
   let last = performance.now();

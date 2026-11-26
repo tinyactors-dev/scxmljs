@@ -1,0 +1,5314 @@
+{
+ "system": "shapes",
+ "scenario": "head fixtures",
+ "duration": 11000,
+ "charts": {
+  "receipt": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "receipt",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "draft",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "send",
+          "targets": [
+           "sent"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "sent",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "amend",
+          "targets": [
+           "draft"
+          ]
+         }
+        ]
+       }
+      ],
+      "transitions": [],
+      "initial": [
+       "draft"
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "receipt"
+    ]
+   }
+  },
+  "shipment": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "shipment",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "ordered",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.0",
+          "targets": [
+           "confirmed"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "confirmed",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.1",
+          "targets": [
+           "picking"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "picking",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.2",
+          "targets": [
+           "picked"
+          ]
+         },
+         {
+          "event": "error.execution",
+          "targets": [
+           "exception"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "picked",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.3",
+          "targets": [
+           "packing"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "packing",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.4",
+          "targets": [
+           "packed"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "packed",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.5",
+          "targets": [
+           "labelled"
+          ]
+         },
+         {
+          "event": "express",
+          "targets": [
+           "loaded"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "labelled",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.6",
+          "targets": [
+           "weighed"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "weighed",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.7",
+          "targets": [
+           "manifested"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "manifested",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.8",
+          "targets": [
+           "collected"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "collected",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.9",
+          "targets": [
+           "hub-in"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "hub-in",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.10",
+          "targets": [
+           "sorted"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "sorted",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.11",
+          "targets": [
+           "hub-out"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "hub-out",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.12",
+          "targets": [
+           "linehaul"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "linehaul",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.13",
+          "targets": [
+           "depot-in"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "depot-in",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.14",
+          "targets": [
+           "depot-sorted"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "depot-sorted",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.15",
+          "targets": [
+           "loaded"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "loaded",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.16",
+          "targets": [
+           "out-for-delivery"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "out-for-delivery",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.17",
+          "targets": [
+           "arriving"
+          ]
+         },
+         {
+          "event": "delivery.timeout",
+          "targets": [
+           "exception"
+          ]
+         },
+         {
+          "event": "scan.ok",
+          "targets": [
+           "arriving"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "arriving",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.18",
+          "targets": [
+           "attempted"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "attempted",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.19",
+          "targets": [
+           "delivered"
+          ]
+         },
+         {
+          "event": "retry",
+          "targets": [
+           "out-for-delivery"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "delivered",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.20",
+          "targets": [
+           "signed"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "signed",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.21",
+          "targets": [
+           "rated"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "rated",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "step.22",
+          "targets": [
+           "archived"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "archived",
+        "kind": "atomic",
+        "children": [],
+        "transitions": []
+       },
+       {
+        "id": "exception",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "resolve",
+          "targets": [
+           "confirmed"
+          ]
+         }
+        ]
+       }
+      ],
+      "transitions": [
+       {
+        "event": "status.ping",
+        "targets": []
+       }
+      ],
+      "initial": [
+       "ordered"
+      ],
+      "onentry": [
+       {
+        "type": "send",
+        "event": "delivery.timeout",
+        "delay": "2d"
+       }
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "shipment"
+    ]
+   }
+  },
+  "account": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "account",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "account-idle",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "open.account",
+          "targets": [
+           "profile"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "profile",
+        "kind": "compound",
+        "children": [
+         {
+          "id": "profile-idle",
+          "kind": "atomic",
+          "children": [],
+          "transitions": [
+           {
+            "event": "open.profile",
+            "targets": [
+             "billing"
+            ]
+           }
+          ]
+         },
+         {
+          "id": "billing",
+          "kind": "compound",
+          "children": [
+           {
+            "id": "billing-idle",
+            "kind": "atomic",
+            "children": [],
+            "transitions": [
+             {
+              "event": "open.billing",
+              "targets": [
+               "card"
+              ]
+             }
+            ]
+           },
+           {
+            "id": "card",
+            "kind": "compound",
+            "children": [
+             {
+              "id": "card-idle",
+              "kind": "atomic",
+              "children": [],
+              "transitions": [
+               {
+                "event": "open.card",
+                "targets": [
+                 "verification"
+                ]
+               }
+              ]
+             },
+             {
+              "id": "verification",
+              "kind": "compound",
+              "children": [
+               {
+                "id": "verification-idle",
+                "kind": "atomic",
+                "children": [],
+                "transitions": [
+                 {
+                  "event": "open.verification",
+                  "targets": [
+                   "check"
+                  ]
+                 }
+                ]
+               },
+               {
+                "id": "check",
+                "kind": "compound",
+                "children": [
+                 {
+                  "id": "queued",
+                  "kind": "atomic",
+                  "children": [],
+                  "transitions": [
+                   {
+                    "event": "run",
+                    "targets": [
+                     "running"
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "running",
+                  "kind": "atomic",
+                  "children": [],
+                  "transitions": [
+                   {
+                    "event": "pass",
+                    "targets": [
+                     "passed"
+                    ]
+                   },
+                   {
+                    "event": "error.platform",
+                    "targets": [
+                     "failed"
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "passed",
+                  "kind": "final",
+                  "children": [],
+                  "transitions": []
+                 },
+                 {
+                  "id": "failed",
+                  "kind": "final",
+                  "children": [],
+                  "transitions": []
+                 }
+                ],
+                "transitions": [
+                 {
+                  "event": "close.verification",
+                  "targets": [
+                   "verification-idle"
+                  ]
+                 }
+                ],
+                "initial": [
+                 "queued"
+                ]
+               },
+               {
+                "id": "verification-locked",
+                "kind": "atomic",
+                "children": [],
+                "transitions": [
+                 {
+                  "event": "unlock.verification",
+                  "targets": [
+                   "verification-idle"
+                  ]
+                 }
+                ]
+               }
+              ],
+              "transitions": [
+               {
+                "event": "lock.verification",
+                "targets": [
+                 "verification-locked"
+                ]
+               },
+               {
+                "event": "close.card",
+                "targets": [
+                 "card-idle"
+                ]
+               }
+              ],
+              "initial": [
+               "verification-idle"
+              ]
+             },
+             {
+              "id": "card-locked",
+              "kind": "atomic",
+              "children": [],
+              "transitions": [
+               {
+                "event": "unlock.card",
+                "targets": [
+                 "card-idle"
+                ]
+               }
+              ]
+             }
+            ],
+            "transitions": [
+             {
+              "event": "lock.card",
+              "targets": [
+               "card-locked"
+              ]
+             },
+             {
+              "event": "close.billing",
+              "targets": [
+               "billing-idle"
+              ]
+             }
+            ],
+            "initial": [
+             "card-idle"
+            ]
+           },
+           {
+            "id": "billing-locked",
+            "kind": "atomic",
+            "children": [],
+            "transitions": [
+             {
+              "event": "unlock.billing",
+              "targets": [
+               "billing-idle"
+              ]
+             }
+            ]
+           }
+          ],
+          "transitions": [
+           {
+            "event": "lock.billing",
+            "targets": [
+             "billing-locked"
+            ]
+           },
+           {
+            "event": "close.profile",
+            "targets": [
+             "profile-idle"
+            ]
+           }
+          ],
+          "initial": [
+           "billing-idle"
+          ]
+         },
+         {
+          "id": "profile-locked",
+          "kind": "atomic",
+          "children": [],
+          "transitions": [
+           {
+            "event": "unlock.profile",
+            "targets": [
+             "profile-idle"
+            ]
+           }
+          ]
+         }
+        ],
+        "transitions": [
+         {
+          "event": "lock.profile",
+          "targets": [
+           "profile-locked"
+          ]
+         },
+         {
+          "event": "close.account",
+          "targets": [
+           "account-idle"
+          ]
+         }
+        ],
+        "initial": [
+         "profile-idle"
+        ]
+       },
+       {
+        "id": "account-locked",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "unlock.account",
+          "targets": [
+           "account-idle"
+          ]
+         }
+        ]
+       }
+      ],
+      "transitions": [
+       {
+        "event": "lock.account",
+        "targets": [
+         "account-locked"
+        ]
+       }
+      ],
+      "initial": [
+       "account-idle"
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "account"
+    ]
+   }
+  },
+  "checkout": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "checkout",
+      "kind": "parallel",
+      "children": [
+       {
+        "id": "payment",
+        "kind": "compound",
+        "children": [
+         {
+          "id": "pay-active",
+          "kind": "compound",
+          "children": [
+           {
+            "id": "pay-h",
+            "kind": "history",
+            "children": [],
+            "transitions": [],
+            "type": "shallow"
+           },
+           {
+            "id": "authorising",
+            "kind": "atomic",
+            "children": [],
+            "transitions": [
+             {
+              "event": "go.pay",
+              "targets": [
+               "authorised"
+              ]
+             }
+            ]
+           },
+           {
+            "id": "authorised",
+            "kind": "atomic",
+            "children": [],
+            "transitions": [
+             {
+              "event": "back.pay",
+              "targets": [
+               "authorising"
+              ]
+             }
+            ]
+           }
+          ],
+          "transitions": [
+           {
+            "event": "pause.payment",
+            "targets": [
+             "on-hold"
+            ]
+           }
+          ],
+          "initial": [
+           "authorising"
+          ]
+         },
+         {
+          "id": "on-hold",
+          "kind": "atomic",
+          "children": [],
+          "transitions": [
+           {
+            "event": "resume.payment",
+            "targets": [
+             "pay-h"
+            ]
+           }
+          ]
+         }
+        ],
+        "transitions": [],
+        "initial": [
+         "pay-active"
+        ]
+       },
+       {
+        "id": "delivery",
+        "kind": "compound",
+        "children": [
+         {
+          "id": "del-active",
+          "kind": "compound",
+          "children": [
+           {
+            "id": "del-h",
+            "kind": "history",
+            "children": [],
+            "transitions": [],
+            "type": "deep"
+           },
+           {
+            "id": "booking",
+            "kind": "compound",
+            "children": [
+             {
+              "id": "slots",
+              "kind": "parallel",
+              "children": [
+               {
+                "id": "carrier",
+                "kind": "compound",
+                "children": [
+                 {
+                  "id": "asking",
+                  "kind": "atomic",
+                  "children": [],
+                  "transitions": [
+                   {
+                    "event": "go.carrier",
+                    "targets": [
+                     "booked"
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "booked",
+                  "kind": "atomic",
+                  "children": [],
+                  "transitions": [
+                   {
+                    "event": "back.carrier",
+                    "targets": [
+                     "asking"
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "transitions": [],
+                "initial": [
+                 "asking"
+                ]
+               },
+               {
+                "id": "window",
+                "kind": "compound",
+                "children": [
+                 {
+                  "id": "choosing",
+                  "kind": "atomic",
+                  "children": [],
+                  "transitions": [
+                   {
+                    "event": "go.window",
+                    "targets": [
+                     "chosen"
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "chosen",
+                  "kind": "atomic",
+                  "children": [],
+                  "transitions": [
+                   {
+                    "event": "back.window",
+                    "targets": [
+                     "choosing"
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "transitions": [],
+                "initial": [
+                 "choosing"
+                ]
+               }
+              ],
+              "transitions": []
+             }
+            ],
+            "transitions": [],
+            "initial": [
+             "slots"
+            ]
+           }
+          ],
+          "transitions": [
+           {
+            "event": "pause.delivery",
+            "targets": [
+             "delivery-hold"
+            ]
+           }
+          ],
+          "initial": [
+           "booking"
+          ]
+         },
+         {
+          "id": "delivery-hold",
+          "kind": "atomic",
+          "children": [],
+          "transitions": [
+           {
+            "event": "resume.delivery",
+            "targets": [
+             "del-h"
+            ]
+           }
+          ]
+         }
+        ],
+        "transitions": [],
+        "initial": [
+         "del-active"
+        ]
+       }
+      ],
+      "transitions": []
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "checkout"
+    ]
+   }
+  },
+  "import-job": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "import-job",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "run",
+        "kind": "compound",
+        "children": [
+         {
+          "id": "reading",
+          "kind": "atomic",
+          "children": [],
+          "transitions": [
+           {
+            "event": "read.done",
+            "targets": [
+             "writing"
+            ]
+           }
+          ]
+         },
+         {
+          "id": "writing",
+          "kind": "atomic",
+          "children": [],
+          "transitions": [
+           {
+            "event": "write.done",
+            "targets": [
+             "written"
+            ]
+           }
+          ]
+         },
+         {
+          "id": "written",
+          "kind": "final",
+          "children": [],
+          "transitions": []
+         }
+        ],
+        "transitions": [
+         {
+          "event": "done.state.run",
+          "targets": [
+           "wrap"
+          ]
+         },
+         {
+          "event": "error.execution",
+          "targets": [
+           "aborted"
+          ]
+         }
+        ],
+        "initial": [
+         "reading"
+        ]
+       },
+       {
+        "id": "wrap",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "wrapped",
+          "targets": [
+           "finished"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "finished",
+        "kind": "final",
+        "children": [],
+        "transitions": []
+       },
+       {
+        "id": "aborted",
+        "kind": "final",
+        "children": [],
+        "transitions": []
+       }
+      ],
+      "transitions": [],
+      "initial": [
+       "run"
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "import-job"
+    ]
+   }
+  },
+  "order": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "order",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "placed",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "pay",
+          "targets": [
+           "paying"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "paying",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "done.invoke.pay",
+          "targets": [
+           "paid"
+          ]
+         },
+         {
+          "event": "error.communication",
+          "targets": [
+           "placed"
+          ]
+         }
+        ],
+        "invokes": [
+         {
+          "type": "scxml",
+          "id": "pay",
+          "src": "payment-run.scxml"
+         }
+        ]
+       },
+       {
+        "id": "paid",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "ship",
+          "targets": [
+           "shipped"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "shipped",
+        "kind": "atomic",
+        "children": [],
+        "transitions": []
+       }
+      ],
+      "transitions": [],
+      "initial": [
+       "placed"
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "order"
+    ]
+   }
+  },
+  "payment-run": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "payment-run",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "charging",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "charged",
+          "targets": [
+           "settled"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "settled",
+        "kind": "final",
+        "children": [],
+        "transitions": []
+       }
+      ],
+      "transitions": [],
+      "initial": [
+       "charging"
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "payment-run"
+    ]
+   }
+  },
+  "inventory-sync": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "inventory-sync",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "listening",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "item.updated",
+          "targets": [
+           "counting"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "counting",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "item.updated",
+          "targets": [
+           "writing"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "writing",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "item.updated",
+          "targets": [
+           "confirming"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "confirming",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "item.updated",
+          "targets": [
+           "listening"
+          ]
+         }
+        ]
+       }
+      ],
+      "transitions": [],
+      "initial": [
+       "listening"
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "inventory-sync"
+    ]
+   }
+  },
+  "task": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "task",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "planning",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "plan.done",
+          "targets": [
+           "calling-tool"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "calling-tool",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "tool.done",
+          "targets": [
+           "summarising"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "summarising",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "summary.done",
+          "targets": [
+           "complete"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "complete",
+        "kind": "final",
+        "children": [],
+        "transitions": []
+       }
+      ],
+      "transitions": [],
+      "initial": [
+       "planning"
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "task"
+    ]
+   }
+  },
+  "cart": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "cart",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "browsing",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "add",
+          "targets": [
+           "browsing"
+          ]
+         },
+         {
+          "event": "checkout",
+          "cond": "items.length > 0",
+          "targets": [
+           "checking-out"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "checking-out",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "cancel",
+          "targets": [
+           "browsing"
+          ]
+         }
+        ]
+       }
+      ],
+      "transitions": [],
+      "initial": [
+       "browsing"
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "cart"
+    ]
+   },
+   "datamodel": [
+    {
+     "id": "items",
+     "type": "array",
+     "readBy": [
+      "browsing"
+     ],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "total",
+     "type": "number",
+     "readBy": [
+      "browsing"
+     ],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "currency",
+     "type": "string",
+     "readBy": [
+      "browsing"
+     ],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "coupon",
+     "type": "null",
+     "readBy": [
+      "browsing"
+     ],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "express",
+     "type": "boolean",
+     "readBy": [
+      "browsing"
+     ],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "notes",
+     "type": "array",
+     "readBy": [],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "updatedAt",
+     "type": "number",
+     "readBy": [],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "ownerId",
+     "type": "string",
+     "readBy": [],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "attempts",
+     "type": "number",
+     "readBy": [
+      "checking-out"
+     ],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "warnings",
+     "type": "array",
+     "readBy": [],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "address",
+     "type": "object",
+     "readBy": [],
+     "writtenBy": [
+      "browsing"
+     ]
+    },
+    {
+     "id": "taxRate",
+     "type": "number",
+     "readBy": [],
+     "writtenBy": [
+      "browsing"
+     ]
+    }
+   ]
+  },
+  "session": {
+   "root": {
+    "id": "__root__",
+    "kind": "compound",
+    "children": [
+     {
+      "id": "session",
+      "kind": "compound",
+      "children": [
+       {
+        "id": "connected",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "drop",
+          "targets": [
+           "reconnecting"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "reconnecting",
+        "kind": "atomic",
+        "children": [],
+        "transitions": [
+         {
+          "event": "reconnected",
+          "targets": [
+           "connected"
+          ]
+         },
+         {
+          "event": "give-up",
+          "targets": [
+           "closed"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "closed",
+        "kind": "final",
+        "children": [],
+        "transitions": []
+       }
+      ],
+      "transitions": [],
+      "initial": [
+       "connected"
+      ]
+     }
+    ],
+    "transitions": [],
+    "initial": [
+     "session"
+    ]
+   }
+  }
+ },
+ "actors": [
+  {
+   "id": "receipt",
+   "chart": "receipt",
+   "label": "receipt",
+   "role": "receipt",
+   "bornAt": 0
+  },
+  {
+   "id": "shipment",
+   "chart": "shipment",
+   "label": "shipment",
+   "role": "shipment",
+   "bornAt": 0
+  },
+  {
+   "id": "account",
+   "chart": "account",
+   "label": "account",
+   "role": "account",
+   "bornAt": 0
+  },
+  {
+   "id": "checkout",
+   "chart": "checkout",
+   "label": "checkout",
+   "role": "checkout",
+   "bornAt": 0
+  },
+  {
+   "id": "import-job",
+   "chart": "import-job",
+   "label": "import-job",
+   "role": "import-job",
+   "bornAt": 200,
+   "diedAt": 4000
+  },
+  {
+   "id": "order",
+   "chart": "order",
+   "label": "order",
+   "role": "order",
+   "bornAt": 0
+  },
+  {
+   "id": "order.pay",
+   "chart": "payment-run",
+   "label": "order.pay",
+   "role": "payment-run",
+   "bornAt": 1000,
+   "parent": "order",
+   "diedAt": 5000
+  },
+  {
+   "id": "inventory-sync",
+   "chart": "inventory-sync",
+   "label": "inventory-sync",
+   "role": "inventory-sync",
+   "bornAt": 0
+  },
+  {
+   "id": "task",
+   "chart": "task",
+   "label": "task",
+   "role": "task",
+   "bornAt": 0
+  },
+  {
+   "id": "cart",
+   "chart": "cart",
+   "label": "cart",
+   "role": "cart",
+   "bornAt": 0
+  },
+  {
+   "id": "session",
+   "chart": "session",
+   "label": "session",
+   "role": "session",
+   "bornAt": 0,
+   "diedAt": 7000
+  }
+ ],
+ "externals": [
+  {
+   "id": "driver",
+   "label": "test driver",
+   "kind": "user"
+  }
+ ],
+ "events": [
+  {
+   "id": "e1",
+   "t": 0,
+   "type": "spawn",
+   "actor": "receipt"
+  },
+  {
+   "id": "e2",
+   "t": 0,
+   "type": "transition",
+   "actor": "receipt",
+   "event": "",
+   "from": [],
+   "to": [
+    "draft",
+    "receipt"
+   ]
+  },
+  {
+   "id": "e3",
+   "t": 0,
+   "type": "config",
+   "actor": "receipt",
+   "active": [
+    "draft",
+    "receipt"
+   ]
+  },
+  {
+   "id": "e4",
+   "t": 0,
+   "type": "spawn",
+   "actor": "shipment"
+  },
+  {
+   "id": "e5",
+   "t": 0,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "",
+   "from": [],
+   "to": [
+    "ordered",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e6",
+   "t": 0,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "ordered",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e7",
+   "t": 0,
+   "type": "spawn",
+   "actor": "account"
+  },
+  {
+   "id": "e8",
+   "t": 0,
+   "type": "transition",
+   "actor": "account",
+   "event": "",
+   "from": [],
+   "to": [
+    "account-idle",
+    "account"
+   ]
+  },
+  {
+   "id": "e9",
+   "t": 0,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "account-idle",
+    "account"
+   ]
+  },
+  {
+   "id": "e10",
+   "t": 0,
+   "type": "spawn",
+   "actor": "checkout"
+  },
+  {
+   "id": "e11",
+   "t": 0,
+   "type": "transition",
+   "actor": "checkout",
+   "event": "",
+   "from": [],
+   "to": [
+    "authorising",
+    "pay-active",
+    "payment",
+    "checkout",
+    "asking",
+    "carrier",
+    "slots",
+    "booking",
+    "del-active",
+    "delivery",
+    "choosing",
+    "window"
+   ]
+  },
+  {
+   "id": "e12",
+   "t": 0,
+   "type": "config",
+   "actor": "checkout",
+   "active": [
+    "authorising",
+    "pay-active",
+    "payment",
+    "checkout",
+    "asking",
+    "carrier",
+    "slots",
+    "booking",
+    "del-active",
+    "delivery",
+    "choosing",
+    "window"
+   ]
+  },
+  {
+   "id": "e13",
+   "t": 0,
+   "type": "spawn",
+   "actor": "order"
+  },
+  {
+   "id": "e14",
+   "t": 0,
+   "type": "transition",
+   "actor": "order",
+   "event": "",
+   "from": [],
+   "to": [
+    "placed",
+    "order"
+   ]
+  },
+  {
+   "id": "e15",
+   "t": 0,
+   "type": "config",
+   "actor": "order",
+   "active": [
+    "placed",
+    "order"
+   ]
+  },
+  {
+   "id": "e16",
+   "t": 0,
+   "type": "spawn",
+   "actor": "inventory-sync"
+  },
+  {
+   "id": "e17",
+   "t": 0,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "",
+   "from": [],
+   "to": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e18",
+   "t": 0,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e19",
+   "t": 0,
+   "type": "spawn",
+   "actor": "task"
+  },
+  {
+   "id": "e20",
+   "t": 0,
+   "type": "transition",
+   "actor": "task",
+   "event": "",
+   "from": [],
+   "to": [
+    "planning",
+    "task"
+   ]
+  },
+  {
+   "id": "e21",
+   "t": 0,
+   "type": "config",
+   "actor": "task",
+   "active": [
+    "planning",
+    "task"
+   ]
+  },
+  {
+   "id": "e22",
+   "t": 0,
+   "type": "spawn",
+   "actor": "cart"
+  },
+  {
+   "id": "e23",
+   "t": 0,
+   "type": "transition",
+   "actor": "cart",
+   "event": "",
+   "from": [],
+   "to": [
+    "browsing",
+    "cart"
+   ]
+  },
+  {
+   "id": "e24",
+   "t": 0,
+   "type": "config",
+   "actor": "cart",
+   "active": [
+    "browsing",
+    "cart"
+   ]
+  },
+  {
+   "id": "e25",
+   "t": 0,
+   "type": "config",
+   "actor": "cart",
+   "active": [
+    "browsing",
+    "cart"
+   ]
+  },
+  {
+   "id": "e26",
+   "t": 0,
+   "type": "snapshot",
+   "actor": "cart",
+   "values": {
+    "items": [],
+    "total": 0,
+    "currency": "EUR",
+    "coupon": null,
+    "express": false,
+    "notes": [],
+    "updatedAt": 0,
+    "ownerId": "u1",
+    "attempts": 0,
+    "warnings": [],
+    "address": {},
+    "taxRate": 0.2
+   }
+  },
+  {
+   "id": "e27",
+   "t": 0,
+   "type": "spawn",
+   "actor": "session"
+  },
+  {
+   "id": "e28",
+   "t": 0,
+   "type": "transition",
+   "actor": "session",
+   "event": "",
+   "from": [],
+   "to": [
+    "connected",
+    "session"
+   ]
+  },
+  {
+   "id": "e29",
+   "t": 0,
+   "type": "config",
+   "actor": "session",
+   "active": [
+    "connected",
+    "session"
+   ]
+  },
+  {
+   "id": "e30",
+   "t": 200,
+   "type": "spawn",
+   "actor": "import-job"
+  },
+  {
+   "id": "e31",
+   "t": 200,
+   "type": "transition",
+   "actor": "import-job",
+   "event": "",
+   "from": [],
+   "to": [
+    "reading",
+    "run",
+    "import-job"
+   ]
+  },
+  {
+   "id": "e32",
+   "t": 200,
+   "type": "config",
+   "actor": "import-job",
+   "active": [
+    "reading",
+    "run",
+    "import-job"
+   ]
+  },
+  {
+   "id": "e33",
+   "t": 600,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.0"
+  },
+  {
+   "id": "e34",
+   "t": 600,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.0",
+   "from": [
+    "ordered"
+   ],
+   "to": [
+    "confirmed"
+   ]
+  },
+  {
+   "id": "e35",
+   "t": 600,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "confirmed",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e36",
+   "t": 800,
+   "type": "message",
+   "from": "driver",
+   "to": "account",
+   "name": "open.account"
+  },
+  {
+   "id": "e37",
+   "t": 800,
+   "type": "transition",
+   "actor": "account",
+   "event": "open.account",
+   "from": [
+    "account-idle"
+   ],
+   "to": [
+    "profile-idle",
+    "profile"
+   ]
+  },
+  {
+   "id": "e38",
+   "t": 800,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "profile-idle",
+    "profile",
+    "account"
+   ]
+  },
+  {
+   "id": "e39",
+   "t": 1000,
+   "type": "message",
+   "from": "driver",
+   "to": "checkout",
+   "name": "go.pay"
+  },
+  {
+   "id": "e40",
+   "t": 1000,
+   "type": "transition",
+   "actor": "checkout",
+   "event": "go.pay",
+   "from": [
+    "authorising"
+   ],
+   "to": [
+    "authorised"
+   ]
+  },
+  {
+   "id": "e41",
+   "t": 1000,
+   "type": "config",
+   "actor": "checkout",
+   "active": [
+    "authorised",
+    "pay-active",
+    "payment",
+    "checkout",
+    "asking",
+    "carrier",
+    "slots",
+    "booking",
+    "del-active",
+    "delivery",
+    "choosing",
+    "window"
+   ]
+  },
+  {
+   "id": "e42",
+   "t": 1000,
+   "type": "message",
+   "from": "driver",
+   "to": "order",
+   "name": "pay"
+  },
+  {
+   "id": "e43",
+   "t": 1000,
+   "type": "transition",
+   "actor": "order",
+   "event": "pay",
+   "from": [
+    "placed"
+   ],
+   "to": [
+    "paying"
+   ]
+  },
+  {
+   "id": "e44",
+   "t": 1000,
+   "type": "config",
+   "actor": "order",
+   "active": [
+    "paying",
+    "order"
+   ]
+  },
+  {
+   "id": "e45",
+   "t": 1000,
+   "type": "spawn",
+   "actor": "order.pay"
+  },
+  {
+   "id": "e46",
+   "t": 1000,
+   "type": "transition",
+   "actor": "order.pay",
+   "event": "",
+   "from": [],
+   "to": [
+    "charging",
+    "payment-run"
+   ]
+  },
+  {
+   "id": "e47",
+   "t": 1000,
+   "type": "config",
+   "actor": "order.pay",
+   "active": [
+    "charging",
+    "payment-run"
+   ]
+  },
+  {
+   "id": "e48",
+   "t": 1000,
+   "type": "message",
+   "from": "driver",
+   "to": "cart",
+   "name": "add"
+  },
+  {
+   "id": "e49",
+   "t": 1000,
+   "type": "transition",
+   "actor": "cart",
+   "event": "add",
+   "from": [
+    "browsing"
+   ],
+   "to": [
+    "browsing"
+   ]
+  },
+  {
+   "id": "e50",
+   "t": 1000,
+   "type": "config",
+   "actor": "cart",
+   "active": [
+    "browsing",
+    "cart"
+   ]
+  },
+  {
+   "id": "e51",
+   "t": 1000,
+   "type": "snapshot",
+   "actor": "cart",
+   "values": {
+    "items": [
+     "mug"
+    ],
+    "total": 12,
+    "currency": "EUR",
+    "coupon": null,
+    "express": false,
+    "notes": [],
+    "updatedAt": 1,
+    "ownerId": "u1",
+    "attempts": 0,
+    "warnings": [],
+    "address": {},
+    "taxRate": 0.2
+   }
+  },
+  {
+   "id": "e52",
+   "t": 1100,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.1"
+  },
+  {
+   "id": "e53",
+   "t": 1100,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.1",
+   "from": [
+    "confirmed"
+   ],
+   "to": [
+    "picking"
+   ]
+  },
+  {
+   "id": "e54",
+   "t": 1100,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "picking",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e55",
+   "t": 1500,
+   "type": "message",
+   "from": "driver",
+   "to": "receipt",
+   "name": "send"
+  },
+  {
+   "id": "e56",
+   "t": 1500,
+   "type": "transition",
+   "actor": "receipt",
+   "event": "send",
+   "from": [
+    "draft"
+   ],
+   "to": [
+    "sent"
+   ]
+  },
+  {
+   "id": "e57",
+   "t": 1500,
+   "type": "config",
+   "actor": "receipt",
+   "active": [
+    "sent",
+    "receipt"
+   ]
+  },
+  {
+   "id": "e58",
+   "t": 1500,
+   "type": "message",
+   "from": "driver",
+   "to": "import-job",
+   "name": "read.done"
+  },
+  {
+   "id": "e59",
+   "t": 1500,
+   "type": "transition",
+   "actor": "import-job",
+   "event": "read.done",
+   "from": [
+    "reading"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e60",
+   "t": 1500,
+   "type": "config",
+   "actor": "import-job",
+   "active": [
+    "writing",
+    "run",
+    "import-job"
+   ]
+  },
+  {
+   "id": "e61",
+   "t": 1500,
+   "type": "message",
+   "from": "driver",
+   "to": "task",
+   "name": "plan.done"
+  },
+  {
+   "id": "e62",
+   "t": 1500,
+   "type": "transition",
+   "actor": "task",
+   "event": "plan.done",
+   "from": [
+    "planning"
+   ],
+   "to": [
+    "calling-tool"
+   ]
+  },
+  {
+   "id": "e63",
+   "t": 1500,
+   "type": "config",
+   "actor": "task",
+   "active": [
+    "calling-tool",
+    "task"
+   ]
+  },
+  {
+   "id": "e64",
+   "t": 1600,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.2"
+  },
+  {
+   "id": "e65",
+   "t": 1600,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.2",
+   "from": [
+    "picking"
+   ],
+   "to": [
+    "picked"
+   ]
+  },
+  {
+   "id": "e66",
+   "t": 1600,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "picked",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e67",
+   "t": 1600,
+   "type": "message",
+   "from": "driver",
+   "to": "account",
+   "name": "open.profile"
+  },
+  {
+   "id": "e68",
+   "t": 1600,
+   "type": "transition",
+   "actor": "account",
+   "event": "open.profile",
+   "from": [
+    "profile-idle"
+   ],
+   "to": [
+    "billing-idle",
+    "billing"
+   ]
+  },
+  {
+   "id": "e69",
+   "t": 1600,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "billing-idle",
+    "billing",
+    "profile",
+    "account"
+   ]
+  },
+  {
+   "id": "e70",
+   "t": 2000,
+   "type": "message",
+   "from": "driver",
+   "to": "checkout",
+   "name": "go.carrier"
+  },
+  {
+   "id": "e71",
+   "t": 2000,
+   "type": "transition",
+   "actor": "checkout",
+   "event": "go.carrier",
+   "from": [
+    "asking"
+   ],
+   "to": [
+    "booked"
+   ]
+  },
+  {
+   "id": "e72",
+   "t": 2000,
+   "type": "config",
+   "actor": "checkout",
+   "active": [
+    "authorised",
+    "pay-active",
+    "payment",
+    "checkout",
+    "booked",
+    "carrier",
+    "slots",
+    "booking",
+    "del-active",
+    "delivery",
+    "choosing",
+    "window"
+   ]
+  },
+  {
+   "id": "e73",
+   "t": 2000,
+   "type": "message",
+   "from": "driver",
+   "to": "session",
+   "name": "drop"
+  },
+  {
+   "id": "e74",
+   "t": 2000,
+   "type": "transition",
+   "actor": "session",
+   "event": "drop",
+   "from": [
+    "connected"
+   ],
+   "to": [
+    "reconnecting"
+   ]
+  },
+  {
+   "id": "e75",
+   "t": 2000,
+   "type": "config",
+   "actor": "session",
+   "active": [
+    "reconnecting",
+    "session"
+   ]
+  },
+  {
+   "id": "e76",
+   "t": 2100,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.3"
+  },
+  {
+   "id": "e77",
+   "t": 2100,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.3",
+   "from": [
+    "picked"
+   ],
+   "to": [
+    "packing"
+   ]
+  },
+  {
+   "id": "e78",
+   "t": 2100,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "packing",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e79",
+   "t": 2400,
+   "type": "message",
+   "from": "driver",
+   "to": "account",
+   "name": "open.billing"
+  },
+  {
+   "id": "e80",
+   "t": 2400,
+   "type": "transition",
+   "actor": "account",
+   "event": "open.billing",
+   "from": [
+    "billing-idle"
+   ],
+   "to": [
+    "card-idle",
+    "card"
+   ]
+  },
+  {
+   "id": "e81",
+   "t": 2400,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "card-idle",
+    "card",
+    "billing",
+    "profile",
+    "account"
+   ]
+  },
+  {
+   "id": "e82",
+   "t": 2500,
+   "type": "message",
+   "from": "driver",
+   "to": "cart",
+   "name": "add"
+  },
+  {
+   "id": "e83",
+   "t": 2500,
+   "type": "transition",
+   "actor": "cart",
+   "event": "add",
+   "from": [
+    "browsing"
+   ],
+   "to": [
+    "browsing"
+   ]
+  },
+  {
+   "id": "e84",
+   "t": 2500,
+   "type": "config",
+   "actor": "cart",
+   "active": [
+    "browsing",
+    "cart"
+   ]
+  },
+  {
+   "id": "e85",
+   "t": 2500,
+   "type": "snapshot",
+   "actor": "cart",
+   "values": {
+    "items": [
+     "mug",
+     "tea"
+    ],
+    "total": 20,
+    "currency": "EUR",
+    "coupon": "TEN",
+    "express": true,
+    "notes": [
+     "gift"
+    ],
+    "updatedAt": 2,
+    "ownerId": "u1",
+    "attempts": 0,
+    "warnings": [],
+    "address": {
+     "city": "Tartu"
+    },
+    "taxRate": 0.2
+   }
+  },
+  {
+   "id": "e86",
+   "t": 2600,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.4"
+  },
+  {
+   "id": "e87",
+   "t": 2600,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.4",
+   "from": [
+    "packing"
+   ],
+   "to": [
+    "packed"
+   ]
+  },
+  {
+   "id": "e88",
+   "t": 2600,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "packed",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e89",
+   "t": 2800,
+   "type": "message",
+   "from": "driver",
+   "to": "import-job",
+   "name": "write.done"
+  },
+  {
+   "id": "e90",
+   "t": 2800,
+   "type": "transition",
+   "actor": "import-job",
+   "event": "write.done",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "written"
+   ]
+  },
+  {
+   "id": "e91",
+   "t": 2800,
+   "type": "config",
+   "actor": "import-job",
+   "active": [
+    "written",
+    "run",
+    "import-job"
+   ]
+  },
+  {
+   "id": "e92",
+   "t": 2800,
+   "type": "transition",
+   "actor": "import-job",
+   "event": "",
+   "from": [
+    "written",
+    "run"
+   ],
+   "to": [
+    "wrap"
+   ]
+  },
+  {
+   "id": "e93",
+   "t": 2800,
+   "type": "config",
+   "actor": "import-job",
+   "active": [
+    "wrap",
+    "import-job"
+   ]
+  },
+  {
+   "id": "e94",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "checkout",
+   "name": "pause.payment"
+  },
+  {
+   "id": "e95",
+   "t": 3000,
+   "type": "transition",
+   "actor": "checkout",
+   "event": "pause.payment",
+   "from": [
+    "authorised",
+    "pay-active"
+   ],
+   "to": [
+    "on-hold"
+   ]
+  },
+  {
+   "id": "e96",
+   "t": 3000,
+   "type": "config",
+   "actor": "checkout",
+   "active": [
+    "on-hold",
+    "payment",
+    "checkout",
+    "booked",
+    "carrier",
+    "slots",
+    "booking",
+    "del-active",
+    "delivery",
+    "choosing",
+    "window"
+   ]
+  },
+  {
+   "id": "e97",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e98",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e99",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e100",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e101",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e102",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e103",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e104",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e105",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e106",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e107",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e108",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e109",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e110",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e111",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e112",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e113",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e114",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e115",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e116",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e117",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e118",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e119",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e120",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e121",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e122",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e123",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e124",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e125",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e126",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e127",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e128",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e129",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e130",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e131",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e132",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e133",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e134",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e135",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e136",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e137",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e138",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e139",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e140",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e141",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e142",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e143",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e144",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e145",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e146",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e147",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e148",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e149",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e150",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e151",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e152",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e153",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e154",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e155",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e156",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e157",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e158",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e159",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e160",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e161",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e162",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e163",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e164",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e165",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e166",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e167",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e168",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e169",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e170",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e171",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e172",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e173",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e174",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e175",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e176",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e177",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e178",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e179",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e180",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e181",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e182",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e183",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e184",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e185",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e186",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e187",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e188",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e189",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e190",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e191",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e192",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e193",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e194",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e195",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e196",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e197",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e198",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e199",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e200",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e201",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e202",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e203",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e204",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e205",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e206",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e207",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e208",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e209",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "counting"
+   ],
+   "to": [
+    "writing"
+   ]
+  },
+  {
+   "id": "e210",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "writing",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e211",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e212",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "writing"
+   ],
+   "to": [
+    "confirming"
+   ]
+  },
+  {
+   "id": "e213",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "confirming",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e214",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e215",
+   "t": 3000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "confirming"
+   ],
+   "to": [
+    "listening"
+   ]
+  },
+  {
+   "id": "e216",
+   "t": 3000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "listening",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e217",
+   "t": 3000,
+   "type": "message",
+   "from": "driver",
+   "to": "session",
+   "name": "reconnected"
+  },
+  {
+   "id": "e218",
+   "t": 3000,
+   "type": "transition",
+   "actor": "session",
+   "event": "reconnected",
+   "from": [
+    "reconnecting"
+   ],
+   "to": [
+    "connected"
+   ]
+  },
+  {
+   "id": "e219",
+   "t": 3000,
+   "type": "config",
+   "actor": "session",
+   "active": [
+    "connected",
+    "session"
+   ]
+  },
+  {
+   "id": "e220",
+   "t": 3100,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.5"
+  },
+  {
+   "id": "e221",
+   "t": 3100,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.5",
+   "from": [
+    "packed"
+   ],
+   "to": [
+    "labelled"
+   ]
+  },
+  {
+   "id": "e222",
+   "t": 3100,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "labelled",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e223",
+   "t": 3200,
+   "type": "message",
+   "from": "driver",
+   "to": "account",
+   "name": "open.card"
+  },
+  {
+   "id": "e224",
+   "t": 3200,
+   "type": "transition",
+   "actor": "account",
+   "event": "open.card",
+   "from": [
+    "card-idle"
+   ],
+   "to": [
+    "verification-idle",
+    "verification"
+   ]
+  },
+  {
+   "id": "e225",
+   "t": 3200,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "verification-idle",
+    "verification",
+    "card",
+    "billing",
+    "profile",
+    "account"
+   ]
+  },
+  {
+   "id": "e226",
+   "t": 3500,
+   "type": "message",
+   "from": "driver",
+   "to": "checkout",
+   "name": "pause.delivery"
+  },
+  {
+   "id": "e227",
+   "t": 3500,
+   "type": "transition",
+   "actor": "checkout",
+   "event": "pause.delivery",
+   "from": [
+    "booked",
+    "carrier",
+    "slots",
+    "booking",
+    "del-active",
+    "choosing",
+    "window"
+   ],
+   "to": [
+    "delivery-hold"
+   ]
+  },
+  {
+   "id": "e228",
+   "t": 3500,
+   "type": "config",
+   "actor": "checkout",
+   "active": [
+    "on-hold",
+    "payment",
+    "checkout",
+    "delivery-hold",
+    "delivery"
+   ]
+  },
+  {
+   "id": "e229",
+   "t": 3600,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.6"
+  },
+  {
+   "id": "e230",
+   "t": 3600,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.6",
+   "from": [
+    "labelled"
+   ],
+   "to": [
+    "weighed"
+   ]
+  },
+  {
+   "id": "e231",
+   "t": 3600,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "weighed",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e232",
+   "t": 4000,
+   "type": "message",
+   "from": "driver",
+   "to": "receipt",
+   "name": "amend"
+  },
+  {
+   "id": "e233",
+   "t": 4000,
+   "type": "transition",
+   "actor": "receipt",
+   "event": "amend",
+   "from": [
+    "sent"
+   ],
+   "to": [
+    "draft"
+   ]
+  },
+  {
+   "id": "e234",
+   "t": 4000,
+   "type": "config",
+   "actor": "receipt",
+   "active": [
+    "draft",
+    "receipt"
+   ]
+  },
+  {
+   "id": "e235",
+   "t": 4000,
+   "type": "message",
+   "from": "driver",
+   "to": "account",
+   "name": "open.verification"
+  },
+  {
+   "id": "e236",
+   "t": 4000,
+   "type": "transition",
+   "actor": "account",
+   "event": "open.verification",
+   "from": [
+    "verification-idle"
+   ],
+   "to": [
+    "queued",
+    "check"
+   ]
+  },
+  {
+   "id": "e237",
+   "t": 4000,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "queued",
+    "check",
+    "verification",
+    "card",
+    "billing",
+    "profile",
+    "account"
+   ]
+  },
+  {
+   "id": "e238",
+   "t": 4000,
+   "type": "message",
+   "from": "driver",
+   "to": "import-job",
+   "name": "wrapped"
+  },
+  {
+   "id": "e239",
+   "t": 4000,
+   "type": "transition",
+   "actor": "import-job",
+   "event": "wrapped",
+   "from": [
+    "wrap"
+   ],
+   "to": [
+    "finished"
+   ]
+  },
+  {
+   "id": "e240",
+   "t": 4000,
+   "type": "config",
+   "actor": "import-job",
+   "active": [
+    "finished",
+    "import-job"
+   ]
+  },
+  {
+   "id": "e241",
+   "t": 4000,
+   "type": "end",
+   "actor": "import-job"
+  },
+  {
+   "id": "e242",
+   "t": 4000,
+   "type": "message",
+   "from": "driver",
+   "to": "order.pay",
+   "name": "charged"
+  },
+  {
+   "id": "e243",
+   "t": 4000,
+   "type": "transition",
+   "actor": "order.pay",
+   "event": "charged",
+   "from": [
+    "charging"
+   ],
+   "to": [
+    "settled"
+   ]
+  },
+  {
+   "id": "e244",
+   "t": 4000,
+   "type": "config",
+   "actor": "order.pay",
+   "active": [
+    "settled",
+    "payment-run"
+   ]
+  },
+  {
+   "id": "e245",
+   "t": 4000,
+   "type": "end",
+   "actor": "task"
+  },
+  {
+   "id": "e246",
+   "t": 4000,
+   "type": "message",
+   "from": "driver",
+   "to": "cart",
+   "name": "checkout"
+  },
+  {
+   "id": "e247",
+   "t": 4000,
+   "type": "transition",
+   "actor": "cart",
+   "event": "checkout",
+   "from": [
+    "browsing"
+   ],
+   "to": [
+    "checking-out"
+   ]
+  },
+  {
+   "id": "e248",
+   "t": 4000,
+   "type": "config",
+   "actor": "cart",
+   "active": [
+    "checking-out",
+    "cart"
+   ]
+  },
+  {
+   "id": "e249",
+   "t": 4000,
+   "type": "snapshot",
+   "actor": "cart",
+   "values": {
+    "items": [
+     "mug",
+     "tea"
+    ],
+    "total": 18,
+    "currency": "EUR",
+    "coupon": "TEN",
+    "express": true,
+    "notes": [
+     "gift"
+    ],
+    "updatedAt": 3,
+    "ownerId": "u1",
+    "attempts": 1,
+    "warnings": [],
+    "address": {
+     "city": "Tartu"
+    },
+    "taxRate": 0.2
+   }
+  },
+  {
+   "id": "e250",
+   "t": 4100,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.7"
+  },
+  {
+   "id": "e251",
+   "t": 4100,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.7",
+   "from": [
+    "weighed"
+   ],
+   "to": [
+    "manifested"
+   ]
+  },
+  {
+   "id": "e252",
+   "t": 4100,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "manifested",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e253",
+   "t": 4600,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.8"
+  },
+  {
+   "id": "e254",
+   "t": 4600,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.8",
+   "from": [
+    "manifested"
+   ],
+   "to": [
+    "collected"
+   ]
+  },
+  {
+   "id": "e255",
+   "t": 4600,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "collected",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e256",
+   "t": 4800,
+   "type": "message",
+   "from": "driver",
+   "to": "account",
+   "name": "run"
+  },
+  {
+   "id": "e257",
+   "t": 4800,
+   "type": "transition",
+   "actor": "account",
+   "event": "run",
+   "from": [
+    "queued"
+   ],
+   "to": [
+    "running"
+   ]
+  },
+  {
+   "id": "e258",
+   "t": 4800,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "running",
+    "check",
+    "verification",
+    "card",
+    "billing",
+    "profile",
+    "account"
+   ]
+  },
+  {
+   "id": "e259",
+   "t": 5000,
+   "type": "message",
+   "from": "driver",
+   "to": "checkout",
+   "name": "resume.payment"
+  },
+  {
+   "id": "e260",
+   "t": 5000,
+   "type": "transition",
+   "actor": "checkout",
+   "event": "resume.payment",
+   "from": [
+    "on-hold"
+   ],
+   "to": [
+    "authorised",
+    "pay-active"
+   ]
+  },
+  {
+   "id": "e261",
+   "t": 5000,
+   "type": "config",
+   "actor": "checkout",
+   "active": [
+    "authorised",
+    "pay-active",
+    "payment",
+    "checkout",
+    "delivery-hold",
+    "delivery"
+   ]
+  },
+  {
+   "id": "e262",
+   "t": 5000,
+   "type": "message",
+   "from": "order.pay",
+   "to": "order",
+   "name": "done.invoke.pay"
+  },
+  {
+   "id": "e263",
+   "t": 5000,
+   "type": "transition",
+   "actor": "order",
+   "event": "done.invoke.pay",
+   "from": [
+    "paying"
+   ],
+   "to": [
+    "paid"
+   ]
+  },
+  {
+   "id": "e264",
+   "t": 5000,
+   "type": "config",
+   "actor": "order",
+   "active": [
+    "paid",
+    "order"
+   ]
+  },
+  {
+   "id": "e265",
+   "t": 5000,
+   "type": "end",
+   "actor": "order.pay"
+  },
+  {
+   "id": "e266",
+   "t": 5000,
+   "type": "message",
+   "from": "driver",
+   "to": "session",
+   "name": "drop"
+  },
+  {
+   "id": "e267",
+   "t": 5000,
+   "type": "transition",
+   "actor": "session",
+   "event": "drop",
+   "from": [
+    "connected"
+   ],
+   "to": [
+    "reconnecting"
+   ]
+  },
+  {
+   "id": "e268",
+   "t": 5000,
+   "type": "config",
+   "actor": "session",
+   "active": [
+    "reconnecting",
+    "session"
+   ]
+  },
+  {
+   "id": "e269",
+   "t": 5100,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.9"
+  },
+  {
+   "id": "e270",
+   "t": 5100,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.9",
+   "from": [
+    "collected"
+   ],
+   "to": [
+    "hub-in"
+   ]
+  },
+  {
+   "id": "e271",
+   "t": 5100,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "hub-in",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e272",
+   "t": 5600,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.10"
+  },
+  {
+   "id": "e273",
+   "t": 5600,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.10",
+   "from": [
+    "hub-in"
+   ],
+   "to": [
+    "sorted"
+   ]
+  },
+  {
+   "id": "e274",
+   "t": 5600,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "sorted",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e275",
+   "t": 5600,
+   "type": "message",
+   "from": "driver",
+   "to": "account",
+   "name": "pass"
+  },
+  {
+   "id": "e276",
+   "t": 5600,
+   "type": "transition",
+   "actor": "account",
+   "event": "pass",
+   "from": [
+    "running"
+   ],
+   "to": [
+    "passed"
+   ]
+  },
+  {
+   "id": "e277",
+   "t": 5600,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "passed",
+    "check",
+    "verification",
+    "card",
+    "billing",
+    "profile",
+    "account"
+   ]
+  },
+  {
+   "id": "e278",
+   "t": 6000,
+   "type": "message",
+   "from": "driver",
+   "to": "checkout",
+   "name": "resume.delivery"
+  },
+  {
+   "id": "e279",
+   "t": 6000,
+   "type": "transition",
+   "actor": "checkout",
+   "event": "resume.delivery",
+   "from": [
+    "delivery-hold"
+   ],
+   "to": [
+    "booked",
+    "carrier",
+    "slots",
+    "booking",
+    "del-active",
+    "choosing",
+    "window"
+   ]
+  },
+  {
+   "id": "e280",
+   "t": 6000,
+   "type": "config",
+   "actor": "checkout",
+   "active": [
+    "authorised",
+    "pay-active",
+    "payment",
+    "checkout",
+    "booked",
+    "carrier",
+    "slots",
+    "booking",
+    "del-active",
+    "delivery",
+    "choosing",
+    "window"
+   ]
+  },
+  {
+   "id": "e281",
+   "t": 6000,
+   "type": "spawn",
+   "actor": "task"
+  },
+  {
+   "id": "e282",
+   "t": 6000,
+   "type": "transition",
+   "actor": "task",
+   "event": "",
+   "from": [],
+   "to": [
+    "calling-tool",
+    "task"
+   ]
+  },
+  {
+   "id": "e283",
+   "t": 6000,
+   "type": "config",
+   "actor": "task",
+   "active": [
+    "calling-tool",
+    "task"
+   ]
+  },
+  {
+   "id": "e284",
+   "t": 6000,
+   "type": "message",
+   "from": "driver",
+   "to": "cart",
+   "name": "cancel"
+  },
+  {
+   "id": "e285",
+   "t": 6000,
+   "type": "transition",
+   "actor": "cart",
+   "event": "cancel",
+   "from": [
+    "checking-out"
+   ],
+   "to": [
+    "browsing"
+   ]
+  },
+  {
+   "id": "e286",
+   "t": 6000,
+   "type": "config",
+   "actor": "cart",
+   "active": [
+    "browsing",
+    "cart"
+   ]
+  },
+  {
+   "id": "e287",
+   "t": 6100,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.11"
+  },
+  {
+   "id": "e288",
+   "t": 6100,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.11",
+   "from": [
+    "sorted"
+   ],
+   "to": [
+    "hub-out"
+   ]
+  },
+  {
+   "id": "e289",
+   "t": 6100,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "hub-out",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e290",
+   "t": 6500,
+   "type": "message",
+   "from": "driver",
+   "to": "receipt",
+   "name": "send"
+  },
+  {
+   "id": "e291",
+   "t": 6500,
+   "type": "transition",
+   "actor": "receipt",
+   "event": "send",
+   "from": [
+    "draft"
+   ],
+   "to": [
+    "sent"
+   ]
+  },
+  {
+   "id": "e292",
+   "t": 6500,
+   "type": "config",
+   "actor": "receipt",
+   "active": [
+    "sent",
+    "receipt"
+   ]
+  },
+  {
+   "id": "e293",
+   "t": 6600,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.12"
+  },
+  {
+   "id": "e294",
+   "t": 6600,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.12",
+   "from": [
+    "hub-out"
+   ],
+   "to": [
+    "linehaul"
+   ]
+  },
+  {
+   "id": "e295",
+   "t": 6600,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "linehaul",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e296",
+   "t": 7000,
+   "type": "message",
+   "from": "driver",
+   "to": "account",
+   "name": "lock.card"
+  },
+  {
+   "id": "e297",
+   "t": 7000,
+   "type": "transition",
+   "actor": "account",
+   "event": "lock.card",
+   "from": [
+    "passed",
+    "check",
+    "verification"
+   ],
+   "to": [
+    "card-locked"
+   ]
+  },
+  {
+   "id": "e298",
+   "t": 7000,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "card-locked",
+    "card",
+    "billing",
+    "profile",
+    "account"
+   ]
+  },
+  {
+   "id": "e299",
+   "t": 7000,
+   "type": "message",
+   "from": "driver",
+   "to": "checkout",
+   "name": "go.window"
+  },
+  {
+   "id": "e300",
+   "t": 7000,
+   "type": "transition",
+   "actor": "checkout",
+   "event": "go.window",
+   "from": [
+    "choosing"
+   ],
+   "to": [
+    "chosen"
+   ]
+  },
+  {
+   "id": "e301",
+   "t": 7000,
+   "type": "config",
+   "actor": "checkout",
+   "active": [
+    "authorised",
+    "pay-active",
+    "payment",
+    "checkout",
+    "booked",
+    "carrier",
+    "slots",
+    "booking",
+    "del-active",
+    "delivery",
+    "chosen",
+    "window"
+   ]
+  },
+  {
+   "id": "e302",
+   "t": 7000,
+   "type": "message",
+   "from": "driver",
+   "to": "order",
+   "name": "ship"
+  },
+  {
+   "id": "e303",
+   "t": 7000,
+   "type": "transition",
+   "actor": "order",
+   "event": "ship",
+   "from": [
+    "paid"
+   ],
+   "to": [
+    "shipped"
+   ]
+  },
+  {
+   "id": "e304",
+   "t": 7000,
+   "type": "config",
+   "actor": "order",
+   "active": [
+    "shipped",
+    "order"
+   ]
+  },
+  {
+   "id": "e305",
+   "t": 7000,
+   "type": "message",
+   "from": "driver",
+   "to": "session",
+   "name": "give-up"
+  },
+  {
+   "id": "e306",
+   "t": 7000,
+   "type": "transition",
+   "actor": "session",
+   "event": "give-up",
+   "from": [
+    "reconnecting"
+   ],
+   "to": [
+    "closed"
+   ]
+  },
+  {
+   "id": "e307",
+   "t": 7000,
+   "type": "config",
+   "actor": "session",
+   "active": [
+    "closed",
+    "session"
+   ]
+  },
+  {
+   "id": "e308",
+   "t": 7000,
+   "type": "end",
+   "actor": "session"
+  },
+  {
+   "id": "e309",
+   "t": 7100,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.13"
+  },
+  {
+   "id": "e310",
+   "t": 7100,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.13",
+   "from": [
+    "linehaul"
+   ],
+   "to": [
+    "depot-in"
+   ]
+  },
+  {
+   "id": "e311",
+   "t": 7100,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "depot-in",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e312",
+   "t": 7500,
+   "type": "message",
+   "from": "driver",
+   "to": "task",
+   "name": "tool.done"
+  },
+  {
+   "id": "e313",
+   "t": 7500,
+   "type": "transition",
+   "actor": "task",
+   "event": "tool.done",
+   "from": [
+    "calling-tool"
+   ],
+   "to": [
+    "summarising"
+   ]
+  },
+  {
+   "id": "e314",
+   "t": 7500,
+   "type": "config",
+   "actor": "task",
+   "active": [
+    "summarising",
+    "task"
+   ]
+  },
+  {
+   "id": "e315",
+   "t": 7600,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.14"
+  },
+  {
+   "id": "e316",
+   "t": 7600,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.14",
+   "from": [
+    "depot-in"
+   ],
+   "to": [
+    "depot-sorted"
+   ]
+  },
+  {
+   "id": "e317",
+   "t": 7600,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "depot-sorted",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e318",
+   "t": 8000,
+   "type": "message",
+   "from": "driver",
+   "to": "inventory-sync",
+   "name": "item.updated"
+  },
+  {
+   "id": "e319",
+   "t": 8000,
+   "type": "transition",
+   "actor": "inventory-sync",
+   "event": "item.updated",
+   "from": [
+    "listening"
+   ],
+   "to": [
+    "counting"
+   ]
+  },
+  {
+   "id": "e320",
+   "t": 8000,
+   "type": "config",
+   "actor": "inventory-sync",
+   "active": [
+    "counting",
+    "inventory-sync"
+   ]
+  },
+  {
+   "id": "e321",
+   "t": 8100,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.15"
+  },
+  {
+   "id": "e322",
+   "t": 8100,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.15",
+   "from": [
+    "depot-sorted"
+   ],
+   "to": [
+    "loaded"
+   ]
+  },
+  {
+   "id": "e323",
+   "t": 8100,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "loaded",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e324",
+   "t": 8500,
+   "type": "message",
+   "from": "driver",
+   "to": "account",
+   "name": "unlock.card"
+  },
+  {
+   "id": "e325",
+   "t": 8500,
+   "type": "transition",
+   "actor": "account",
+   "event": "unlock.card",
+   "from": [
+    "card-locked"
+   ],
+   "to": [
+    "card-idle"
+   ]
+  },
+  {
+   "id": "e326",
+   "t": 8500,
+   "type": "config",
+   "actor": "account",
+   "active": [
+    "card-idle",
+    "card",
+    "billing",
+    "profile",
+    "account"
+   ]
+  },
+  {
+   "id": "e327",
+   "t": 8600,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "step.16"
+  },
+  {
+   "id": "e328",
+   "t": 8600,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "step.16",
+   "from": [
+    "loaded"
+   ],
+   "to": [
+    "out-for-delivery"
+   ]
+  },
+  {
+   "id": "e329",
+   "t": 8600,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "out-for-delivery",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e330",
+   "t": 9000,
+   "type": "message",
+   "from": "driver",
+   "to": "task",
+   "name": "summary.done"
+  },
+  {
+   "id": "e331",
+   "t": 9000,
+   "type": "transition",
+   "actor": "task",
+   "event": "summary.done",
+   "from": [
+    "summarising"
+   ],
+   "to": [
+    "complete"
+   ]
+  },
+  {
+   "id": "e332",
+   "t": 9000,
+   "type": "config",
+   "actor": "task",
+   "active": [
+    "complete",
+    "task"
+   ]
+  },
+  {
+   "id": "e333",
+   "t": 9300,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "delivery.timeout"
+  },
+  {
+   "id": "e334",
+   "t": 9300,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "delivery.timeout",
+   "from": [
+    "out-for-delivery"
+   ],
+   "to": [
+    "exception"
+   ]
+  },
+  {
+   "id": "e335",
+   "t": 9300,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "exception",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e336",
+   "t": 10000,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "resolve"
+  },
+  {
+   "id": "e337",
+   "t": 10000,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "resolve",
+   "from": [
+    "exception"
+   ],
+   "to": [
+    "confirmed"
+   ]
+  },
+  {
+   "id": "e338",
+   "t": 10000,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "confirmed",
+    "shipment"
+   ]
+  },
+  {
+   "id": "e339",
+   "t": 10400,
+   "type": "message",
+   "from": "driver",
+   "to": "shipment",
+   "name": "status.ping"
+  },
+  {
+   "id": "e340",
+   "t": 10400,
+   "type": "transition",
+   "actor": "shipment",
+   "event": "status.ping",
+   "from": [],
+   "to": []
+  },
+  {
+   "id": "e341",
+   "t": 10400,
+   "type": "config",
+   "actor": "shipment",
+   "active": [
+    "confirmed",
+    "shipment"
+   ]
+  }
+ ]
+}

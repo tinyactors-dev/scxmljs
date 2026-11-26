@@ -1,176 +1,153 @@
-# The Office: world notes
+# The Office: world notes (generic)
 
-The recorded llm-chat run (`../data/trace.json`) as an office floor you walk through. Serve
-`prototypes/viz3d/` statically and open `office/index.html` (three.js 0.170 vendored in `vendor/`,
-no network). `node record.mjs` films the scripted visit into `out/office.mp4` and
-`out/office-small.mp4`; `node record.mjs --test 12,40` writes stills of film seconds;
-`node shots.mjs '[{"name":"x","s":20,"pos":[..],"tgt":[..],"js":"..."}]'` takes stills of the
-live page. `node core/check-sim.mjs` prints active leaves and capsules in flight at a few times.
+Any system of statecharts in, an office out. `index.html?system=<name>` loads
+`data/<name>/trace.json` and, when `data/index.json` marks it, `data/<name>/office.json`.
+`node core/make-index.mjs` rewrites `data/index.json` from the `data/` folders. Inside the room,
+the DIRECTORY by the door has a brass plate per system; clicking one switches systems.
 
-## Files
+Checks (node, no browser):
+- `node core/check-situation.mjs [system...]`: per actor, the situation over the loop as a strip
+  (`·` idle, `W` working, `w` waiting, `!` exception, `D` done, blank = absent). It also loads each
+  trace stripped down to the REQUIRED fields only.
+- `node core/check-plan.mjs [system...]`: the floor plan as an ASCII map, and fails if two lives
+  share a seat at the same time or two groups overlap.
 
-| File | What |
+Films: `node record.mjs --system <name>` writes `out/<name>.mp4` and `-small.mp4`.
+`--test 12,40` writes stills. `SYSTEM=<name> node shots.mjs '[...]'` takes stills of the live page.
+
+## The parts
+
+| File | What it decides |
 |---|---|
-| `core/sim.js` | the run as a pure function of time (CONTRACT.md), plus `at`/`depth` per event, `flight(m)`, `alive`, `event`, `eventsBetween`, `playDuration` |
-| `world/layout.js` | where everything is |
-| `world/kit.js` | boxes, materials, canvas textures (faces, plates, counters) |
-| `world/avatar.js` | the blocky person and the pose vocabulary |
-| `world/poses.js` | the state -> pose tables (below) |
-| `world/people.js` | who stands/sits where, walking in and out, reactions |
-| `world/office.js` | building, desks and stations; their update reads the datamodel |
-| `world/tubes.js` | pneumatic tubes, capsules, the slip |
-| `main.js` | scene, clock, camera, picking, selection, HEAD and BOARD mounting |
-| `film.js`, `record.mjs` | the scripted visit and the recorder |
+| `core/sim.js` | The run as a function of time, from the REQUIRED trace fields only. Adds `depth`/`at` inside an instant, lifetimes (several per id), `flight`, `recipients` (broadcasts), `situationAt`/`situations` and `append` (live use later). |
+| `core/situation.js` | `idle / working / waiting / exception / done / absent` per actor, from the chart and the run (below). |
+| `core/plan.js` | Floor plan: hub, bays, visitors, stations, seats over time, room, door, board, clock, blackouts. |
+| `core/desk.js` | Which variables sit on a chart's desk, and their types. |
+| `world/building.js` | Room, door, windows, wall clock (play control), board frame, directory. |
+| `world/stations.js` | Externals by kind. |
+| `world/desks.js` | A desk per seat; the hub's exchange; visitor stools; datamodel objects. |
+| `world/people.js` | Avatars pooled per seat, walking in and out, poses from situations. |
+| `world/tubes.js` | The comb manifold, routes, instanced capsules, the slip. |
+| `film.js` | A visit planned from the run. |
 
-## Time
+## Generic rules
 
-The bus has zero latency, so a whole causal chain (timer -> manager -> reception -> Ada -> host ->
-model) happens at one trace millisecond. `sim.js` gives every event a `depth` (message hops before
-it inside its instant, from `via`/`cause`, else "after whatever reached the sender in this
-instant") and an effective time `at = t + depth * 0.04 ms`. `warp` gives each hop 0.72 playback
-seconds and compresses idle gaps (about 0.052 * sqrt(gap ms) s, 0.22 to 2.8 s), so one loop of the
-14.35 s run is 88.9 s. A capsule's flight is `sim.flight(m)`: from its sender's step to `at` for a
-hop, one second before `at` for a reply with no link inside its instant (the model, a timer).
+**Floor plan.**
+- The hub is the actor that talks to the most distinct partners, not counting its invoked
+  children. To count, it must have at least 3 partners, 1.4 times the next actor's count, and be
+  alive for more than half the run. It sits at the EXCHANGE in the middle, under the manifold.
+- Every other actor sits in a bay per chart (identical kinds grouped). A bay is rows of up to 6
+  cubicles and is sized to the most of that chart alive at once.
+- Bays are placed greedily around the hub: heavier talkers nearer, the south half (nearer the
+  visitor) preferred.
+- An invoked child (`invokeid`, `invoked by` in its role, or an `invoke ...` message from its
+  parent) sits on a visitor's stool across its parent's desk. A parent with more than 6 children
+  at once gets a bay of children next to its own.
+- Seats are given out over time. A new life takes the seat its identity (`identity`, else `id`)
+  had before, else the lowest free one. A seat stays busy until the leaver has walked out, so 60
+  short-lived workers keep reusing a small bay.
+- A mass end is three or more ends in one instant, and half of everyone alive. It is a blackout:
+  the lights go out, those people vanish, and the reborn walk back in.
 
-## Actor -> character
+**Externals by kind.** From `kind` first, then words in the id or label:
 
-| Actor / endpoint | In the office |
+| Kind | Becomes |
 |---|---|
-| host | the operator at the octagonal EXCHANGE in the middle (headset), all tubes meet in the brass hub above |
-| Ada, Bo, Terminal, Python (client) | people at cubicle desks in a row facing the visitor, each with a nameplate |
-| tools.terminal, tools.python | a machine beside that desk (SHELL, PYTHON) with a gear window, crank, chimney and lamp |
-| llm (the model) | THE MODEL: an oracle cabinet behind glass to the north: two tape reels, a field of lamps, a purple eye, a horn, a printout slot |
-| log (chat log) | the archivist at the CHAT LOG desk (east): ledger, page pile, binders, filing cabinets |
-| stage (the people at the keyboards) | the lit hatch PEOPLE AT THE KEYBOARDS behind RECEPTION with three silhouettes; the bell on the counter |
-| director (scenario chart) | the floor manager with a tie and clipboard who walks in, stands at reception and leaves when the script is done |
-| timers | the wall clock on the north wall: its bells ring when a delayed send fires |
-| workspace + 6 packages | the storekeeper dozing on a stool in the WORKSPACE storeroom (north-west), six closed crates on shelves |
-| bus | the tubes themselves |
-| keycheck, downloads | not built: no traffic in this run |
+| user | the hatch by the door ("people at the keyboards") |
+| timer | the wall clock; a delayed send pops out of the receiver's desk timer |
+| log / storage | an archive whose pile grows |
+| model | an oracle cabinet |
+| service / processor / app | a machine |
+| tool | a small machine |
+| bus | nothing (the tubes are the bus) |
+| anything else | a grey cabinet |
 
-## State -> pose (`world/poses.js`; first active state wins)
+An external that talks to one actor only (90 % of its traffic) stands beside that actor's desk.
+Unused externals are not built.
 
-| Chart | Active state | Pose |
-|---|---|---|
-| client | `left` | gets up and walks out of the door |
-| client | `offline` | asleep: head on the desk, eyes shut; lamp and screen dark |
-| client | `joining` | waves (after walking in from the door) |
-| client | `syncing` | elbows on the desk, watching |
-| client | `working` | turned to the tool machine, cranking it |
-| client | `sending` | turned to the tube mouth, reaching for it |
-| client | `host-busy` | elbows on the desk, watching the stream on the screen |
-| client | `host-idle` | leaning back, hands behind the head |
-| host | `backoff` | checking the wristwatch |
-| host | `connecting`, `thinking` | receiver at the ear, waiting (the MODEL cord is plugged) |
-| host | `writing`, `calling` | receiver at the ear, writing |
-| host | `tools` | turned round to the switchboard, plugging cords |
-| host | `settling` | stamping |
-| host | `idle` | leaning back |
-| scenario | any step / `done` | standing with the clipboard / walks out |
-| workspace | `open` | dozing on the stool |
+**Situation** (`core/situation.js`). In priority order:
+1. absent: not alive.
+2. done: a top-level final state, or the last 0.6 s before an end with reason "done".
+3. exception: the active leaf is exceptional, or an error event just arrived. A leaf is
+   exceptional when its name matches fail/error/offline/backoff/reject/timeout/...,
+   or when it is reachable only by events like error/timeout/cancel. An exceptional leaf in one
+   parallel region shows for 2.5 s only.
+4. working: it changed state within the last 0.7 playback seconds.
+5. waiting: it sent a request and the answer has not come yet. The answer is the partner's next
+   message back for an external, or a message whose cause chain reaches the request for an actor.
+   Requests to user, timer and log endpoints never wait.
+6. working: it started an invoke of an external that has not answered done or error.
+7. idle: none of the above.
 
-Reactions layered on the pose (each caused by one message): typing for a second when the people at
-the keyboards hand something in (`ui.*` from stage); a quick reach to the tube mouth when a capsule
-arrives; a shrug for 1.8 s when an `input.rejected` arrives; the archivist writes when a log
-capsule arrives. Spawned clients walk in from the door (3 s) and sit down.
+**Situation → pose.**
 
-## Variable -> desk object (only what the trace writes)
-
-| Chart | Variable | Object |
-|---|---|---|
-| client | `queue` | yellow letters standing in the wire in-tray (Bo's waiting message) |
-| client | `awaiting` | a slip clipped beside the tube mouth (sent, not answered yet) |
-| client | `rejection` | a red note stuck to the monitor |
-| client | `granted` | keys on hooks on the left partition: yellow input, red control, green tools |
-| client | `running` | green cards in the pigeonholes at the right end of the desk |
-| client | `seq` | the mechanical three-digit counter on the desk; the screen's lines |
-| host | `turn` | the big flip counter on the exchange's front |
-| host | `clients` | the roster pegs on the switchboard, lit in each client's colour |
-| host | `pending` | a green patch cord from the plug to that client's jack, its lamp lit; green cards in the panel's pigeonholes |
-| host | `steers` | yellow slips on the clipboard at the counter's west side |
-| host | `incoming` | notes on the spike |
-| host | `stoppedBy` | a red STOP flag with the name |
-| package | state | crate lid (closed while `absent`, open while fetching, blue fill when ready) |
-
-Also: the desk lamp is the client's `online` state; the MODEL cord and lamp are the host's
-requesting states; the oracle runs between its request and its `done`; a tool machine runs between
-`run` and `tool.done`.
-
-## Message kind -> capsule
-
-| Kind | Capsule |
+| Situation | Pose |
 |---|---|
-| typed input (`ui.submit/steer/interrupt`, `input.*`, `restore`) | yellow |
-| control (hello, welcome, snapshot, busy/idle, accepted, resync, bye) | blue |
-| the model (`invoke llm`, `llm.*`, `done.invoke.llm`) | violet, slightly larger |
-| tools (`tool.call`, `run`, `tool.done`, `tool.result`) | green |
-| refusal (`input.rejected`) | red |
-| timer (from `timers`) | orange |
-| script notes (from the floor manager) | cream, small |
-| package invoke | brown, small |
-| log (`log.batch`, anything to the log) | small dim grey bead |
+| idle | leaning back, hands behind the head |
+| working | typing, or cranking the machine beside the desk when the work is with it |
+| waiting on an external | on the phone (the receiver leaves the desk) |
+| waiting on an actor | turned to the tube mouth, then checking the wristwatch |
+| exception | on their feet, hands on the head |
+| done | standing and waving, then walking out |
 
-A broadcast is one capsule per receiver, so they leave the hub together and fan out. The last
-non-log capsule an endpoint received lies in the wire basket under its mouth. Clicking a capsule
-(flying or lying) unrolls its slip above it: event name, from -> to, the summary.
+Reactions are layered on top of the pose: a reach when a capsule arrives, typing when the people
+at the keyboards hand something in, a shrug at a refusal.
 
-## Interaction
+**Desk = datamodel.** Up to 4 variables per chart. Score = changes in the run + 2 x states that
+read it. Each becomes an object by type, with an engraved name plate:
 
-Drag to orbit, wheel/pinch to zoom, click the floor to walk there, WASD/arrows to walk, `h` home.
-Click a person: the camera comes to their face and the lid (hair/hat) lifts; click again, or wheel
-in, to go into the head (HEAD's machines in a warm skull room, `setDetail` from the camera
-distance: 0 at 1.0 m, 1 at 0.3 m); click a machine to go deeper (`focus`). Escape steps back one
-level each time (slip, machine, head, desk, home). Click a machine or the oracle or reception for a
-close-up. The wall clock is the play control: click its face to pause (the pendulum stops), click
-the lever below to change speed (1/2, 1, 2); space, `[`/`]`, `,`/`.` on the keyboard. The board
-gets the pointer as u,v (move/down/up/wheel); its `seek` sets the clock, `select` puts yellow rings
-under those people and enlarges those capsules, `world` is ignored (the room plays the base run).
-Selecting a person or a capsule calls `board.highlight`.
+| Type | Object |
+|---|---|
+| number | flip counter |
+| boolean | lamp with a switch |
+| string | card with the text |
+| array | tray with one sheet per item |
+| object | pigeonholes with one card per key |
 
-## Integration
+The desk lamp is on while someone sits there. A charted actor with no datamodel gets a plain desk.
 
-- `head/head.js` was present and worked first time; mounted at scale 0.042 in the selected
-  person's head, rotated with them. Placeholder (a box with gears) only if the import fails.
-- `board/board.js` was present and worked; its canvas is a `CanvasTexture` on the west wall,
-  `now` is the ambient clock so film mode is deterministic; `locate()` is used by the film to find a
-  span to touch. `resetView()` before the film touches it (a capsule highlight had framed it).
+**Mail.**
+- Each desk mouth drops to a row header. Headers join a spine to the bay's junction box, and a
+  trunk runs from the junction to the manifold. Stations have trunks of their own.
+- Capsule colour is a stable hue per event family (the name up to its first dot), red for errors,
+  a grey bead for log traffic.
+- A broadcast is one capsule per receiver.
+- A self-send loops over the desk.
+- A delayed send comes out of the desk timer.
+- Mail for someone who has left falls out of their empty desk's mouth onto the floor.
+- Every capsule spends at least 0.7 s in the tube, so it can be seen and clicked.
 
-## What works
+**What office.json can say** (llm-chat has one):
 
-- The overview reads as a place: who sits where, the tubes meeting at the exchange, the model's
-  room, the board on the wall. Capsules fly at the moment the trace says and the receiver reacts.
-- Bo's queued letter, the red refusal note, the keys, the counters and the patch cords change at
-  the moment the trace writes them. Walk-ins, the terminal walking out, Bo asleep while offline.
-- The head flow (lid, dive, machine focus, Escape back out) and the board seek work in the live page
-  and in the film through the same code (`api.click` raycasts under the drawn cursor).
+| Key | What it overrides |
+|---|---|
+| `names` | display names |
+| `characters` | an avatar look per actor id |
+| `plan.stations` | externals kept as stations, never attached |
+| `plan.kinds` | external kind overrides |
+| `plan.hub` | the hub (`false` for none) |
+| `poses` | state → pose per chart |
+| `desk` | the variables per chart |
+| `capsules` | colours per family |
+| `film` | pins for the visit: bay, actor, message, seek |
 
-## What does not (yet)
+## Performance
 
-- Small things are small: from the overview the capsules are dots and the desk objects need a
-  closer look; nothing reads poses from far away except posture.
-- Tool machines read a little like loudspeakers; the gear behind the round window should be bigger.
-- A capsule's flight inside a burst is about half a second of playback: following one needs the
-  slower speed (the film slows time for it; the live page has the lever).
-- Package downloads never happen in this run, so the storeroom never moves.
-- Board 'world' (what-if runs) does not change the room; the room always plays the base run.
-- The host's tube mouth sits above his counter; capsules for the host land in a basket in mid-air
-  next to him.
+- Static furniture is one vertex-coloured mesh per group.
+- Tubes are one merged mesh, and the rings an InstancedMesh.
+- Capsules are one InstancedMesh: up to 600, recoloured per frame.
+- Avatars are pooled per seat and restyled only when the occupant changes; invisible ones cost
+  nothing.
+- Counters and cards redraw their canvas only when their value changes.
+- `many` (61 actors, 22 at once) renders without trouble in the software renderer.
 
-## The film (`out/office.mp4`, 86 s, 1280x720, 30 fps; `out/office-small.mp4` crf 27, faststart)
+## Known gaps
 
-Overview with mail flying (Ada sends, the host goes busy, Bo and Terminal walk in) -> the cursor
-clicks the floor in front of Ada and Bo -> Bo types while the host is busy: his letter waits in his
-tray, his steer comes back red and he shrugs -> the terminal's tool call, the machine cranks -> the
-camera follows the tool result up the tube to the exchange; the cursor clicks it and its slip
-unrolls (time stopped while it is read) -> on to the model -> click Ada, the lid lifts, click again
-and in; click her `work` machine, deeper; Escape three times out -> the board: the cursor touches
-Python's tool span and the room jumps to that moment (Python and Terminal cranking, a yellow ring
-under Python) -> back to the overview: Bo falls asleep offline, the terminal walks out -> pull out.
-All six scripted clicks hit their targets (logged by `record.mjs`). Weak moment: following the
-model request starts with the camera very close to the host's face.
-
-## Next
-
-Bigger, slower capsules near the camera; sound (the bell, the tube's whoosh); the room playing a
-what-if world when the board picks one (a second, ghosted copy of the people who diverge); a
-"follow this capsule" click that slows time automatically.
+- The room is often larger than its contents (the station row on the north wall, the minimum
+  size). The home view frames the room, not the people.
+- Waiting between actors needs cause links. Without them, actor-to-actor requests never show as
+  waiting.
+- The exception heuristic is partly name-based (English words).
+- Visitors share their parent's tube mouth.
+- Package downloads and other idle invoked children just sit.
+- Board "world" events still do not change the room: the room always plays the trace it loaded.

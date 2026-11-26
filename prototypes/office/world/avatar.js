@@ -1,5 +1,5 @@
 // world/avatar.js: a blocky little person with a pose vocabulary. The world decides WHICH pose
-// (from the actor's active states, see world/poses.js); this file only knows how a pose looks.
+// (from core/situation.js, or office.json poses); this file only knows how a pose looks.
 import * as THREE from "three";
 import { box, mat, faceTex, lerp, clamp01 } from "./kit.js";
 
@@ -23,59 +23,81 @@ export const POSES = {
   stamp: P({ lean: 0.25, headX: 0.3, aRx: -1.6, aRz: -0.1, stampIt: 1 }),
   clipboard: P({ sit: 0, headX: 0.35, aLx: -1.2, aLz: -0.4, aRx: -0.9, aRz: 0.4 }),
   doze: P({ lean: -0.1, headX: 0.45, aLx: -0.4, aLz: 0.7, aRx: -0.4, aRz: -0.7, eyes: 0, bob: 0.5 }),
+  panic: P({ sit: 0, headX: -0.2, aLx: -2.9, aLz: 0.9, aRx: -2.9, aRz: -0.9, shrug: 1 }),             // up on their feet, hands on the head
+  doneWave: P({ sit: 0, aRx: -2.7, aRz: -0.3, wave: 1, headX: -0.1 }),
   ledger: P({ lean: 0.25, headX: 0.35, aLx: -1.0, aLz: 0.2, aRx: -1.15, aRz: -0.15 }),
   writeLedger: P({ lean: 0.3, headX: 0.4, aLx: -1.0, aLz: 0.2, aRx: -1.25, aRz: -0.1, type: 0.8 }),
 };
 
-export function makeAvatar({ shirt = "#5b7bd5", pants = "#3a3f55", skin = "#f0c8a0", hair = "#3b2a20", hairStyle = "short", hat = null, accessory = null, face = {} } = {}) {
+export function makeAvatar(spec = {}) {
+  // own materials, so a pooled avatar can be restyled for its next occupant
+  const M = { shirt: new THREE.MeshLambertMaterial(), pants: new THREE.MeshLambertMaterial(), skin: new THREE.MeshLambertMaterial(), hair: new THREE.MeshLambertMaterial(), hat: new THREE.MeshLambertMaterial(), acc: new THREE.MeshLambertMaterial(), shoe: mat("#2a2420"), tie: mat("#b8322c") };
+  const B = (w, h, d, m) => box(w, h, d, null, { material: m });
   const root = new THREE.Group();
   const hips = new THREE.Group(); root.add(hips);
   const legL = new THREE.Group(), legR = new THREE.Group();
   legL.position.set(-0.13, 0, 0); legR.position.set(0.13, 0, 0);
-  for (const [g, x] of [[legL, 0], [legR, 0]]) {
-    const thigh = box(0.22, 0.42, 0.24, pants); thigh.position.set(x, -0.21, 0); g.add(thigh);
-    const shin = box(0.21, 0.36, 0.22, pants); shin.position.set(x, -0.6, 0); g.add(shin); g.userData.shin = shin;
-    const shoe = box(0.23, 0.1, 0.3, "#2a2420"); shoe.position.set(x, -0.8, 0.04); g.add(shoe); g.userData.shoe = shoe;
+  for (const g of [legL, legR]) {
+    const thigh = B(0.22, 0.42, 0.24, M.pants); thigh.position.set(0, -0.21, 0); g.add(thigh);
+    const shin = B(0.21, 0.36, 0.22, M.pants); shin.position.set(0, -0.6, 0); g.add(shin); g.userData.shin = shin;
+    const shoe = B(0.23, 0.1, 0.3, M.shoe); shoe.position.set(0, -0.8, 0.04); g.add(shoe); g.userData.shoe = shoe;
     hips.add(g);
   }
   const torso = new THREE.Group(); hips.add(torso);
-  const body = box(0.54, 0.6, 0.3, shirt); body.position.y = 0.32; torso.add(body);
-  const belt = box(0.55, 0.06, 0.31, pants); belt.position.y = 0.04; torso.add(belt);
+  const body = B(0.54, 0.6, 0.3, M.shirt); body.position.y = 0.32; torso.add(body);
+  const belt = B(0.55, 0.06, 0.31, M.pants); belt.position.y = 0.04; torso.add(belt);
   const neck = new THREE.Group(); neck.position.y = 0.64; torso.add(neck);
-  const headGeoSize = 0.46;
-  const faceMap = faceTex({ skin, ...face }), sleepMap = faceTex({ skin, ...face, closed: true });
-  const skinM = mat(skin);
-  const faceM = new THREE.MeshLambertMaterial({ map: faceMap });
-  const head = new THREE.Mesh(new THREE.BoxGeometry(headGeoSize, headGeoSize, headGeoSize), [skinM, skinM, skinM, skinM, faceM, skinM]);
-  head.castShadow = true; head.position.y = headGeoSize / 2; neck.add(head);
-  // the lid: hair or hat on top. It lifts when you go into this person's head.
-  const lid = new THREE.Group(); lid.position.y = headGeoSize; neck.add(lid);
+  const HS = 0.46;
+  const faceM = new THREE.MeshLambertMaterial();
+  const head = new THREE.Mesh(new THREE.BoxGeometry(HS, HS, HS), [M.skin, M.skin, M.skin, M.skin, faceM, M.skin]);
+  head.castShadow = true; head.position.y = HS / 2; neck.add(head);
+  const lid = new THREE.Group(); lid.position.y = HS; neck.add(lid);
   const lidMesh = new THREE.Group(); lid.add(lidMesh);
-  if (hairStyle !== "bald") {
-    const top = box(headGeoSize + 0.04, 0.1, headGeoSize + 0.04, hair); top.position.set(0, 0.03, 0); lidMesh.add(top);
-    const back = box(headGeoSize + 0.04, hairStyle === "long" ? 0.55 : 0.22, 0.08, hair); back.position.set(0, hairStyle === "long" ? -0.25 : -0.1, -headGeoSize / 2 - 0.02); neck.add(back);
-    if (hairStyle === "long") { for (const sx of [-1, 1]) { const side = box(0.06, 0.4, 0.3, hair); side.position.set(sx * (headGeoSize / 2 + 0.03), -0.17 + headGeoSize, -0.08); neck.add(side); } }
-    else { for (const sx of [-1, 1]) { const side = box(0.05, 0.14, 0.32, hair); side.position.set(sx * (headGeoSize / 2 + 0.02), headGeoSize - 0.08, -0.07); neck.add(side); } }
-  }
-  if (hat === "beanie") { const b = box(0.52, 0.2, 0.52, "#e0663a"); b.position.y = 0.1; lidMesh.add(b); const p = box(0.12, 0.08, 0.12, "#f4e0c0"); p.position.y = 0.24; lidMesh.add(p); }
-  if (hat === "cap") { const b = box(0.5, 0.14, 0.5, "#2d4e8a"); b.position.y = 0.07; lidMesh.add(b); const v = box(0.4, 0.04, 0.22, "#2d4e8a"); v.position.set(0, 0.02, 0.33); lidMesh.add(v); }
-  if (accessory === "headset") { const band = box(0.52, 0.05, 0.08, "#222"); band.position.y = 0.12; lidMesh.add(band); for (const sx of [-1, 1]) { const ear = box(0.08, 0.16, 0.16, "#333"); ear.position.set(sx * 0.27, headGeoSize / 2, 0); neck.add(ear); } const mic = box(0.03, 0.03, 0.22, "#333"); mic.position.set(-0.24, 0.12, 0.16); neck.add(mic); }
-  if (accessory === "headphones") { const band = box(0.54, 0.06, 0.1, "#1f8a5a"); band.position.y = 0.1; lidMesh.add(band); for (const sx of [-1, 1]) { const ear = box(0.1, 0.2, 0.2, "#1f8a5a"); ear.position.set(sx * 0.28, headGeoSize / 2, 0); neck.add(ear); } }
-  if (accessory === "tie") { const t = box(0.08, 0.36, 0.02, "#b8322c"); t.position.set(0, 0.36, 0.16); torso.add(t); }
+  const parts = {};
+  parts.top = B(HS + 0.04, 0.1, HS + 0.04, M.hair); parts.top.position.set(0, 0.03, 0); lidMesh.add(parts.top);
+  parts.backShort = B(HS + 0.04, 0.22, 0.08, M.hair); parts.backShort.position.set(0, HS - 0.1, -HS / 2 - 0.02); neck.add(parts.backShort);
+  parts.backLong = B(HS + 0.04, 0.55, 0.08, M.hair); parts.backLong.position.set(0, HS - 0.25, -HS / 2 - 0.02); neck.add(parts.backLong);
+  parts.sidesShort = []; parts.sidesLong = [];
+  for (const sx of [-1, 1]) { const a = B(0.05, 0.14, 0.32, M.hair); a.position.set(sx * (HS / 2 + 0.02), HS - 0.08, -0.07); neck.add(a); parts.sidesShort.push(a); const b = B(0.06, 0.4, 0.3, M.hair); b.position.set(sx * (HS / 2 + 0.03), HS - 0.17, -0.08); neck.add(b); parts.sidesLong.push(b); }
+  parts.beanie = new THREE.Group(); { const b = B(0.52, 0.2, 0.52, M.hat); b.position.y = 0.1; parts.beanie.add(b); const p = B(0.12, 0.08, 0.12, mat("#f4e0c0")); p.position.y = 0.24; parts.beanie.add(p); } lidMesh.add(parts.beanie);
+  parts.cap = new THREE.Group(); { const b = B(0.5, 0.14, 0.5, M.hat); b.position.y = 0.07; parts.cap.add(b); const v = B(0.4, 0.04, 0.22, M.hat); v.position.set(0, 0.02, 0.33); parts.cap.add(v); } lidMesh.add(parts.cap);
+  parts.headset = new THREE.Group(); { const band = B(0.52, 0.05, 0.08, M.acc); band.position.y = HS + 0.12; parts.headset.add(band); for (const sx of [-1, 1]) { const ear = B(0.08, 0.16, 0.16, M.acc); ear.position.set(sx * 0.27, HS / 2, 0); parts.headset.add(ear); } const mic = B(0.03, 0.03, 0.22, M.acc); mic.position.set(-0.24, 0.12, 0.16); parts.headset.add(mic); } neck.add(parts.headset);
+  parts.tie = B(0.08, 0.36, 0.02, M.tie); parts.tie.position.set(0, 0.36, 0.16); torso.add(parts.tie);
   const armL = new THREE.Group(), armR = new THREE.Group();
   armL.position.set(-0.36, 0.56, 0); armR.position.set(0.36, 0.56, 0);
   for (const g of [armL, armR]) {
-    const upper = box(0.17, 0.32, 0.19, shirt); upper.position.y = -0.14; g.add(upper);
-    const lower = box(0.16, 0.26, 0.18, shirt); lower.position.y = -0.42; g.add(lower);
-    const hand = box(0.15, 0.12, 0.16, skin); hand.position.y = -0.6; g.add(hand); g.userData.hand = hand;
+    const upper = B(0.17, 0.32, 0.19, M.shirt); upper.position.y = -0.14; g.add(upper);
+    const lower = B(0.16, 0.26, 0.18, M.shirt); lower.position.y = -0.42; g.add(lower);
+    const hand = B(0.15, 0.12, 0.16, M.skin); hand.position.y = -0.6; g.add(hand); g.userData.hand = hand;
     torso.add(g);
   }
-  // a prop the person holds in the right hand (receiver, pen, clipboard); set by the world
   const prop = new THREE.Group(); prop.position.y = -0.66; armR.add(prop);
   const propL = new THREE.Group(); propL.position.y = -0.66; armL.add(propL);
-
-  const a = { root, hips, torso, neck, head, lid, lidMesh, armL, armR, legL, legR, prop, propL, faceM, faceMap, sleepMap, headSize: headGeoSize, cur: { ...POSES.stand } };
+  const a = { root, hips, torso, neck, head, lid, lidMesh, armL, armR, legL, legR, prop, propL, faceM, faceMap: null, sleepMap: null, headSize: HS, M, parts, styleKey: null };
+  a.style = (sp) => styleAvatar(a, sp);
+  a.style(spec);
   return a;
+}
+
+const faceCache = new Map();
+function faces(skin, face) { const k = skin + JSON.stringify(face || {}); if (!faceCache.has(k)) faceCache.set(k, [faceTex({ skin, ...face }), faceTex({ skin, ...face, closed: true })]); return faceCache.get(k); }
+export function styleAvatar(a, { shirt = "#5b7bd5", pants = "#3a3f55", skin = "#f0c8a0", hair = "#3b2a20", hairStyle = "short", hat = null, hatColor = null, accessory = null, face = {} } = {}) {
+  const key = JSON.stringify([shirt, pants, skin, hair, hairStyle, hat, hatColor, accessory, face]); if (a.styleKey === key) return; a.styleKey = key;
+  a.M.shirt.color.set(shirt); a.M.pants.color.set(pants); a.M.skin.color.set(skin); a.M.hair.color.set(hair);
+  a.M.hat.color.set(hatColor || (hat === "cap" ? "#2d4e8a" : "#e0663a")); a.M.acc.color.set(accessory === "headphones" ? "#1f8a5a" : "#222");
+  const P = a.parts; const bald = hairStyle === "bald", long = hairStyle === "long";
+  P.top.visible = !bald; P.backShort.visible = !bald && !long; P.backLong.visible = long; P.sidesShort.forEach((x) => (x.visible = !bald && !long)); P.sidesLong.forEach((x) => (x.visible = long));
+  P.beanie.visible = hat === "beanie"; P.cap.visible = hat === "cap"; P.headset.visible = accessory === "headset" || accessory === "headphones"; P.tie.visible = accessory === "tie";
+  const [f, sl] = faces(skin, face); a.faceMap = f; a.sleepMap = sl; a.faceM.map = f; a.faceM.needsUpdate = true;
+}
+
+// a stable, friendly look for anyone without a character: from a hash of their id (and chart)
+const SKINS = ["#f1c7a1", "#e2ae86", "#d9a47e", "#9c6b4a", "#c98e6a", "#f0c8a0", "#7a5236"];
+const HAIRS = ["#2a1d18", "#6b4426", "#1d1d22", "#bfc5cf", "#7a5a3a", "#3a3a3a", "#a0522d", "#d8b66a"];
+export function generatedLook(id, chart, hashStr, hueColor) {
+  const h = hashStr(id), hc = hashStr(chart || id);
+  return { shirt: hueColor(chart || id, 0.5, 0.5), pants: ["#36324a", "#3b3a33", "#22252e", "#2f4d7a", "#4a3b2a"][h % 5], skin: SKINS[(h >> 3) % SKINS.length], hair: HAIRS[(h >> 6) % HAIRS.length],
+    hairStyle: ["short", "long", "short", "bald", "short"][(h >> 9) % 5], hat: [null, null, null, "beanie", "cap", null][(h >> 12) % 6], hatColor: hueColor(id, 0.6, 0.5), accessory: [null, null, "headphones", null, "tie"][(h >> 15) % 5], face: { glasses: ((h >> 18) % 4) === 0 } };
 }
 
 const KEYS = ["turn", "sit", "lean", "headX", "headY", "aLx", "aLz", "aRx", "aRz", "lLx", "lRx", "bob", "type", "eyes", "walk", "wave", "crank", "shrug", "plug", "stampIt"];

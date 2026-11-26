@@ -1,0 +1,16 @@
+{
+  "names": { "llm": "the model", "log": "chat log", "stage": "people at the keyboards", "tools.terminal": "shell", "tools.python": "python", "director": "floor manager", "workspace": "storekeeper" },
+  "characters": {
+    "ada": { "shirt": "#8e5bd6", "pants": "#36324a", "hair": "#2a1d18", "hairStyle": "long", "skin": "#f1c7a1" },
+    "bo": { "shirt": "#3f9a5f", "pants": "#3b3a33", "hair": "#6b4426", "hat": "beanie", "skin": "#e2ae86" },
+    "terminal": { "shirt": "#3a4150", "pants": "#22252e", "hair": "#bfc5cf", "accessory": "headphones", "skin": "#d9a47e", "face": { "glasses": true } },
+    "python": { "shirt": "#e0b23a", "pants": "#2f4d7a", "hair": "#1d1d22", "skin": "#9c6b4a" },
+    "host": { "shirt": "#c8b27a", "pants": "#4a3b2a", "hair": "#4a2f1c", "skin": "#eab38c", "accessory": "headset" },
+    "director": { "shirt": "#e9e4d8", "pants": "#2c2f3a", "hair": "#7a5a3a", "skin": "#f1c7a1", "accessory": "tie" },
+    "workspace": { "shirt": "#5b6f8a", "pants": "#3e5a7a", "hair": "#3a3a3a", "skin": "#c98e6a", "hat": "cap", "face": { "beard": "#5a4030" } }
+  },
+  "plan": { "stations": ["llm"], "kinds": { "llm": "model" } },
+  "poses": { "client": { "offline": "asleep" } },
+  "desk": { "client": ["queue", "awaiting", "running", "seq"], "host": ["request", "pending", "steers", "clients"] },
+  "capsules": { "log": "#9aa0aa", "llm": "#b07cff", "invoke": "#b07cff", "done": "#b07cff", "tool": "#36d17c", "run": "#36d17c", "input": "#ffc93a", "ui": "#ffc93a", "host": "#4aa3ff", "client": "#4aa3ff", "welcome": "#4aa3ff", "snapshot": "#4aa3ff" }
+}

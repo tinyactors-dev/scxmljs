@@ -1,145 +1,202 @@
-# board/: the telemetry board
+# board/: the telemetry board, for any system
 
-The board is a wall screen in the office. It shows the recorded run as a trace, drawn on one 2D
-canvas that WORLD maps onto the wall. It is meant to be read from across the room, so it uses large
-type, few words, and colour that carries the meaning. The design size is 1600 × 900; the board
-scales to any `width`/`height`.
+The board is the one 2D surface in the office: a wall screen that shows the recorded run as a trace.
+It is drawn on a canvas at a design size of 1600 × 900 and scaled to `width`/`height`. It is meant
+to be read from across the room: large type, few words, and colour that carries the meaning.
+**Nothing in `board.js` knows a system by name.** Rows, span names, colours, behaviours and reels
+all come from the trace.
 
 ## What it shows
 
-- **Behaviour chips** (top row): the seven `trace.stories`, numbered and coloured (SEND, TOOLS,
-  QUEUE, STEER, STOP, OFFLINE, JOIN). A **band of numbered brackets** above the lanes shows when
-  each one happened.
-- **Header line**: one line of text. It shows the picked behaviour's question, the name of a picked
-  message, or the change that a what-if makes. With nothing picked it is empty.
-- **Lanes**: one row per participant in the room. The default order is
-  `ada, bo, host, terminal, python, llm` (shown as MODEL): people's clients at the top, the host in
-  the middle, the machines that do the work below. Time runs from left to right in the shared warped
-  time (`sim.warp` of each event's `at`, so the hops within one instant are spread out the same way
-  as in the room). The axis is labelled in virtual seconds.
-  - **Spans** come from the active states. A solid span means the participant is doing something; a
-    hatched span means it is waiting.
-    - Host: ASKING THE MODEL (`requesting`, amber), WAITING FOR TOOLS (`tools`, teal hatched),
-      BACKING OFF (`backoff`, red hatched), and a thin amber bar over the whole `turn`.
-    - Model: THINKING (`connecting`, violet hatched), WRITING (`writing`/`calling`, violet).
-    - Clients: RUNNING A TOOL (`working`, teal), OFFLINE (grey hatched), WAITING IN QUEUE (from
-      the `queue` data value, yellow hatched), and a faint amber foot line while the client knows
-      the host is busy.
-    - Before a participant is born or after it leaves, its row is dark and hatched.
-  - **Messages** are vertical arrows from the sender's row to the receiver's rows. A fan-out (one
-    sender, one event name, one instant) is drawn as one line with an arrowhead on each target. Log
-    traffic (`log.batch`, anything sent to `log`, `snapshot.send`) is drawn only as faint ticks at
-    the foot of a row. A message to or from something without a row (the stage, the tools on a
-    desk) is drawn as a short stub on its one row.
-  - **Lamps** beside the names glow in the colour of what each participant is busy with at the
-    playhead.
-- **Playhead**: a white line with a time handle at the foot of the lanes. Time after it is dimmed.
-- **What-if reels** (bottom row): AS RECORDED, MODEL FAILS, PYTHON DROPS, STOP EARLY, NO PYTHON.
-  When a what-if is picked:
-  - the view frames the run from just before the fork to its end;
-  - a magenta dashed line marks the fork;
-  - after the fork the lanes show the what-if take in magenta, using the same solid and hatched
-    grammar. For model-fails this is the retry rhythm, with the waits growing longer;
-  - the recorded run continues only as thin ghost strips at the top of each row, in its own colours,
-    so you can see what would have happened;
-  - a magenta bar marks where the what-if ends, and the hatching after it shows that nothing more
-    happens.
-  - The what-if world files are loaded lazily, from `baseUrl` + `worlds/<id>.json`.
-- **Picked behaviour**:
-  - the view frames its stretch of time;
-  - only its rows, spans and messages stay lit, in the story's colour;
-  - its steps are joined in order and numbered 1…n on the actors' rows.
-- **Picked message**:
-  - the view frames its cause chain;
-  - the message itself is drawn in yellow;
-  - what led to it is drawn in warm white, following the `via`/`cause` links back to the stage;
-  - what it led to is drawn in cyan, up to six hops forward, without log traffic.
+### Rows (chosen automatically)
 
-## Interface
+- **Long-lived actors** get one row each.
+  - Rows are grouped by chart kind; charts built from the same `source` file count as one kind.
+  - The group with the most traffic per member (the hub) sits in the middle.
+  - An actor that comes back under a new id gets one row with gaps, and its label shows `×N`. This
+    applies when the new id has the same chart kind and the same `identity` or label, and the two
+    lifetimes do not overlap (for example `harness` → `harness~2`, or `python` → `python~2`).
+- **Swarms.** Short-lived actors of one kind collapse into one swarm lane, labelled
+  `KIND ×N` with `≤k at once`. A group becomes a swarm when it has more than 12 members, or when
+  at least 4 members exist and at least 60 % of them live less than 35 % of the run (3 members are
+  enough when there are more than 10 individual rows). Members that live at least 60 % of the run
+  keep their own rows.
+  - **Collapsed**, the lane is a stacked occupancy band: how many members are alive, and how many
+    of them are working, waiting, in an exception or idle at each moment. A green tick on top marks
+    each spawn. A tick at the foot marks each end, red when the member ended failing.
+  - **Expanded** (touch the lane's name), members are packed into tracks by lifetime. Each track
+    shows one member at a time, with its spans, birth notch and end cap.
+- **Invoked children** sit in a slim sub-row (`↳ KIND ×n`) directly under their parent. A child
+  counts as invoked when the parent's chart has an `<invoke>` whose `src` is the child chart's
+  `source`, or whose id ends the child's id. The sub-row uses packed tracks; with more than 3
+  tracks it becomes a collapsed swarm.
+- **Externals** that both send (2 or more messages) and receive (1 or more) get a slim row, at most
+  4. The row shows a busy span from each request until the last answer to that requester.
+- **One actor** (a single chart): the board becomes that actor's state timeline. It has one lane
+  per parallel region, or one lane for the whole chart, and shows every state, including idle.
+- **Quiet lanes** get half the height. A lane is quiet when it is busy less than 2 % of its life
+  and has fewer than 3 messages per actor.
+- An actor with no transitions and no messages gets no row.
+
+### Spans
+
+- **Source.** When the sim has `situations(id)`, the spans are WORLD's situation classifier. When it
+  does not, the board derives them itself from the active states, the chart (finals, exceptional
+  names and events, invokes) and how each state was left in the run:
+  - left by someone else's message → idle;
+  - left by itself → working;
+  - left by a timer or a delayed self-send → waiting;
+  - entered after sending a request, then left by the answer → waiting.
+
+  The same derivation corrects one case of the classifier. When the classifier says `idle` but
+  every active leaf is a working or waiting state (a job busy in `running`, a reminder in `sleep`),
+  the span takes that state's kind.
+- **Colour = situation kind**, one palette for every system:
+
+  | Kind | Look |
+  |---|---|
+  | working | solid teal |
+  | waiting | hatched amber |
+  | exception | red |
+  | done | hatched grey |
+
+  Idle is drawn only in the single-actor timeline.
+- **Names** come from the most specific active state, made readable (`payment-failed` →
+  PAYMENT FAILED). For working and waiting, the board uses the leaf the latest transition entered.
+  It shortens a name to its last word, its first word, or `ABC…` to fit.
+
+### Marks
+
+- **Messages**:
+  - between two rows: a vertical arrow, with fan-outs bundled into one mark;
+  - to or from an external's slim row: two short stubs, not a line across every row. A behaviour
+    or a hover draws the full line;
+  - to something without a row: a stub on the actor's own row;
+  - chatter (a name with 20 or more messages, at least 12 % of all traffic, that almost never makes
+    its receiver change state, such as a log): faint ticks.
+- **Births and ends.** A green notch marks a birth. A cap marks an end: red for an exception or a
+  failed final state, grey for done, pink for an end with no final state.
+- **Mass death.** A full-height red bar tagged `✕ n` marks one. It is detected when 3 or more actors
+  end within a short window, they are at least half of those alive, and most of them did not reach
+  a final state.
+- **Rebirth.** A green bar tagged `↻ n` marks one: the same names (`identity` or label) spawning
+  again after the death.
+- **Axis breaks.** A zigzag across the lanes with `+4 min` on the axis marks a quiet gap of
+  20 s or more, or a gap that is 20 % of a short run.
+- **The axis** labels ticks as `350ms`, `12.5s` or `4m10`, at a step that adapts to the zoom.
+
+### Tracer conventions honoured
+
+- **Reborn actors**: new ids with `identity` + `incarnation`. Same kind and same `identity` with
+  lives that do not overlap → one row with a gap (`×N`); a rebirth counts the incarnation ≥ 2 spawns
+  of the dead identities.
+- **`end.reason`**: `done` = a grey bar; `cancelled` = an amber bar with a slash; `disposed` = a red
+  ✕ (in a swarm's foot: grey, amber, red ticks). When the trace has reasons, a mass death = 2 or more
+  `disposed` ends at one instant (otherwise the older heuristic: many unfinished ends at once).
+- **Timers**: a `timer` set by the actor itself is pending from the set until `due`, its `cancel`, or
+  the actor's end; an idle stretch under it is WAITING (hatched) and the span ends at the due time.
+- **Derived stories** (`derived: true`) are named after their first message and grouped like episodes.
+- **Single actor**: a main lane (the deepest state outside any parallel state) when parallel states
+  are not active ≥ 90 % of the life, plus one lane per region when they are active ≥ 25 %.
+- **Invoked children**: same-kind children that come and go share packed tracks; distinct long-lived
+  children each get their own `↳` sub-row (support-desk's 14 intakes, teams and monitors).
+- **Lane names**: shrink, then drop a parenthetical (sub-rows, externals), then wrap to two lines,
+  and only then cut. Sibling sub-rows share one type size.
+- **Ordering**: within a kind, rows form a chain from the busiest, each next to the one it talks to
+  most. Picking an episode inside a collapsed swarm opens it (and closes it again when unpicked).
+
+### Behaviours (the chips)
+
+- **With `trace.stories`**: as before, one chip per story, numbered steps, and the story's question
+  in the header. If the story ids are generic (`episode-3`), a chip is named after the story's first
+  message. With more than 7 stories, the chips group by that name (`UI SUBMIT ×5`).
+- **Without stories: episodes.** Each uncaused stimulus (a message or spawn with no `cause`/`via`)
+  plus its causal closure is one episode; the closure follows cause/via forward and skips chatter.
+  The spawns at boot become one START episode. If less than 20 % of messages and transitions have
+  links, the board splits the run into bursts of activity separated by quiet instead.
+  - Episodes are grouped by kind of stimulus: sender and event name, for example `JOB SUBMIT ×62`.
+  - Tapping a chip shows its next occurrence (`3/62`); a tap after the last one unpicks.
+  - More than 7 kinds: 6 chips per page, plus `▸ MORE`.
+  - With 7 or fewer episodes, there is one chip each.
+  - The band of brackets above the lanes shows each episode where it happened; tap a bracket for
+    exactly that episode.
+  - A picked episode draws its causal tree in the episode's colour. The header reads
+    `<stimulus> from <sender> · n steps`.
+
+### What-if reels
+
+The reels exist only when `trace.worlds` has entries. Without them the band is gone and the lanes
+take its room. With them, the reels behave as before: the fork is a dashed magenta line, the what-if
+take after it is magenta, the recorded run is ghost strips, and the end is marked.
+
+## Interface (unchanged from the contract, plus extras)
 
 ```js
-import { createBoard } from "./board/board.js";
-const board = createBoard({ sim, width: 1600, height: 900,
-  rows,        // optional: actor ids in the room's order (default ada, bo, host, terminal, python, llm)
-  baseUrl,     // optional: the data/ directory, for worlds/<id>.json (default: ../../data/ from board.js)
-  createSim,   // optional: core/sim.js's createSim, used to make a what-if's sim (else board imports ../core/sim.js)
-  now,         // optional: () => ms, the clock used to detect a double tap and idle time (pass the film clock when recording)
-});
+const board = createBoard({ sim, width, height,
+  rows,       // optional: actor ids in the room's order (orders actors within their group)
+  baseUrl,    // optional: where worlds/<id>.json live (default ../data/<trace.system>/ beside board/)
+  createSim,  // optional: core/sim.js's createSim, for what-if worlds
+  now });     // optional: () => ms, the clock for double taps (the film clock when recording)
 ```
 
-- `canvas`, `dirty`: the board sets `dirty = true` whenever it redraws. WORLD sets
-  `texture.needsUpdate` and then `board.dirty = false`. The board caches a static layer (lanes,
-  marks, selection) and redraws only the playhead, the lamps and the dimming on `update(t)`. If the
-  playhead has not moved by half a pixel, it draws nothing.
-- `update(t)`: the playhead, in virtual ms. When a what-if is picked, `t` is that take's time.
-  When the view is zoomed and the user has been idle for 2.5 s, the view follows the playhead.
-- `pointer(type, u, v, extra?)`: `u, v` in 0..1 board coordinates. `type` is one of:
-  - `'down'`, `'move'`, `'up'`, `'leave'`, as in the contract;
-  - **`'wheel'`** (an extra): `extra` is a `deltaY` number or `{dy, dx}`. `dy` zooms around `u` and
-    `dx` pans.
-- `on(event, fn)`: returns an unsubscribe function.
-- `highlight({actorId?, messageId?})`: the room's selection. A row lights up; a message shows its
-  cause chain and the view frames it. It emits nothing. `highlight({})` clears it.
-
-### Gestures
-
-| Gesture | Result |
-|---|---|
-| Tap a behaviour chip or bracket | Frames the behaviour. Emits `select` and `seek` to its start. Tap it again to unpick it. |
-| Tap a message mark | Shows its cause chain. Emits `select` and `seek` to the message. Tap it again to unpick it. |
-| Tap a span | Emits `seek` to the span's start and `select` for its actor. |
-| Tap a row's name | Lights the row. Emits `select` for that actor. |
-| Tap an empty lane, or the axis | Emits `seek`. |
-| Drag the playhead handle, or drag anywhere in the lanes | Scrubs: emits a `seek` on every move. |
-| Drag along the axis strip | Pans. |
-| Tap a reel | Emits `world` and overlays that take. Tap AS RECORDED to clear it. |
-| Wheel, or a pinch (call `zoom`) | Zooms around the pointer. |
-| Double tap in the lanes | Home: the full view, nothing picked. |
+- `canvas`, `dirty`, `update(t)`, `pointer(type, u, v, extra?)`, `on(event, fn)` and
+  `highlight({actorId?, messageId?})` work as in the contract.
+- `pointer('wheel', u, v, {dy, dx})`: `dy` zooms around the pointer and `dx` pans.
+- `highlight({actorId})` lights the actor's row. If the actor is a member of a collapsed swarm, it
+  lights the swarm lane; if the swarm is expanded, it outlines the member's track.
 
 ### Events
 
 | Event | Payload | When |
 |---|---|---|
-| `seek` | `{t}` (virtual ms) | A tap on a lane, the axis or a span; a scrub; picking a behaviour (its start) or a message (its time) |
-| `select` | `{actorIds, messageIds, storyId}` | Picking a behaviour: its actors, including externals such as `stage`, `llm` and `tools.*`, and its message ids |
-| | `{actorIds, messageIds, chainIds, storyId: null}` | Picking a message: the bundle's ids. `chainIds` (an extra) lists every event in the drawn chain |
-| | `{actorIds: [id], messageIds: [], storyId: null}` | Tapping a span or a row's name |
+| `seek` | `{t}` | A tap on a lane, the axis or a span; a scrub; picking a behaviour (its start), a message, or a time in a swarm |
+| `select` | `{actorIds, messageIds, storyId}` | Picking a story |
+| | `{actorIds, messageIds, storyId: null, episodeId}` | Picking a derived episode: every actor and message in its closure |
+| | `{actorIds, messageIds, chainIds, storyId: null}` | Picking a message |
+| | `{actorIds: [...alive], messageIds: [], storyId: null, laneId}` | **Touching a swarm lane's name**: expands or collapses it, and `actorIds` = the swarm's members alive at the playhead. **Touching inside a collapsed swarm** at time t: the members alive at t, and a `seek` to t |
+| | `{actorIds: [id], ...}` | Touching a span, a row's name, or a member's track in an expanded swarm |
 | | `{actorIds: [], messageIds: [], storyId: null}` | Unpicking, or a double tap home |
-| `world` | `{worldId \| null}` | Tapping a reel. It is emitted at the tap, before the file loads; the overlay appears when the file has loaded |
+| `world` | `{worldId \| null}` | Tapping a reel (only when worlds exist) |
 
 ### Extras
 
-- `zoom(factor, u)`, `pan(dxDesignPx)`, `resetView()`.
-- `selectStory(id|null)`, `selectWorld(id|null)` (returns a promise), `selectMessage(id)`. These
-  emit events, as taps do.
-- `loadWorld(id)`: a promise that preloads a world file. Use it for film mode, so that a pick takes
-  effect in the same frame.
-- `warp(t)` / `unwarp(s)` / `duration`: the board's current time axis. This is `sim.warp` for the
-  recorded run, and the what-if's own warp when one is picked. It continues linearly past a take's
-  end.
-- `locate({messageId | storyId | worldId | t[, actorId] | actorId})` returns `{u, v}`: where
-  something is drawn. Use it for scripted pointers.
-- `state`: `{t, storyId, worldId, messageId, view}`.
-- `rows`, `dispose()`.
+- `zoom`, `pan`, `resetView`, `selectStory(id)`, `selectWorld(id)`, `selectMessage(id)`,
+  `loadWorld(id)`, `warp`, `unwarp`, `duration`, `locate(...)`, `state`, `dispose`: as before.
+- New:
+  - `selectEpisode(i)`: the i-th behaviour, story or episode. `null` unpicks.
+  - `expand(laneKey, on)`.
+  - `lanes`: `[{key, type: actor|tracks|ext|region, label, actors, swarm, expanded}]`.
+  - `rows`: the lane keys.
+  - `behaviours`: `[{id, label, a0, a1, kind, story}]`.
+  - `massEvents`: `{deaths: [{at, n, ids}], births: [{at, n}]}`.
+  - `state.episodeId`, `state.expanded`.
+  - `locate({episode})` and `locate({laneId, t?})`.
 
 ## What WORLD must forward
 
-- Every frame: `board.update(t)`. Upload the texture when `board.dirty`, then set
-  `board.dirty = false`.
-- Raycast hits on the screen: `down`, `move`, `up` and `leave` as `(u, v)`, with `v` = 0 at the top.
-  Also forward the wheel over the screen as `pointer('wheel', u, v, {dy: e.deltaY, dx: e.deltaX})`.
-  For a pinch over the screen, call `board.zoom(distanceRatio, uMid)`.
-- On `seek`, jump the room to `t`. On `select`, light the actors and messages it names. On `world`,
-  play that take, then drive `update` with that take's `t`.
-- When the visitor picks a person or a capsule in the room, call `highlight({actorId, messageId})`.
+WORLD forwards the same things as before:
+- `update(t)` every frame. Upload the texture when `dirty`, then set `dirty = false`.
+- Raycast `down`, `move`, `up` and `leave` as `(u, v)`, with `v` = 0 at the top.
+- The wheel, as `pointer('wheel', ...)`.
+- A pinch, as `zoom(ratio, uMid)`.
+- When the room selects someone, `highlight(...)`.
+
+On a swarm `select`, WORLD gets the alive members. To show the swarm as a crowd, it can light all
+of them.
 
 ## Files
 
-- `board.js`: the board. Its only import is a dynamic `../core/sim.js`, used for what-ifs when
-  `createSim` is not passed.
-- `test.html`: the board shown flat at full size, and beside it the same board at one-third size on
-  a wall tilted with a CSS 3D transform. The trace plays in a loop, the emitted events are logged,
-  mouse, touch, pen, wheel and pinch all work, and Space pauses. `?film=1` is the scripted mode,
-  with `window.frame(i)`.
-- `shots.mjs`: `node board/shots.mjs` writes the stills in `out/`; `node board/shots.mjs --film`
-  writes `out/board.mp4`. Serve from `prototypes/viz3d/` (`shots.mjs` runs its own server).
+- `board.js`: the board.
+- `test.html?system=<name>`: reads `../data/<name>/trace.json`, or else `fixtures/<name>/trace.json`.
+  `&stories=0` removes stories and worlds. It shows the board flat and at one-third size on a
+  tilted wall, logs every event, and works with mouse, touch, wheel and pinch. `?film=1` is the
+  scripted mode (the scripted visit exists for llm-chat only).
+- `shots.mjs [system...]`: per-system stills in `out/<system>/`, from every system in `../data/`
+  and `fixtures/`, plus llm-chat without stories. The stills are `1-overview`, `2-behaviour`,
+  `3-swarm-expanded`, `4-mass-death` and `9-third-size-skewed`. `--film` writes the llm-chat clip.
+- `fixtures/make.mjs`: hand-made traces for shapes the examples lack:
+  - `checkout`: one actor with parallel regions, 2.4 s;
+  - `job-queue`: a dispatcher, 72 short-lived jobs (21 alive at once), a process kill and a
+    restart, 3.3 min;
+  - `orders`: invoked payment children, 10-minute waits with reminders, and no cause/via links,
+    so its episodes come from bursts.

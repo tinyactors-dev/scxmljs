@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Head gallery</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1b1d22; color: #e9e2cf; font: 12px ui-monospace, Menlo, monospace; overflow: hidden; }
+  canvas { display: block; position: fixed; inset: 0; }
+  .cap { position: fixed; padding: 3px 6px; color: #cfc8b4; background: #0007; border-radius: 3px; pointer-events: none; }
+  .cap a { pointer-events: auto; color: #ffd27a; }
+  #sys { position: fixed; right: 8px; top: 6px; }
+  #sys select { background: #2a2d35; color: #e9e2cf; border: 1px solid #444; font: inherit; }
+</style>
+</head>
+<body>
+<div id="sys"><select></select></div>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js" } }</script>
+<script type="module">
+// one head per distinct chart of a system, at detail 0.5 (?detail=), at a busy moment of its busiest actor
+import * as THREE from "three";
+import { createHead } from "./head.js";
+import { listSystems, loadSystem, lights, actorsByChart, busyTime } from "./bench.js";
+const q = new URLSearchParams(location.search);
+const SYSTEM = q.get("system") || "llm-chat"; const DETAIL = Number(q.get("detail") ?? 0.5); const PLAYING = q.has("play");
+const sel = document.querySelector("#sys select");
+for (const s of await listSystems()) { const o = document.createElement("option"); o.value = o.textContent = s; sel.append(o); }
+sel.value = SYSTEM; sel.onchange = () => { location.search = `?system=${encodeURIComponent(sel.value)}`; };
+const sim = await loadSystem(SYSTEM);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setScissorTest(true);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; document.body.prepend(renderer.domElement);
+const cells = [];
+for (const a of actorsByChart(sim)) {
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b1d22); lights(THREE, scene);
+  let head, err = null;
+  try { head = createHead({ THREE, sim, actorId: a.id }); scene.add(head.group); head.setDetail(DETAIL); } catch (e) { err = e; console.error(a.id, e); }
+  const camera = new THREE.PerspectiveCamera(36, 1, 0.05, 100);
+  const cap = document.createElement("div"); cap.className = "cap";
+  cap.innerHTML = `<a href="test.html?system=${encodeURIComponent(SYSTEM)}&actor=${encodeURIComponent(a.id)}&detail=${DETAIL}">${a.chart}</a> · ${a.id}${err ? " · ERROR " + err.message : head ? ` · L${head.levels}` : ""}`;
+  document.body.append(cap);
+  cells.push({ a, scene, head, camera, cap, t: Number(q.get("t") ?? busyTime(sim, a.id)) });
+}
+function layout() {
+  const n = Math.max(1, cells.length); const cols = Math.ceil(Math.sqrt(n * innerWidth / innerHeight * 0.75)); const rows = Math.ceil(n / cols);
+  const w = innerWidth / cols, h = innerHeight / rows;
+  cells.forEach((c, i) => { c.rect = { x: (i % cols) * w, y: Math.floor(i / cols) * h, w, h }; c.camera.aspect = w / h; c.camera.updateProjectionMatrix(); c.cap.style.left = `${c.rect.x + 6}px`; c.cap.style.top = `${c.rect.y + 6}px`;
+    const el = 0.6, az = 0.3, d = 17.5 * Math.max(1, 1.25 / (w / h)); c.camera.position.set(Math.sin(az) * Math.cos(el) * d, Math.sin(el) * d - 0.4, Math.cos(az) * Math.cos(el) * d); c.camera.lookAt(0, -0.4, 0); });
+}
+layout(); addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); layout(); });
+let s0 = performance.now();
+function draw(now) {
+  for (const c of cells) {
+    if (c.head) c.head.update(PLAYING ? sim.unwarp((sim.warp(c.t) + (now - s0) / 1000) % sim.playDuration) : c.t, 0);
+    const r = c.rect; const y = innerHeight - r.y - r.h;
+    renderer.setViewport(r.x, y, r.w, r.h); renderer.setScissor(r.x + 1, y + 1, r.w - 2, r.h - 2); renderer.render(c.scene, c.camera);
+  }
+  if (PLAYING) requestAnimationFrame(draw);
+}
+draw(performance.now());
+window.ready = true;
+</script>
+</body>
+</html>

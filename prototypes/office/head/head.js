@@ -20,15 +20,18 @@
 //   variable        -> a gauge on the back rail of the machine that reads it (tube of balls, dial, lever, lamp)
 // `room` is an optional room (an attic under the skull's dome) for WORLD to mount; `affordances()` lists the
 // events that would move the actor now (for click-driven use); `{interactive: true}` adds push-buttons for them.
+// `{desk: true}` builds the same machines as a tabletop model (README "The desk model"): no room, inlet, capsules,
+// gauges or buttons, not fitted to the entry camera (one machine unit = one group unit, standing on y = 0, centred),
+// every level open up to `levels` (setLevels), and plates as large as their place allows.
 // Everything is a pure function of (t, detail, focus): with t fixed, update() changes nothing (the stage
 // re-normalisation eases with dt towards a fixed target and then stays). This file imports nothing.
 
 const K0 = 0.5;           // scale of a closed machine inside a machine
-const K1 = 0.86;          // ... of an open one (it grows as it opens; the parent makes room)
+const K1_HEAD = 0.86;     // ... of an open one (it grows as it opens; the parent makes room); a desk model's: 1
 const GROW_PARTS = 16;    // a parent with more parts than this keeps its machines at K0 (big charts use the stage)
 const PAD_W = 1.3;        // slot width of a station
 const PAD_ZONE = 1.1;     // depth taken by a pad and its plate
-const MARGIN = 0.42;
+const MARGIN_HEAD = 0.42; // a machine's wall to its parts; a desk model's is narrower
 const ROW_GAP = 0.45;
 const SHELF = 0.32;       // exceptional rows stand on a shelf
 const PLINTH = 0.3;
@@ -37,7 +40,7 @@ const CAP_FLY = 0.55;     // playback s a capsule flies from the inlet
 const TRAVEL = 0.38;      // playback s a marble spends on a track
 const GLOW = 1.8;         // playback s a taken track keeps glowing
 const LAG_SOFT = 0.35, LAG_HARD = 1.6;
-const MARBLE_R = 0.14;
+const MARBLE_R_HEAD = 0.14; // a desk model's marbles are bigger (seen from across the desk)
 const PAD_TOP = 0.12;
 const OPEN_LEVELS = 3;
 const FAN = 10;           // a part with more tracks than this becomes a hub with a bus
@@ -58,7 +61,12 @@ const ERR_COND = /\berror\b|\bfail|\bok\s*===?\s*false|!\s*[\w.]*\bok\b/i;
 
 export function createHead({ THREE, sim, actorId, options = {} }) {
   const V3 = THREE.Vector3;
-  const INTERACTIVE = !!options.interactive;
+  const DESK = !!options.desk; // a tabletop model at the person's desk (README "The desk model")
+  const INTERACTIVE = !!options.interactive && !DESK;
+  let deskLevels = DESK ? (options.levels ?? 99) : 99; // desk: machines deeper than this stay closed (their window says what runs)
+  const PLATE_MIN = DESK ? (options.plateMin ?? 0.6) : MIN_PLATE, PLATE_CAP = DESK ? 4 : 1.9;
+  // a desk model spends its width on the parts: narrow walls and gaps, nested machines as large as their parents' parts
+  const MARGIN = DESK ? 0.18 : MARGIN_HEAD, K1 = DESK ? 1 : K1_HEAD, SUB_PAD = DESK ? 0.2 : 0.5, BENCH_GAP = DESK ? 0.3 : 0.6, MARBLE_R = DESK ? 0.25 : MARBLE_R_HEAD, PLATE_LIFT = DESK ? 0.3 : 0.37;
   const warp = typeof sim.warp === "function" ? (t) => sim.warp(t) : (t) => t / 1000;
   const group = new THREE.Group(); group.name = `head:${actorId}`;
   const root = new THREE.Group(); group.add(root);
@@ -132,7 +140,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
 
   // ---------- engraved plates (text only on things) ----------
   const plateCache = new Map(); const plateMeshes = new Set();
-  const STYLES = { plate: ["#262a31", "#b89443", "#f4e7c4"], window: ["#14161a", "#5a5f68", "#ffcf6a"], button: ["#c9a44c", "#7a5a1a", "#1d1a14"], event: ["#2d2a24", "#8c7440", "#efe0b8"] };
+  const STYLES = { plate: ["#262a31", "#b89443", "#f4e7c4"], window: ["#14161a", "#5a5f68", "#ffcf6a"], button: ["#c9a44c", "#7a5a1a", "#1d1a14"], event: ["#2d2a24", "#8c7440", "#efe0b8"], why: ["#5a2018", "#b3261e", "#fff4e6"] };
   function plateTexture(text, style = "plate") {
     const key = style + "|" + text;
     if (plateCache.has(key)) return plateCache.get(key);
@@ -161,7 +169,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
   function plate(text, h, maxW = Infinity, info = {}) {
     const { aspect, mat: pm, lines } = plateTexture(text, info.style);
     const mesh = new THREE.Mesh(geo.plane, pm);
-    mesh.userData.plate = { text, h: h * (1 + 0.78 * (lines - 1)), maxW, aspect, kind: info.kind || "state", m: info.m || null, comp: info.comp !== false };
+    mesh.userData.plate = { text, h: h * (1 + 0.78 * (lines - 1)), maxW, aspect, kind: info.kind || "state", m: info.m || null, comp: info.comp !== false, glyph: 56 / (84 + 66 * (lines - 1)) }; // glyph: the font's share of the plate's height
     sizePlate(mesh, 1); plateMeshes.add(mesh); return mesh;
   }
   function sizePlate(mesh, comp) {
@@ -252,7 +260,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
 
   function newRecord(kind, node, level, hue, parent) {
     const m = { kind, node, id: node.id, level, hue, parent, children: [], pads: new Map(), padList: [], trackByKey: new Map(), tracks: [], arcs: new Map(), moves: [], moveStarts: [], hopperKicks: [], open: 1, k: 1, plates: [] };
-    m.group = new THREE.Group(); m.chrome = new THREE.Group(); m.interior = new THREE.Group(); m.own = new THREE.Group();
+    m.group = new THREE.Group(); m.group.name = `${kind}:${node.id}`; m.chrome = new THREE.Group(); m.interior = new THREE.Group(); m.own = new THREE.Group();
     m.group.add(m.chrome); m.group.add(m.interior); m.interior.add(m.own);
     maxLevel = Math.max(maxLevel, level); recs.push(m);
     return m;
@@ -265,7 +273,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
   }
 
   // ---------- layout (re-run whenever a machine inside another grows) ----------
-  const slotW = (s) => (s.sub ? s.sub.size.w * s.sub.k + 0.5 : PAD_W);
+  const slotW = (s) => (s.sub ? s.sub.size.w * s.sub.k + SUB_PAD : PAD_W);
   const slotD = (s) => (s.sub ? s.sub.size.d * s.sub.k + 0.3 : PAD_ZONE);
   const slotH = (s) => (s.sub ? s.sub.size.h * s.sub.k : 0);
   const rowW = (r) => r.reduce((a, s) => a + slotW(s), 0);
@@ -303,7 +311,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     m.doorX = ini ? Math.max(-w / 2 + MARGIN, ini.pos.x - (ini.door ? 0 : 0.66)) : 0;
   }
   function layoutBench(b) {
-    const GAP = 0.6, subs = b.children;
+    const GAP = BENCH_GAP, subs = b.children;
     const rw = (r) => r.reduce((s, x) => s + x.size.w * x.k, 0) + GAP * Math.max(0, r.length - 1);
     let z = 0, y = 0, W = 0; const steps = [];
     b.rowsSpec.forEach((row, ri) => {
@@ -367,7 +375,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
       s.k = 1; b.interior.add(s.group); return s;
     });
     b.children = subs;
-    const GAP = 0.6;
+    const GAP = BENCH_GAP;
     const rw = (r) => r.reduce((s, x) => s + x.size.w, 0) + GAP * Math.max(0, r.length - 1);
     const area = subs.reduce((s, x) => s + x.size.w * x.size.d, 0);
     let rows;
@@ -439,15 +447,16 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
   }
   function fitChrome(m) { // everything of the housing from its current size
     const { w, d } = m.size, H = m.H;
-    const BEAM = Math.min(0.5, 0.22 + 0.03 * w); m.BEAM = BEAM;
+    // a desk model's machine kept closed says its name and what runs in it on a beam as tall as its front allows
+    const BEAM = DESK ? (m.level > deskLevels ? Math.min(1.3, Math.max(0.5, 0.13 * w, 0.4 * H)) : 0.5) : Math.min(0.5, 0.22 + 0.03 * w); m.BEAM = BEAM; const NP = DESK ? 0.84 : 0.66; // a desk model's names are read from across the desk
     m.plinth.scale.set(w, PLINTH, d); m.plinth.position.y = -PLINTH / 2;
     m.walls.scale.set(w, H, d); m.walls.position.y = H / 2;
     m.beamY = [H - BEAM / 2 + 0.045, m.level === 1 ? -BEAM / 2 - 0.02 : H - BEAM / 2 + 0.045]; // open: a region's beam hangs on its plinth's face; a nested machine's stays up, over its parent's floor
     m.beamG.position.set(0, m.beamG.position.y || m.beamY[0], d / 2 - 0.02);
     m.beam.scale.set(w, BEAM, 0.12);
-    const pw = sizePlateH(m.namePlate, BEAM * 0.66, w * 0.5); m.namePlate.position.set(-w / 2 + 0.12 + pw / 2, 0, 0.065);
-    if (m.incPlate) { const tw = sizePlateH(m.incPlate, BEAM * 0.66, w * 0.2); m.incPlate.position.set(-w / 2 + 0.22 + pw + tw / 2, 0, 0.065); }
-    if (m.window && m.window.userData.plate) { const ww = sizePlateH(m.window, BEAM * 0.66, w * 0.42); m.window.position.set(w / 2 - 0.12 - ww / 2, 0, 0.065); }
+    const pw = sizePlateH(m.namePlate, BEAM * NP, w * 0.5); m.namePlate.position.set(-w / 2 + 0.12 + pw / 2, 0, 0.065);
+    if (m.incPlate) { const tw = sizePlateH(m.incPlate, BEAM * NP, w * 0.2); m.incPlate.position.set(-w / 2 + 0.22 + pw + tw / 2, 0, 0.065); }
+    if (m.window && m.window.userData.plate) { const ww = sizePlateH(m.window, BEAM * NP, w * 0.46); m.window.position.set(w / 2 - 0.12 - ww / 2, 0, 0.065); }
     const hx = -w / 2 + 0.38, hz = -d / 2 + 0.38;
     if (m.funnel) { m.chute.position.set(hx, H + 0.2, hz); m.funnel.position.set(hx, H + 0.52, hz); }
     m.hopper.position.set(hx, H + 0.6, hz);
@@ -495,7 +504,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
       st.outlet = new THREE.Object3D(); st.outlet.position.copy(curve.getPoint(1)).add(new V3(0.15, 0.08, -0.05)); g.add(st.outlet);
     }
     if (!st.door) { // the name, on the floor in front of the pad, tilted up to the viewer
-      const p = plate(node.id, PLATE_H, st.initial ? 0.98 : 1.16, { m }); p.position.set(st.initial ? 0.07 : 0, 0.03 + 0.37 * p.userData.plate.hh, 0.47); p.rotation.x = -0.75; g.add(p); st.plate = p;
+      const p = plate(node.id, PLATE_H, st.initial ? 0.98 : 1.16, { m }); p.position.set(st.initial ? 0.07 : 0, 0.03 + PLATE_LIFT * p.userData.plate.hh, DESK ? 0.52 : 0.47); p.rotation.x = DESK ? -0.95 : -0.75; g.add(p); st.plate = p; // a desk model's lie flatter and lower: the marble behind shows over them
     }
     if (st.timers) addClock(st, g);
   }
@@ -573,7 +582,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     const mesh = new THREE.Mesh(geo.plane, tm); m.own.add(mesh);
     const tr = { m, key: edge.key, edge, kind, lane, mesh, mat: tm, baseCol, exc, chute: kind === "door", firstTaken: Infinity, buttons: [] };
     mesh.userData.pick = { kind: "transition", id: `${m.id}:${edge.a}->${edge.b}` }; pickables.push(mesh);
-    tr.plate = plate(edgeLabel(edge), EVENT_H, 1.4, { m, kind: "event", style: "event" }); m.own.add(tr.plate);
+    tr.plate = plate(edgeLabel(edge), EVENT_H, 1.4, { m, kind: "event", style: "event" }); m.own.add(tr.plate); if (DESK) tr.plate.visible = false; // a desk model's tracks carry no event plates: unreadable across a desk (the head has them)
     if (INTERACTIVE) addButtons(tr);
     m.trackByKey.set(edge.key, tr); m.tracks.push(tr);
     placeTrack(tr); return tr;
@@ -709,11 +718,19 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
   function addButtons(tr) {
     const evs = [...new Set(tr.edge.events.flatMap((x) => x.split(/\s+/)).filter((x) => x && !x.includes("*") && !/^done\.|^error\./.test(x)))];
     evs.slice(0, 3).forEach((ev, i) => {
-      const b = new THREE.Group(); const body = new THREE.Mesh(geo.box, mat.button); b.add(body);
-      const pl = plate(ev, 0.12, 1.0, { m: tr.m, kind: "button", style: "button" }); pl.position.z = 0.032; b.add(pl);
+      // its own materials: lit (bright brass, glowing) when its event would be taken now, else dim (dark, its label too)
+      const b = new THREE.Group(); const bm = M(mat.button.clone()); const body = new THREE.Mesh(geo.box, bm); b.add(body);
+      const pl = plate(ev, 0.12, 1.0, { m: tr.m, kind: "button", style: "button" }); pl.material = M(pl.material.clone()); pl.position.z = 0.032; b.add(pl);
       body.userData.pick = pl.userData.pick = { kind: "event", event: ev, track: tr }; pickables.push(body, pl);
-      b.visible = false; tr.m.own.add(b); tr.buttons.push({ g: b, body, pl, ev, i });
+      b.visible = false; tr.m.own.add(b); tr.buttons.push({ g: b, body, pl, ev, i, bm, base: pl.material.map, baseAspect: pl.userData.plate.aspect });
     });
+  }
+  let hoverB = null;
+  function setButtonText(b, why) { // the button's plate: its event, or why it would do nothing
+    if ((b.why || null) === why) return; b.why = why;
+    if (why) { const t2 = plateTexture(why.toUpperCase(), "why"); b.pl.material.map = t2.tex; b.pl.material.emissiveMap = t2.tex; b.pl.userData.plate.aspect = t2.aspect; }
+    else { b.pl.material.map = b.base; b.pl.material.emissiveMap = b.base; b.pl.userData.plate.aspect = b.baseAspect; }
+    b.pl.material.needsUpdate = true; b.pl.userData.plate.maxW = why ? 2.4 : 1.0; placeButton(b.track || b.pl.userData.pick.track, b);
   }
   function placeButton(tr, b) {
     sizePlate(b.pl, plateComp(tr.m)); const p = b.pl.userData.plate; b.body.scale.set(p.w + 0.06, p.hh + 0.06, 0.05);
@@ -899,7 +916,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     if (m.kind === "solo") { for (const e of m.edges) addTrack(m, e, "loop"); }
     else { buildTracks(m); declutter(m); entryRamp(m); }
     for (const mv of m.moves) { mv.track = trackFor(m, mv.from, mv.to, mv.ev); const t = mv.track && mv.track.viaBus ? mv.track.bus : mv.track; if (t) t.firstTaken = Math.min(t.firstTaken, mv.start); }
-    m.marble = new THREE.Mesh(geo.marble, M(new THREE.MeshStandardMaterial({ color: 0xeef8ff, emissive: 0x8fd4ff, emissiveIntensity: 0.75, roughness: 0.15, metalness: 0.3 })));
+    m.marble = new THREE.Mesh(geo.marble, M(new THREE.MeshStandardMaterial({ color: 0xeef8ff, emissive: 0x8fd4ff, emissiveIntensity: DESK ? 1.4 : 0.75, roughness: 0.15, metalness: 0.3 })));
     m.marble.visible = false; m.own.add(m.marble);
     if (m.remembers) { m.ghost = new THREE.Mesh(geo.marble, mat.ghost); m.ghost.visible = false; m.own.add(m.ghost); }
     for (const c of m.children) ensureChrome(c);
@@ -918,10 +935,10 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     declutter(r); entryRamp(r); r.arcs.clear();
   }
   // plates never fall below MIN_PLATE head units while their machine is small (as wide as their place allows)
-  function plateComp(m) { if (!m) return 1; const s = scaleOf(m) * PLATE_H; return Math.min(1.9, Math.max(1, MIN_PLATE / s)); }
+  function plateComp(m) { if (!m) return 1; const s = scaleOf(m) * PLATE_H; return Math.min(PLATE_CAP, Math.max(1, PLATE_MIN / s)); }
   function resizePlates(m) {
     if (!m.interiorBuilt) return; const c = plateComp(m); if (Math.abs((m.plateC || 0) - c) < 0.01) return; m.plateC = c;
-    for (const st of m.padList) if (st.plate) { sizePlate(st.plate, c); st.plate.position.y = 0.03 + 0.37 * st.plate.userData.plate.hh; }
+    for (const st of m.padList) if (st.plate) { sizePlate(st.plate, c); st.plate.position.y = 0.03 + PLATE_LIFT * st.plate.userData.plate.hh; }
     for (const tr of m.tracks) placeTrackPlate(tr);
     if (m.kind === "machine") declutter(m);
   }
@@ -943,7 +960,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
       cands.push({ dv, changes, score: changes.length + 1.5 * ((dv.readBy || []).length) });
     }
     cands.sort((a, b) => b.score - a.score);
-    const chosen = cands.slice(0, options.maxGauges ?? 4);
+    const chosen = cands.slice(0, DESK ? 0 : options.maxGauges ?? 4);
     const regOf = (sid) => regions.find((r) => { let ok = false; walk(r.node, (x2) => { if (x2.id === sid) ok = true; }); return ok; });
     const roofOf = (r) => { let x = r; while (x && x.kind === "bench") x = x.children[0]; return x; };
     for (const c of chosen) {
@@ -1044,6 +1061,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     return { x0, x1, y0: ya, y1: yb };
   }
   function fitBox(b) {
+    if (DESK) return { s: 1, p: new V3(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2) }; // the world sizes a desk model
     const sz = b.getSize(new V3());
     const place = (s) => { let lo = ROOM_FLOOR + 0.6, hi = 3; for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2; const e = projExtent(b, s, mid); if ((e.y0 + e.y1) / 2 < -0.06) lo = mid; else hi = mid; } return (lo + hi) / 2; };
     const ok = (s) => { if (sz.x * s > 15 || sz.z * s > 12.5) return false; const y0 = place(s); const e = projExtent(b, s, y0); return e.x1 - e.x0 <= 2 * ENTRY.fillW && e.y1 - e.y0 <= 2 * ENTRY.fillH; };
@@ -1070,7 +1088,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
   const tableTop = new THREE.Mesh(geo.box, mat.wood); table.add(tableTop);
   const tableLegs = [0, 1, 2, 3].map(() => { const l = new THREE.Mesh(geo.box, mat.woodDark); table.add(l); return l; });
   function placeTable() {
-    if (!top) { table.visible = false; return; }
+    if (!top || DESK) { table.visible = false; return; } // a desk model stands on the desk
     root.updateMatrixWorld(true); group.updateMatrixWorld(true);
     const b = recBox(stage || top).applyMatrix4(root.matrix);
     const w = b.max.x - b.min.x + 0.7, d = b.max.z - b.min.z + 0.7, y = b.min.y - 0.02, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
@@ -1078,13 +1096,13 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     const lh = Math.max(0.05, y - th - ROOM_FLOOR);
     tableLegs.forEach((l, i) => { l.scale.set(0.3, lh, 0.3); l.position.set(cx + (i & 1 ? 1 : -1) * (w / 2 - 0.3), ROOM_FLOOR + lh / 2, cz + (i & 2 ? 1 : -1) * (d / 2 - 0.3)); });
   }
-  const inlet = new THREE.Group(); inlet.position.set(...INLET); group.add(inlet);
+  const inlet = new THREE.Group(); inlet.position.set(...INLET); if (!DESK) group.add(inlet); // a desk model's mail lands in the desk's basket
   { const pipe = new THREE.Mesh(geo.rod, mat.brass); pipe.scale.set(4.5, 2.4, 4.5); pipe.position.y = 1.2; inlet.add(pipe);
     const mouth = new THREE.Mesh(geo.funnel, mat.funnel); mouth.rotation.x = Math.PI; mouth.scale.setScalar(1.1); mouth.position.y = -0.1; inlet.add(mouth);
     const ring = new THREE.Mesh(geo.ring, mat.brass); ring.rotation.x = Math.PI / 2; ring.scale.setScalar(0.6); ring.position.y = 0.4; inlet.add(ring); }
 
   // ---------- the room (optional; WORLD mounts it: README "The room") ----------
-  const room = options.room === false ? null : buildRoom();
+  const room = options.room === false || DESK ? null : buildRoom();
   function buildRoom() {
     const R = new THREE.Group(); R.name = `head-room:${actorId}`;
     // a skull-shaped attic: a lathe, drawn from inside only (BackSide), so a camera outside sees in through the near side
@@ -1138,15 +1156,16 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
 
   // capsule pool
   const capPool = [];
-  for (let i = 0; i < 8; i++) { const c = new THREE.Mesh(geo.capsule, mat.capsule); c.visible = false; group.add(c); capPool.push(c); }
+  for (let i = 0; i < (DESK ? 0 : 8); i++) { const c = new THREE.Mesh(geo.capsule, mat.capsule); c.visible = false; group.add(c); capPool.push(c); }
 
   // ---------- detail / focus ----------
-  let detail = options.detail ?? 0, focusId = null, focusPath = null, focusLevel = maxLevel;
+  let detail = options.detail ?? (DESK ? 1 : 0), focusId = null, focusPath = null, focusLevel = maxLevel;
   const ss = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
   const openLevels = Math.min(maxLevel, OPEN_LEVELS);
   // a small chart is all open by the time the WORLD's entry camera arrives (detail 0.57); a big one opens later
   const PACE = stations.size <= 12 ? 1.8 : stations.size <= 40 ? 0.9 : 1;
   function openOf(m, active) {
+    if (m.level > deskLevels) return 0;
     if (big && !active && m.level > 1 && !(focusPath && focusPath.has(m))) return 0;
     if (!focusPath) return ss(Math.min(1, detail * PACE) * openLevels - (m.level - 1));
     const base = stage ? stage.level - 1 : 0;
@@ -1211,8 +1230,10 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     return { alive: false, fade: lastEnd > -Infinity ? Math.max(0, 1 - (s - lastEnd) / 1.2) : 0 };
   }
   let lastAct = new Set(), lastT = 0, fitDirty = true;
-  function update(t, dt) {
-    const s = warp(t); lastT = t;
+  // s: the playback second, when the caller has one (a live run's playhead goes past its last instant while the
+  // room settles, where warp(t) stops: the marbles would stop mid-move)
+  function update(t, dt, sAt) {
+    const s = sAt ?? warp(t); lastT = t;
     const life = lifeState(s);
     const act = life.alive && sim.activeAt ? new Set(sim.activeAt(actorId, t)) : new Set(); lastAct = act;
     const lifeDim = life.alive ? 1 : 0.35 + 0.4 * life.fade;
@@ -1301,7 +1322,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
         const want = m.open < 0.5 && lit ? lit : null;
         if (want !== m.windowText) {
           m.windowText = want;
-          if (want) { const t2 = plateTexture(want, "window"); m.window.material = t2.mat; m.window.userData.plate = { text: want, h: 1, maxW: 1, aspect: t2.aspect, kind: "window", m, comp: false }; plateMeshes.add(m.window); m.window.visible = true; fitChrome(m); }
+          if (want) { const t2 = plateTexture(want, "window"); m.window.material = t2.mat; m.window.userData.plate = { text: want, h: 1, maxW: 1, aspect: t2.aspect, kind: "window", m, comp: false, glyph: 56 / 84 }; plateMeshes.add(m.window); m.window.visible = true; fitChrome(m); }
           else m.window.visible = false;
         }
       }
@@ -1315,14 +1336,23 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
         st.hand.visible = st.clockWedge.visible = !!run; st.clockFace.emissiveIntensity = run ? 0.45 : 0.08;
         if (run) { const u = Math.min(1, (t - run.t0) / run.delay); st.hand.rotation.z = -u * Math.PI * 2; const q = Math.round(u * 48); if (st.wedgeQ !== q) { st.wedgeQ = q; st.clockWedge.geometry.dispose(); owned.geos.delete(st.clockWedge.geometry); st.clockWedge.geometry = G(new THREE.CircleGeometry(0.16, 24, Math.PI / 2 - (q / 48) * Math.PI * 2, Math.max(0.001, (q / 48) * Math.PI * 2))); } }
       }
-      if (m.marble) { const mm = m.marble.material; if (life.alive) { mm.emissiveIntensity = 0.75; mm.color.setHex(0xeef8ff); } else { mm.emissiveIntensity = 0; mm.color.setHex(0x6a7080); } }
+      if (m.marble) { const mm = m.marble.material; if (life.alive) { mm.emissiveIntensity = DESK ? 1.4 : 0.75; mm.color.setHex(0xeef8ff); } else { mm.emissiveIntensity = 0; mm.color.setHex(0x6a7080); } }
       if (m.interiorBuilt) for (const st of m.padList) if (st.tubeMat) {
         const on = act.has(st.node.id) && (!st.childIds.length || st.childIds.some((c) => (sim.alive ? sim.alive(c, t) : true)));
         st.tubeMat.emissiveIntensity = on ? 0.9 + 0.4 * Math.sin(s * 6) : 0; st.tubeOn = on;
       }
     }
     // push-buttons: only for the events that would move the actor now
-    if (INTERACTIVE) { const live = new Set(affordanceList().map((a) => a.button).filter(Boolean)); for (const m of machines) for (const tr of m.tracks) for (const b of tr.buttons) { b.g.visible = live.has(b); mat.button.emissiveIntensity = 0.25; } }
+    // lit: an affordance of the configuration (not pre-empted) that the caller's judge (options.judge: its guards) accepts; dim: the rest
+    if (INTERACTIVE) {
+      const live = new Set(affordanceList().filter((a) => !a.preempted).map((a) => a.button).filter(Boolean)); const judged = new Map();
+      const ok = (ev) => { if (!options.judge) return true; if (!judged.has(ev)) judged.set(ev, !!options.judge(ev)); return judged.get(ev); };
+      for (const m of machines) for (const tr of m.tracks) for (const b of tr.buttons) {
+        b.g.visible = true; const lit = live.has(b) && ok(b.ev); b.lit = lit;
+        b.bm.color.setHex(lit ? 0xd8b050 : 0x4a4236); b.bm.emissiveIntensity = lit ? 0.55 : 0; b.pl.material.color.setScalar(lit ? 1 : 0.45); b.pl.material.emissiveIntensity = lit ? 0.35 : 0.05;
+        const why = b === hoverB && !lit ? (options.whyNot ? options.whyNot(b.ev) : "not now") : null; setButtonText(b, why);
+      }
+    }
     // capsules: in at the inlet, a flight to the funnel of the machine that takes them, a drop, gone
     root.updateMatrixWorld(true);
     let n = 0;
@@ -1423,7 +1453,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     for (const h of hits) {
       if (!effectiveVisible(h.object)) continue;
       const pk = h.object.userData.pick;
-      if (pk.kind === "event") { const a = affordanceList().find((x) => x.event === pk.event && x.track === pk.track && !x.preempted) || affordanceList().find((x) => x.event === pk.event && x.track === pk.track); if (!a) continue; return { kind: "event", id: `${a.from}:${a.event}`, event: a.event, from: a.from, to: a.to, targets: a.targets, object: h.object, point: h.point }; }
+      if (pk.kind === "event") { const a = affordanceList().find((x) => x.event === pk.event && x.track === pk.track && !x.preempted) || affordanceList().find((x) => x.event === pk.event && x.track === pk.track); const btn = pk.track.buttons.find((x) => x.ev === pk.event); if (!a) return { kind: "event", id: `:${pk.event}`, event: pk.event, from: null, to: null, targets: [], object: h.object, point: h.point, dim: true, button: btn }; return { kind: "event", id: `${a.from}:${a.event}`, event: a.event, from: a.from, to: a.to, targets: a.targets, object: h.object, point: h.point, dim: btn ? !btn.lit : false, button: btn }; }
       let id = pk.id;
       if (h.object.userData.pickIds) id = h.object.userData.pickIds[h.instanceId];
       if (pk.kind === "state" && machById.has(id)) { const m = machById.get(id); if (m.open > 0.5 && (h.object === m.walls || h.object === m.lid)) continue; }
@@ -1465,7 +1495,16 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
   }
 
   const api = {
-    group, update, setDetail, pick, focus, dispose, room, refresh,
+    group, update, setDetail, pick, focus, dispose, room, refresh, desk: DESK,
+    /** the pointer is over this event button (a pick result) or none: a dim one shows why it would do nothing (options.whyNot) */
+    hoverButton(hit) { hoverB = hit && hit.button ? hit.button : null; },
+    /** a press of a dim button: it shows why (as on hover) until the pointer moves on */
+    showWhy(ev) { for (const m of machines) for (const tr of m.tracks) for (const b of tr.buttons) if (b.ev === ev && !b.lit) { hoverB = b; return; } },
+    /** desk: how many levels of machines open (the rest stay closed, their window saying what runs); the next update re-lays out */
+    setLevels(n) { if (n !== deskLevels) { deskLevels = n; fitDirty = true; for (const m of machines) if (m.chromeBuilt && m.plinth) fitChrome(m); } },
+    get openLevels() { return Math.min(deskLevels, maxLevel); },
+    /** the top record: 'bench' (a parallel chart: its regions side by side), 'machine' or 'solo' */
+    get topKind() { return top ? top.kind : null; },
     get focusBounds() { return targetBounds(focusId); },
     get detail() { return detail; },
     get focusId() { return focusId; },

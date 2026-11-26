@@ -34,7 +34,8 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshLamb
 const seat = { x: 0, z: 0, facing: 0 };
 const furn = new THREE.Group(); scene.add(furn); const grp = new THREE.Group(); furn.add(grp);
 const batch = new BoxBatch(); const desk = deskFurniture(batch, grp, seat, { machine: false }); furn.add(batch.mesh());
-desk.screen("cooking", true);
+// the tabletop model's envelope (world/models.js stands the person's machines in it): a glass box here
+{ const [mb] = deskBoxes().filter((b) => b.name === "model"); const g = new THREE.Mesh(new THREE.BoxGeometry(...mb.s), new THREE.MeshLambertMaterial({ color: "#9fd0ff", transparent: true, opacity: 0.3, depthWrite: false })); g.position.set(...mb.c); furn.add(g); }
 const av = makeAvatar({ shirt: "#5fbf8f", pants: "#3a3f55", skin: "#e2ae86", hair: "#3b2a20", hairStyle: "short" });
 scene.add(av.root);
 const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 0.07), new THREE.MeshLambertMaterial({ color: "#1d1d1d" })); receiver.position.set(0, 0.01, 0.1); av.prop.add(receiver);
@@ -84,7 +85,7 @@ function overlap(A, B) {
   return minPen;
 }
 // which pairs are tested, and how much contact is allowed (metres): a hand rests on a keyboard, a
-// thigh sits on the seat; nothing passes through a head, a body, a monitor or another arm
+// thigh sits on the seat; nothing passes through a head, a body, the model or another arm
 const SOFT = { keyboard: 0.03, basket: 0.04, "chair seat": 0.05, "chair back": 0.03, thigh: 0.03 };
 function check() {
   if (!current || !current.P) return { violations: [], short: [] };

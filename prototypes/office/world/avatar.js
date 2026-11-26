@@ -14,7 +14,7 @@
 // so transitions are eased by the caller. tools/inspect.html checks every pose for intersections.
 import * as THREE from "three";
 import { box, mat, faceTex, lerp, clamp01 } from "./kit.js";
-import { SPOT, CHAIR } from "./layout.js";
+import { SPOT, CHAIR, MODEL, DESK } from "./layout.js";
 
 export const RIG = {
   HS: 0.46, hipStand: 0.88, hipSit: 0.545, thigh: 0.38, shin: 0.46,
@@ -24,8 +24,8 @@ export const RIG = {
   yaw: 1.05, pitchUp: 0.45, pitchDown: 0.5, // neck limits
   leanMax: 0.42, twistMax: 0.6,
 };
-const K = SPOT.keyboard, BK = SPOT.basket, HT = SPOT.hatch, PH = SPOT.phone, MON = SPOT.monitor;
-const screen = [MON[0] + 0.02, MON[1] + 0.46, MON[2]];
+const K = SPOT.keyboard, BK = SPOT.basket, HT = SPOT.hatch, PH = SPOT.phone;
+const screen = [MODEL.x - 0.34, DESK.topY + 0.3, MODEL.z - 0.06]; // eyes on their machines (the tabletop model, world/models.js), a little to the right, clear of the left arm reaching for the basket
 // a pose: sit 0 standing .. 1 seated; turn = body yaw in the chair; lean, twist = torso; look = point
 // (seat frame) or null (ahead); L/R = hand targets (seat frame; L is the person's left, on +x);
 // pL/pR = elbow pole directions; shrug lifts the shoulders; eyes 0 closed; the rest drive loops.

@@ -1,0 +1,5 @@
+[
+  {"do": "wait", "ms": 3000},
+  {"do": "tap", "control": "say:ada:HELLO", "after": 6000},
+  {"do": "tap", "control": "llm:answer", "after": 8000}
+]

@@ -30,7 +30,9 @@ export function pickVariables(sim, chartName, { max = 4, prefer = null } = {}) {
   const typeFor = (d) => { const t = d.type && d.type !== "null" && d.type !== "unknown" ? d.type : firstType.get(d.id); return t || firstType.get(d.id) || "string"; };
   let vars = [...decl.values()].map((d) => ({ id: d.id, type: typeFor(d), score: (changes.get(d.id) || 0) + 2 * ((d.readBy || []).length), changes: changes.get(d.id) || 0 }));
   if (prefer && prefer.length) return prefer.map((id) => vars.find((v) => v.id === id) || { id, type: firstType.get(id) || "string" }).slice(0, max);
-  const changing = vars.filter((v) => v.changes > 0);
-  vars = (changing.length ? changing : vars).sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : 1));
-  return vars.slice(0, max);
+  // the ones that change first, then the rest (a desk with room keeps a constant beside its counter: cookTime by timer);
+  // shown in declaration order, so a live run that starts changing a variable does not swap the desk's objects
+  const order = new Map([...decl.keys()].map((k, i) => [k, i]));
+  vars.sort((a, b) => (b.changes > 0) - (a.changes > 0) || b.score - a.score || (a.id < b.id ? -1 : 1));
+  return vars.slice(0, max).sort((a, b) => order.get(a.id) - order.get(b.id));
 }

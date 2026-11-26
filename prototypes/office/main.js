@@ -21,6 +21,8 @@ import { createViewSampler } from "./engine/view.js";
 import { buildRecorder } from "./engine/recorder.js";
 import { buildTicker, TAPE_W } from "./world/ticker.js";
 import { seatPoint } from "./world/desks.js";
+import { createModels } from "./world/models.js";
+import { DESK, MODEL } from "./world/layout.js";
 
 // the flight recorder (engine/log.js, LOGGING.md): always on, from the first line, so boot errors are in it too
 const log = createLog(); log.attachErrors(); window.officeLog = log;
@@ -48,7 +50,7 @@ const sim = live ? live.sim : createSim(trace); // live: one sim that grows (sim
 const LOOP = live ? 1e9 : sim.playDuration;
 // live: the plan is made again as the run grows, from the previous one (nothing already placed moves) and the links
 // the inputs will make (so the first press does not rearrange the room)
-const planCfg = (prev) => ({ ...(cfg.plan || {}), names: cfg.names, ...(live ? { links: live.links(), prev } : {}) });
+const planCfg = (prev) => ({ ...(cfg.plan || {}), names: cfg.names, ...(live ? { links: live.links(), prev, boardNorth: true } : {}) });
 let plan = makePlan(sim, planCfg(null)); // live: let, rebuilt as the run grows
 
 // ---------------------------------------------------------------- renderer & scene
@@ -114,16 +116,20 @@ const nameOf = (id) => { if (id === "*") return "everyone"; const a = sim.actor(
 // across live rebuilds (its refusals with it) and placed again by buildWorld: live, beside the console of the first
 // person an input drives; a recorded run, at the board's south end, facing the room
 const APP = live ? (live.def.app || { id: "user" }).id : null;
-const youLabel = (m) => { if (!live || m.from !== APP) return null; const c = live.controls().find((x) => x.event === m.name && x.actor === m.to); return c ? c.label : String(m.name).replace(/[._]/g, " ").toUpperCase(); };
+// a line's cause from the visitor is named by the control they pressed: an input's own, else the press that came just before it
+const pressLabels = []; // [trace events before the press, label]
+const youLabel = (m) => { if (!live || m.from !== APP) return null; const c = live.controls().find((x) => x.event === m.name && x.actor === m.to); if (c) return c.label; const i = sim.trace.events.findIndex((e) => e.id === m.id); let best = null; for (const [n, label] of pressLabels) if (n <= i) best = label; return best || String(m.name).replace(/[._]/g, " ").toUpperCase(); };
 const ticker = buildTicker(scene, { sim, nameOf, youLabel, live, at: { x: 0, z: 0, ry: 0 } });
 // the live console the visitor meets first: one beside a person's desk, else the first there is
 const firstConsole = () => { if (!liveControls) return null; const cs = liveControls.consoles(); return cs.find((k) => k.desk) || cs[0] || null; };
 function tickerSpot() {
   const k = firstConsole();
+  // a desk's console: the printer stands just behind it, its tape above the console, so console and tape are one column beside the desk
+  if (k && k.desk && k.actors[0]) { const seat = people.seatOfActor(k.actors[0], playS)?.seat; if (seat && Number.isFinite(seat.x)) { const g = k.group, back = v3(0, 0, -(k.back + 0.28)).applyAxisAngle(v3(0, 1, 0), g.rotation.y); const p = v3(g.position.x + back.x, 0, g.position.z + back.z); /* just behind the console's tilted panel */ const top = new THREE.Box3().setFromObject(k.group).max.y; return { x: p.x, z: p.z, ry: g.rotation.y, lift: Math.max(0.3, top - 0.9) }; } } // the printer's body clears the console's top
   if (k) { const g = k.group; const ry = g.rotation.y; const off = v3(-(k.W / 2 + 0.66), 0, 0.15).applyAxisAngle(v3(0, 1, 0), ry); return { x: g.position.x + off.x, z: g.position.z + off.z, ry }; } // beside it, away from the desk
   const b = plan.board; return { x: b.x + 0.55, z: Math.min(R.z1 - 0.8, b.z + b.w / 2 + 0.8), ry: Math.PI / 2 }; // close to the wall: it hides less of the board
 }
-function placeTicker() { const a = tickerSpot(); ticker.root.position.set(a.x, 0, a.z); ticker.root.rotation.y = a.ry; ticker.root.updateMatrixWorld(true); }
+function placeTicker(s = 0) { const a = tickerSpot(); ticker.root.position.set(a.x, 0, a.z); ticker.root.rotation.y = a.ry; ticker.setLift(a.lift || 0); ticker.update(s, 0); ticker.root.updateMatrixWorld(true); } // drawn at once: the start view frames the tape as long as it is
 buildWorld(); placeTicker();
 const slip = makeSlip(); scene.add(slip);
 const recentIn = (arr, s, w) => { if (!arr) return false; for (const x of arr) { if (x > s) break; if (s - x < w) return true; } return false; };
@@ -139,17 +145,22 @@ const rings = {}; const ringFor = (id) => { if (!rings[id]) { const r = new THRE
 const BOARD_W = 1600, BOARD_H = 900;
 let board = null, boardTex = null, boardStatus = "missing";
 const boardMesh = new THREE.Mesh(new THREE.PlaneGeometry(plan.board.w, plan.board.h), new THREE.MeshBasicMaterial({ color: "#111" }));
-boardMesh.position.set(plan.board.x + 0.1, 2.45, plan.board.z); boardMesh.rotation.y = Math.PI / 2; scene.add(boardMesh);
+// the board on its wall: the west wall, or a small room's north wall (core/plan.js)
+function mountBoard() { const b = plan.board; if (b.wall === "north") { boardMesh.position.set(b.x, b.y ?? 2.45, b.z + 0.1); boardMesh.rotation.y = 0; } else { boardMesh.position.set(b.x + 0.1, 2.45, b.z); boardMesh.rotation.y = Math.PI / 2; } }
+mountBoard(); scene.add(boardMesh);
 let boardMod = null;
 function makeBoard() { // live: made again when the run grows
-  board = boardMod.createBoard({ sim, width: BOARD_W, height: BOARD_H, createSim, baseUrl: base, now: () => (live ? wamb : amb) * 1000 });
+  board = boardMod.createBoard({ sim, width: BOARD_W, height: BOARD_H, live: !!live, capsules: cfg.capsules, room: () => ({ people, stations, get playS() { return playS; } }) }); // board/: columns are the room's desks and stations
   if (boardTex) boardTex.dispose();
   boardTex = new THREE.CanvasTexture(board.canvas); boardTex.colorSpace = THREE.SRGBColorSpace; boardTex.anisotropy = 8;
   boardMesh.material = new THREE.MeshBasicMaterial({ map: boardTex, toneMapped: false });
   board.on("seek", ({ t }) => { if (live) live.viewPast(Math.min(live.restS(), sim.warp(t))); else playS = Math.min(LOOP - 0.01, sim.warp(t)); }); // live: touching the past
   board.on("select", ({ actorIds = [], messageIds = [] }) => { spot = { actors: new Set(actorIds), messages: new Set(messageIds), at: amb }; });
   board.on("world", () => {});
+  board.on("hover", ({ actorIds = [] }) => { hoverId = actorIds[0] || null; }); // a row under the pointer: its person's hover ring
+  board.on("focus", () => { const p = boardMesh.position, n = v3(0, 0, 1).applyQuaternion(boardMesh.quaternion), t = Math.tan(camera.fov * Math.PI / 360), d = Math.max(plan.board.h / 2 / t, plan.board.w / 2 / (t * camera.aspect)) * 1.04; boardBack = boardBack || { pos: camera.position.clone(), tgt: controls.target.clone() }; flyTo(p.clone().addScaledVector(n, d), p.clone(), 1.3); }); // the board's empty part touched: stand squarely in front of it (Escape: back)
 }
+let boardBack = null; // where the camera was before it went to stand in front of the board
 try {
   boardMod = await import("./board/board.js");
   makeBoard();
@@ -164,13 +175,16 @@ try {
 let createHead = null, headStatus = "missing";
 try { createHead = (await import("./head/head.js")).createHead; headStatus = "ok"; } catch (err) { console.warn("head unavailable:", err.message); headStatus = "broken: " + err.message; }
 const HEAD_SCALE = 0.042;
+// each person's machines also stand on their desk as a live tabletop model (world/models.js: the same createHead)
+const models = createHead ? createModels({ scene, sim, createHead }) : null;
+let frameN = 0;
 const heads = new Map();
 function headFor(id) {
   if (heads.has(id)) return heads.get(id);
   let h;
   log.note("head-built"); // log: building a head can take a while
   log.ev("world", "head", { id, how: "built" }); // log:
-  if (createHead && sim.chartOf(id)) { try { h = createHead({ THREE, sim, actorId: id, ...(live ? { options: { interactive: true } } : {}) }); } catch (err) { console.warn("createHead", id, err.message); } }
+  if (createHead && sim.chartOf(id)) { try { h = createHead({ THREE, sim, actorId: id, ...(live ? { options: { interactive: true, judge: (ev) => !live.busy && !live.viewingPast && live.accepts(id, ev), whyNot: (ev) => (live.viewingPast ? "looking back" : live.whyNot(id, ev)) } } : {}) }); } catch (err) { console.warn("createHead", id, err.message); } }
   if (!h) { const group = new THREE.Group(); group.add(box(6, 6, 6, "#c86b5a")); h = { group, update() {}, setDetail() {}, pick: () => null, focus() {}, dispose() {}, placeholder: true }; }
   h.group.scale.setScalar(HEAD_SCALE); h.group.visible = false; scene.add(h.group);
   // the head's own room (head/head.js: an attic under the skull's dome), shown only while the skin is hidden;
@@ -217,19 +231,33 @@ const frus = new THREE.Frustum(), frusM = new THREE.Matrix4();
 function inFrame(pts, margin = 0.92) { camera.updateMatrixWorld(); for (const p of pts) { const q = p.clone().project(camera); if (q.z < -1 || q.z > 1 || Math.abs(q.x) > margin || Math.abs(q.y) > margin) return false; } return true; }
 // the person (head and desk front) an input drives, for framing
 function personPts(id) { const c = headPos(id); const seat = people.seatOfActor(id, playS); const out = []; if (c) out.push(c.clone().add(v3(0, 0.25, 0)), c.clone().add(v3(0, -0.9, 0))); if (seat) { const r = seat.avatar.root; out.push(v3(r.position.x, 0.75, r.position.z)); } return out; }
+// the desk model's place on a person's desk (world/layout.js MODEL), whether or not it is built yet
+function modelPts(id) { const seat = people.seatOfActor(id, playS)?.seat; if (!seat || seat.visitor) return []; const o = []; for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [DESK.topY, DESK.topY + 0.32]) o.push(seatPoint(seat, [MODEL.x + sx * MODEL.w / 2, y, MODEL.z + sz * MODEL.d / 2])); return o; }
 // live: where the visitor starts: in front of the person the inputs drive, at about standing height, the person,
 // their console and the printer in frame; a recorded run: the whole room (homeView)
 function startView() {
   const k0 = live ? firstConsole() : null;
   if (!k0) return homeView();
-  const pts = [...boxPts(new THREE.Box3().setFromObject(k0.group)), ...boxPts(ticker.box())];
-  for (const a of k0.actors) pts.push(...personPts(a));
+  const pts = [...boxPts(new THREE.Box3().setFromObject(k0.group)), ...boxPts(ticker.fullBox(0.22))]; // the tape and room for two more lines (older ones scroll off the top)
+  for (const a of k0.actors) { pts.push(...personPts(a)); pts.push(...modelPts(a)); }
+  if (plan.board.wall === "north") pts.push(...boxPts(new THREE.Box3().setFromObject(boardMesh))); // a small room's board, behind the people
+  for (const k of liveControls.consoles()) if (k !== k0 && k.desk && k.at === k0.at) pts.push(...boxPts(new THREE.Box3().setFromObject(k.group))); // the person's other consoles
   const st = stations.byId.get(k0.at); if (st) pts.push(...boxPts(new THREE.Box3().setFromObject(st.group))); // a station's console: the station too
   const seat = k0.desk && k0.actors[0] ? people.seatOfActor(k0.actors[0], playS) : null;
-  // in front of the person, a little from the console's side (it does not stand in front of them); a station's
-  // console: from where it faces
-  const f = seat ? seat.avatar.root.rotation.y - 0.32 : k0.group.rotation.y;
-  return frameAll(pts, { dir: v3(Math.sin(f), 0, Math.cos(f)), el: 0.2, margin: 1.12 });
+  // in front of the person, from the console's side (it does not stand in front of them), as near to their desk
+  // model as keeps everything in frame with nothing across it; a station's console: from where it faces
+  if (!seat) { const f = k0.group.rotation.y; return frameAll(pts, { dir: v3(Math.sin(f), 0, Math.cos(f)), el: 0.2, margin: 1.12 }); }
+  const f0 = seat.seat.facing || 0, mc = seatPoint(seat.seat, [MODEL.x, DESK.topY + 0.15, MODEL.z]), head = headPos(k0.actors[0]);
+  let best = null;
+  // looking at the middle of everything, or nearer the desk (a deep room: the board on the far wall, the console near)
+  const mid = new THREE.Box3().setFromPoints(pts).getCenter(v3(0, 0, 0)); const aims = [mid, mid.clone().lerp(mc, 0.5), mc.clone().lerp(mid, 0.25)];
+  for (const df of [-0.42, -0.3, -0.18, -0.06, 0.06]) for (const el of [0.2, 0.28, 0.36]) for (const tgt of aims) {
+    const v = frameAll(pts, { dir: v3(Math.sin(f0 + df), 0, Math.cos(f0 + df)), el, margin: 1.1, tgt });
+    const seen = rig.clear(v.pos, mc, k0.actors[0]) && (!head || rig.clear(v.pos, head, k0.actors[0]));
+    const score = v.pos.distanceTo(mc) + (seen ? 0 : 5) + Math.abs(df) * 0.6;
+    if (!best || score < best.score) best = { ...v, score };
+  }
+  return best;
 }
 function home(dur = 1.6) { const h = live ? startView() : homeView(); flyTo(h.pos, h.tgt, dur); }
 const headPos = (id) => people.headCenter(id, playS);
@@ -302,6 +330,7 @@ function leaveHead(then) {
 function back() {
   if (rig.flight && rig.flight.kind === "leave") { const f = rig.flight, prev = f.onDone; f.onDone = () => { if (prev) prev(); back(); }; return; } // queued until we are out
   if (slipMsg) { slipMsg = null; return; }
+  if (boardBack && !sel) { const v = boardBack; boardBack = null; flyTo(v.pos, v.tgt, 1.3); return; } // from in front of the board: back where we were
   if (sel && sel.focusId) { sel.focusId = null; sel.head.focus(null); sel.focusPoint = null; const c = sel.anchor || headPos(sel.id); if (c) flyTo(insideView(c, sel.anchorF ?? facing(sel.id)), c, 1.1); return; }
   if (sel && (sel.stage === "inside" || sel.stage === "entering")) { leaveHead(); return; }
   if (sel) { const id = sel.id; sel = null; hideHeads(); if (board) board.highlight({}); const c = headPos(id); if (c) { const off = camera.position.clone().sub(controls.target); off.setLength(Math.min(9, Math.max(4.5, off.length() * 1.7))); const tgt = controls.target.clone(); flyTo(rig.resolve(tgt.clone().add(off)), tgt, 1.3); return; } }
@@ -325,9 +354,10 @@ function revealConsequence(pw) {
   } else if (!inHead() && !(sel && sel.focusId)) {
     const it = liveControls && liveControls.items.get(pw.id);
     const pts = []; if (it) pts.push(...boxPts(new THREE.Box3().setFromObject(it.ui.group)));
-    for (const id of ids.slice(0, 4)) pts.push(...personPts(id));
-    const hidden = ids.some((id) => hiddenPerson(id));
-    if (pts.length && (!inFrame(pts) || hidden)) {
+    // a person whose desk model is in view shows what the press did there: their model and their head are enough
+    for (const id of ids.slice(0, 4)) { const mb = models && models.boxOf(id); if (mb) { pts.push(...boxPts(mb)); const c = headPos(id); if (c) pts.push(c); } else pts.push(...personPts(id)); }
+    const hidden = ids.some((id) => hiddenPerson(id) && !(models && models.boxOf(id)));
+    if (pts.length && (!inFrame(pts, 1.0) || hidden)) {
       // from the visitor's own direction if the people can be seen from there over the furniture, else turned
       // toward the front of the first of them, a step at a time
       const here = camera.position.clone().sub(controls.target); here.y = 0; here.normalize();
@@ -372,7 +402,7 @@ function pickAt(x, y) {
   if (sel && sel.head && sel.stage === "inside") { const hp = sel.head.pick(raycaster); if (hp) return { kind: "head", hit: hp }; }
   if (liveControls) { const c = liveControls.pick(raycaster); if (c) return { kind: "control", id: c.id }; } // live: the controls
   const nearC = liveControls ? liveControls.near(x, y, camera, innerWidth, innerHeight) : null; // live: within a thumb's reach
-  const cands = [boardMesh, ticker.tape, tubes.caps, ...people.roots().filter((r) => r.visible), ...stations.list.map((s) => s.group), ...building.pick.map((p) => p.object), ...recorder.pick.map((p) => p.object), ...building.occluders, desks.root];
+  const cands = [boardMesh, ticker.tape, tubes.caps, ...people.roots().filter((r) => r.visible), ...stations.list.map((s) => s.group), ...building.pick.map((p) => p.object), ...recorder.pick.map((p) => p.object), ...building.occluders, desks.root, ...(models ? [models.root] : [])];
   const shown = (o) => { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; }; // hidden things (the ceiling seen from above) take no clicks
   for (const h of raycaster.intersectObjects(cands, true)) {
     const o = h.object; if (!shown(o)) continue;
@@ -382,6 +412,7 @@ function pickAt(x, y) {
     if (o.userData.actorId) return { kind: "actor", id: o.userData.actorId, point: h.point };
     if (o.userData.stationId) return { kind: "actor", id: o.userData.stationId, point: h.point };
     if (o.userData.recorder) return { kind: "recorder", point: h.point };
+    { let q = o; while (q && !(q.name || "").startsWith("desk-model:")) q = q.parent; if (q) return { kind: "actor", id: q.name.slice(11), point: h.point, via: "model" }; } // a desk model: its person
     if (building.occluders.includes(o)) return nearSubject(x, y) || { kind: "wall", point: h.point };
     if (!building.pick.some((p) => p.object === o)) { let q = o; while (q && q !== desks.root) q = q.parent; if (q === desks.root) { const who = deskOwner(h.point); return who ? { kind: "actor", id: who, point: h.point, via: "desk" } : nearSubject(x, y) || { kind: "furniture", point: h.point }; } }
     const pk = building.pick.find((p) => p.object === o); if (pk) return pk.kind === "floor" && nearC ? { kind: "control", id: nearC.id } : pk.kind === "floor" ? nearSubject(x, y) || { kind: pk.kind, point: h.point } : { kind: pk.kind, id: pk.id, point: h.point };
@@ -430,6 +461,7 @@ function perform(a, src = "input") {
   switch (a.do) {
     case "press": if (liveControls) {
       const it = liveControls.items.get(a.id); const wasPlaying = live && !live.atRest(); const lastS = sim.warp(Number.MAX_SAFE_INTEGER); const evN = sim.trace.events.length;
+      if (it && !it.fixed) pressLabels.push([evN, it.c.label]);
       const ok = liveControls.press(a.id); const why = ok ? null : liveControls.lastWhy(a.id);
       log.ev("world", "press", { id: a.id, ok, why, queued: ok && wasPlaying, stepping: !!live?.stepping, pending: live ? live.pendingTimers().length : 0 }); // log: taken, refused (and why), or queued behind what plays
       if (!ok && it && a.id !== "time:mode") ticker.refuse(`YOU: ${it.c.label}`, why || "not now", playS);
@@ -437,7 +469,8 @@ function perform(a, src = "input") {
       if (ok && wasPlaying) catchUp = lastS;
       if (ok && it) pressWatch = { id: a.id, evN, actor: it.c.actor || null, at: amb };
     } break;
-    case "headSend": if (live) { const wasPlaying = !live.atRest(); const lastS = sim.warp(Number.MAX_SAFE_INTEGER); pressWatch = { id: `head:${a.event}`, evN: sim.trace.events.length, actor: a.actor, at: amb, head: true }; if (wasPlaying) catchUp = lastS; live.send(a.actor, a.event); } break;
+    case "headSend": if (live && !live.busy && !live.accepts(a.actor, a.event)) { const why = live.viewingPast ? "looking back" : live.whyNot(a.actor, a.event); log.ev("world", "press", { id: `head:${a.event}`, ok: false, why }); ticker.refuse(`YOU: ${String(a.event).replace(/[._]/g, " ").toUpperCase()}`, why, playS); if (sel && sel.head && sel.head.showWhy) sel.head.showWhy(a.event); break; } // live: a dim button in a head does nothing, and says why
+      if (live) { const wasPlaying = !live.atRest(); const lastS = sim.warp(Number.MAX_SAFE_INTEGER); pressWatch = { id: `head:${a.event}`, evN: sim.trace.events.length, actor: a.actor, at: amb, head: true }; if (wasPlaying) catchUp = lastS; live.send(a.actor, a.event); } break;
     case "ticker": { const r = ticker.pick({ x: a.u, y: a.v }); spot = r && r.key ? { actors: new Set(r.actors), messages: new Set(r.messages), at: amb } : null; if (board) board.highlight(r && r.actors && r.actors[0] ? { actorId: r.actors[0] } : {}); log.ev("world", "ticker", { key: r ? r.key : null, actors: r ? r.actors : [], text: r?.text?.slice(0, 120) }); break; } // log: a line selected
     case "focus": focusHead(a.state); break;
     case "board": boardHot = true; if (board) { if (a.type === "tap") { board.pointer("down", a.u, a.v); board.pointer("up", a.u, a.v); } else board.pointer(a.type, a.u, a.v, a.extra); } break;
@@ -484,7 +517,9 @@ if (!REC && !REPLAY) {
     if (p && p.kind === "board" && board) { if (down && down.board) perform({ do: "board", type: "move", u: p.uv.x, v: 1 - p.uv.y }); else { board.pointer("move", p.uv.x, 1 - p.uv.y); boardHot = true; } } else if (board && !down) board.pointer("leave", 0, 0);
     const cur = p && !["floor", "wall", "furniture"].includes(p.kind) ? "pointer" : "default";
     if (!down) { const key = p ? `${p.kind}:${p.id ?? p.hit?.id ?? ""}` : ""; if (key !== hoverKey || cur !== cursorNow) log.ev("pick", "hover", { x: Math.round(e.clientX), y: Math.round(e.clientY), hit: p ? [p.kind, p.id ?? p.hit?.id ?? null] : null, cursor: cur }); hoverKey = key; } // log: hover target and cursor changes
-    canvas.style.cursor = cursorNow = cur; if (!down) hoverId = p && p.kind === "actor" ? p.id : null;
+    canvas.style.cursor = cursorNow = cur; if (!down && !(p && p.kind === "board")) hoverId = p && p.kind === "actor" ? p.id : null; // a board row hovered keeps the room's hover
+    if (liveControls && !down) liveControls.hover(p && p.kind === "control" ? p.id : null); // live: a dim control says why
+    if (sel && sel.head && sel.head.hoverButton && !down) sel.head.hoverButton(p && p.kind === "head" && p.hit.kind === "event" ? p.hit : null); // live: so does a dim button in a head
   });
   const end = (e) => {
     pointers.delete(e.pointerId); if (!down) return; const d = down; down = null; controls.enabled = true;
@@ -562,6 +597,7 @@ function step(dt) {
   for (const [id, v] of lids) { const want = sel && sel.id === id ? sel.lid : 0; lids.set(id, want >= v ? want : Math.max(want, v - dt / 0.5)); if (!lids.get(id) && !(sel && sel.id === id)) lids.delete(id); }
   if (sel && sel.head && !lids.has(sel.id)) lids.set(sel.id, sel.lid);
   const dark = people.update(playS, wa, { id: sel && sel.id, skinHidden: !!(sel && sel.skinHidden), lidOf });
+  if (models) models.update({ people, playS, t, dt: moving ? dt : 0, camera, selected: sel && sel.id, frame: frameN++ }); // the desk models: built near the camera, their marbles at t
   // a blackout (everyone ended at once): the lights go out
   const k = 1 - 0.85 * dark; hemi.intensity = 1.35 * k; sun.intensity = 1.7 * k; fill.intensity = 0.35 * k; scene.background.copy(SKY).lerp(NIGHT, dark); scene.fog.color.copy(scene.background);
   building.update(playS, t, wa, { paused: live ? !moving : displayPaused ?? paused, speedIndex, duration: sim.duration, clockRing: recentIn(clockRings, playS, 0.9), camera });
@@ -585,7 +621,7 @@ function step(dt) {
       const kd = dist / headK(); sel.skinHidden = kd < 0.95 && sel.stage !== "approach";
       const h = sel.head; h.group.visible = sel.skinHidden || lidOf(sel.id) > 0.02; h.group.position.copy(c); h.group.rotation.y = anchored ? sel.anchorF ?? facing(sel.id) : facing(sel.id);
       detailNow = sel.focusId ? Math.max(clamp01((1.0 - kd) / 0.7), 0.9) : clamp01((1.0 - kd) / 0.7); h.setDetail(detailNow); h.skull.visible = sel.skinHidden;
-      h.update(t, live && !moving ? 0 : dt);
+      h.update(t, live && !moving ? 0 : dt, playS); // the playhead itself: past a live run's last instant warp(t) stops
       camera.near = anchored ? Math.max(0.004, Math.min(0.05, dist * 0.05)) : 0.05;
     }
   } else camera.near = 0.05;
@@ -643,6 +679,7 @@ function subjects() {
   if (liveControls) for (const it of liveControls.items.values()) { if (!it.ui.group.parent) continue; const b = B3(it.ui.group); out.push({ kind: "control", id: it.c.id, min: b.min, max: b.max }); }
   for (const a of tubes.active) out.push({ kind: "capsule", id: a.msg.id, min: a.pos.clone().subScalar(0.12), max: a.pos.clone().addScalar(0.12) });
   { const b = ticker.box(); out.push({ kind: "ticker", id: "ticker", min: b.min, max: b.max }); }
+  if (models) for (const m of models.stats().models) { const b = models.boxOf(m.id); if (b) out.push({ kind: "model", id: m.id, min: b.min, max: b.max }); }
   return out;
 }
 let platesKept = null, platesN = -1;
@@ -653,6 +690,7 @@ function viewSample() {
   if (!platesKept || platesN !== PLATES.size) { platesKept = []; for (const p of PLATES) { if (!attached(p)) PLATES.delete(p); else platesKept.push(p); } platesN = PLATES.size; } // the world's plates change only when it is built
   const plates = [...platesKept];
   if (sel && sel.head && sel.head.plates && sel.head.group.visible) for (const x of sel.head.plates()) plates.push(x.mesh);
+  if (models && !inHead()) plates.push(...models.plates());
   const out = viewer.sample({ camera, W: innerWidth, H: innerHeight, subjects: subs, plates, selected, occluded: (id) => occludedFrom(camera.position, id) });
   if (sel && sel.head && sel.skinHidden && (inHead() || sel.focusId)) out.head = headView(sel.head);
   return out;
@@ -708,19 +746,22 @@ if (live) {
     const sp = Math.max(RW, RD) * 0.62 + 4; sun.position.set(RC.x - 14, 26, RC.z + 16); sun.target.position.copy(RC);
     Object.assign(sun.shadow.camera, { left: -sp, right: sp, top: sp, bottom: -sp }); sun.shadow.camera.updateProjectionMatrix();
     buildWorld();
-    boardMesh.geometry.dispose(); boardMesh.geometry = new THREE.PlaneGeometry(plan.board.w, plan.board.h); boardMesh.position.set(plan.board.x + 0.1, 2.45, plan.board.z);
+    boardMesh.geometry.dispose(); boardMesh.geometry = new THREE.PlaneGeometry(plan.board.w, plan.board.h); mountBoard();
     if (boardMod) makeBoard();
     // heads are updated in place (a press inside one must not rebuild it: its marbles keep their places); a reset
     // or a head that cannot refresh is built again
+    if (info.reset) pressLabels.length = 0;
+    if (models) { models.reseat(); if (info.reset) models.clear(); else models.refresh(); } // the desk models: refreshed in place (their marbles keep their places), found again at their new seats
     for (const [id, h] of [...heads]) { if (!info.reset && h.refresh && sim.chartOf(id)) { try { if (h.refresh() !== false) { log.ev("world", "head", { id, how: "refreshed" }); continue; } } catch (err) { console.warn("head refresh", id, err.message); } } scene.remove(h.group); try { h.dispose(); } catch {} heads.delete(id); }
     if (sel && sel.head && !heads.has(sel.id)) { const h = headFor(sel.id); h.focus(sel.focusId || null); sel.head = h; }
-    liveControls.rebuild(worldRefs()); placeTicker();
+    liveControls.rebuild(worldRefs()); placeTicker(playS);
     if (window.api) Object.assign(window.api, { plan, people, stations, desks, tubes, building });
+    liveSyncAt = -1; // the controls' lit and dim at the next frame (the driver is no longer busy then)
     viewBoxes = null; platesKept = null; if (pressWatch && !info.reset) { revealNext = pressWatch; pressWatch = null; } /* after the next update: the new people stand at their seats only then */ log.ev("world", "rebuild", { ms: Math.round(performance.now() - t0), events: sim.trace.events.length, actors: sim.actors.length }); // log:
   };
   live.on("change", rebuildWorld);
-  liveControls.rebuild(worldRefs()); placeTicker();
-  if (!REPLAY && !REC) { const v = startView(); camera.position.copy(v.pos); controls.target.copy(v.tgt); controls.update(); } // live: start where the inputs and the person they drive are
+  liveControls.rebuild(worldRefs()); placeTicker(playS);
+  if (!REPLAY && !REC) { people.update(playS, 0, { id: null, skinHidden: false, lidOf }); const v = startView(); /* the people at their seats first: the view frames them */ camera.position.copy(v.pos); controls.target.copy(v.tgt); controls.update(); } // live: start where the inputs and the person they drive are
   window.live = live;
   live.screen = () => liveControls.screenPositions(camera, innerWidth, innerHeight);
   live.pressControl = (id) => liveControls.press(id);
@@ -729,7 +770,7 @@ if (live) {
 // ---------------------------------------------------------------- live loop / film hooks
 window.DURATION = LOOP * 1000;
 window.state = () => ({ system: SYSTEM, playS, t: tNow(), paused, speedIndex, sel: sel && { id: sel.id, stage: sel.stage, focusId: sel.focusId }, slip: slipMsg, boardStatus, headStatus, loop: LOOP, actors: sim.actors.length, hub: plan.hub, room: [RW, RD] });
-window.api = { sim, plan, cfg, scene, camera, controls, people, stations, desks, tubes, building, board: () => board, heads, headFor, HEAD_SCALE,
+window.api = { sim, plan, cfg, scene, camera, controls, people, stations, desks, tubes, building, board: () => board, heads, headFor, HEAD_SCALE, ticker, models,
   select, enterHead, focusHead, frameAll, startView, personPts, boxPts, inFrame, hiddenPerson, back, openCapsule, walkTo, flyTo, home, homeView, togglePause, setSpeed, click, pickAt, perform, intentOf, recorder: () => recorder,
   setPlay: (s) => (playS = s), getPlay: () => playS, setPaused: (b) => (paused = b), setDisplayPaused: (b) => (displayPaused = b), clearSpot: () => (spot = null),
   reset: () => { sel = null; slipMsg = null; spot = null; flight = null; rig.stop(); lids.clear(); hideHeads(); board && board.highlight({}); }, rig, frameOf, leaveHead,

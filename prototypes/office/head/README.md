@@ -53,6 +53,23 @@ the beam carried one round lamp per part, timers were clocks on stalks and the d
 the roof with a copper pipe up to it. The owner's first visit (QUALITY.md, H1–H9) showed none of them
 explained itself at the size the world mounts a head; they were replaced as above.
 
+## The desk model (`{desk: true}`)
+
+`createHead({THREE, sim, actorId, options: {desk: true}})` builds the same machines, marbles and motion as a
+tabletop model that WORLD stands on the person's desk (`world/models.js`). It differs only in what a model at
+arm's length needs: no room, inlet, capsules, gauges or push-buttons; no fitting to the entry camera (one
+machine unit is one group unit, the content centred and standing on y = 0: WORLD scales the group to the desk);
+narrower walls and gaps (`MARGIN` 0.18, a nested machine as large as its parent's parts), bigger, brighter
+marbles, beam names on 84 % of the beam, and station plates lying flatter and as large as their place allows.
+`setLevels(n)` closes every machine deeper than `n` (its window says what runs there); WORLD picks the
+deepest level whose state names stay legible at the desk (`world/models.js`, `FONT_MIN`). `update(t, dt, s)`
+takes the playhead second `s` when the caller has one (a live run's playhead goes past its last instant, where
+`warp(t)` stops); the walk-in head is updated the same way.
+
+Interactive heads (`{interactive: true, judge(event), whyNot(event)}`) now show every push-button: lit (bright
+brass) when its event is an affordance of the configuration that `judge` accepts, dim (dark) otherwise;
+`hoverButton(pick)` and `showWhy(event)` turn a dim button's plate into `whyNot(event)`.
+
 ## Exceptional: the structural rule
 
 For each compound state, over the transitions among its parts (each transition drawn at the level

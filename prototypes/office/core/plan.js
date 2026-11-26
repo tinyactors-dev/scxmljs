@@ -216,7 +216,10 @@ export function makePlan(sim, cfg = {}) {
   const clock = clocks.length ? { x: clocks[0].x, z: clocks[0].z } : { x: room.x1 - 3.5, z: room.z0 + 0.2 };
   const westFree0 = room.z0 + 1.2, westFree1 = (users.length ? users[users.length - 1].z - 1.8 : door.z - 1.6);
   const bw = Math.max(3, Math.min(7.2, (westFree1 - westFree0) * 0.95));
-  const board = { x: room.x0 + 0.15, z: (westFree0 + westFree1) / 2, w: bw, h: bw * 900 / 1600 };
+  let board = { x: room.x0 + 0.15, z: (westFree0 + westFree1) / 2, w: bw, h: bw * 900 / 1600, wall: "west" };
+  // a small live room (cfg.boardNorth): the board hangs on the north wall behind the people, left of the clock, where the start view
+  // (in front of the desk, from the console's side) sees it whole above their heads
+  if (small && cfg.boardNorth && !north.length) { const a = room.x0 + 0.6, b = clock.x - 1.7; const w = Math.min(3.3, b - a); if (w >= 2.6) board = { x: b - w / 2, z: room.z0 + 0.15, w, h: w * 900 / 1600, wall: "north", y: 1.85 + (w * 900 / 1600) / 2 }; }
   const directory = { x: room.x0 + 0.15, z: Math.min(room.z1 - 1.0, door.z + (small ? 1.5 : 1.9)) };
   const hubXZ = groups.get("hub") ? { x: groups.get("hub").x, z: groups.get("hub").z } : { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 };
 

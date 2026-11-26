@@ -1,8 +1,10 @@
 // live/controls.js: the physical controls of live mode, as things in the room.
 //
 //   consoles  a bakelite lectern per place an input enters (a station, a desk), one brass-rimmed
-//             push button per control with its engraved label under it. Enabled: a coloured cap
-//             standing proud; inert: a grey cap sunk into its bezel. Pressing pushes the cap in.
+//             push button per control with its engraved label under it. Lit (its event would be taken
+//             now): a coloured cap glowing in a lit ring, standing proud, its label bright; dim: a dark
+//             grey cap sunk into its bezel, its label dark. Pointing at a dim one (or pressing it) turns
+//             its label into the reason it would do nothing. Pressing pushes the cap in.
 //   the time console under the wall clock: ADVANCE (to the next due timer), ONE HOP (release
 //             one causal hop), and a FLOW/STEP lever; a red flag on the clock and a plate tell
 //             what is pending.
@@ -19,7 +21,7 @@ const CAPS = ["#d8432f", "#3b9a5a", "#e2b33c", "#3d73c4", "#2fa3a3", "#9a4fb0"];
 const hash = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
 const CELL_W = 0.48, CELL_H = 0.42;
 const SCALE_DESK = 0.72; // a console beside a desk is smaller than a station's: it must not hide the person
-export const SIDE = [-2.05, 0, 2.05], SIDE_TURN = 0.55; // where a desk's console stands, in the seat frame (world/layout.js)
+export const SIDE = [-1.85, 0, 2.15], SIDE_TURN = 0.3; // where a desk's console stands, in the seat frame (world/layout.js): the desk's front corner
 
 // an engraved label: dark letters cut into brass, on two lines when long; drawn at a resolution
 // that keeps the letters crisp at 2 m whatever the plate's size
@@ -49,13 +51,16 @@ function makeButton(c, color) {
   const capM = new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0 });
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.09, 0.07, 20), capM); cap.rotation.x = Math.PI / 2; cap.position.set(0, 0.05, 0.06); cap.castShadow = true; g.add(cap);
   const dome = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), capM); dome.rotation.x = Math.PI / 2; dome.scale.set(1, 0.35, 1); dome.position.set(0, 0.05, 0.095); g.add(dome);
+  // a ring that lights round a cap whose event would be taken now
+  const ringM = new THREE.MeshBasicMaterial({ color: "#ffd36b", transparent: true, opacity: 0 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.112, 0.016, 8, 28), ringM); ring.position.set(0, 0.05, 0.045); g.add(ring);
   const lab = textPlate(c.label, 0.44, 0.13); lab.position.set(0, -0.13, 0.012); g.add(lab);
   // a refusal: the reason replaces the label for a while, white on red (labelTex for the reason is made on demand)
   lab.userData.base = lab.material.map;
   // a hit area bigger than the cap: the cell, so a thumb finds it
   const hit = new THREE.Mesh(new THREE.PlaneGeometry(CELL_W - 0.02, CELL_H - 0.02), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(0, -0.02, 0.1); g.add(hit);
   const capG = [cap, dome];
-  return { group: g, hit, capM, capG, color: new THREE.Color(color), grey: new THREE.Color("#5b5650"), labM: lab.material, lab, pressedAt: -1, enabled: null };
+  return { group: g, hit, capM, capG, ringM, color: new THREE.Color(color), grey: new THREE.Color("#3e3a36"), labM: lab.material, lab, pressedAt: -1, enabled: null };
 }
 
 /** A lever: a slot, an arm with a ball handle. Pulled = rotated toward the visitor. */
@@ -71,7 +76,7 @@ function makeLever(c, { color = "#c43b2e", size = 1 } = {}) {
   const lab = textPlate(c.label, 0.44 * Math.max(1, size * 0.8), 0.13 * Math.max(1, size * 0.8)); lab.position.set(0, -0.08 * size, 0.02); g.add(lab);
   const hit = new THREE.Mesh(new THREE.BoxGeometry(0.4 * size, 0.8 * size, 0.3 * size), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(0, 0.05, 0.1); g.add(hit);
   lab.userData.base = lab.material.map;
-  return { group: g, hit, pivot, capM: knobM, capG: [], color: new THREE.Color(color), grey: new THREE.Color("#5b5650"), labM: lab.material, lab, pressedAt: -1, enabled: null, lever: true };
+  return { group: g, hit, pivot, capM: knobM, capG: [], color: new THREE.Color(color), grey: new THREE.Color("#3e3a36"), labM: lab.material, lab, pressedAt: -1, enabled: null, lever: true };
 }
 
 /** A lectern holding a grid of controls, facing local +z. Returns its group and each cell's frame. */
@@ -89,7 +94,7 @@ function makeConsole(n, { cols = 3, title = null, tilt = 0.75, height = 0.95 } =
   if (title) { titleMesh = textPlate(title, W - 0.1, 0.12, { bg: "#2a1d12", fg: "#e9c46a" }); titleMesh.position.set(0, Hh - 0.11, 0.005); panel.add(titleMesh); }
   const cells = [];
   for (let i = 0; i < n; i++) { const r = Math.floor(i / cols), c = i % cols; const cell = new THREE.Group(); cell.position.set(-W / 2 + 0.06 + (c + 0.5) * CELL_W, (rows - 1 - r) * CELL_H + 0.2, 0.0); panel.add(cell); cells.push(cell); }
-  return { group: g, cells, panel, W, rows, titleMesh };
+  return { group: g, cells, panel, W, rows, titleMesh, back: Hh * Math.sin(tilt) + 0.2 }; // back: how far behind its post the tilted panel reaches
 }
 
 export function createControls({ scene, live, still = false }) {
@@ -129,8 +134,10 @@ export function createControls({ scene, live, still = false }) {
     consoles = []; for (const [, it] of items) if (!it.fixed) items.delete(it.c.id);
     const byKey = new Map();
     // an input that drives one person stands beside that person's desk, whoever sends it
-    const placeOf = (c) => (c.event && c.actor && world.sim.actor(c.actor) && !world.sim.actor(c.actor).external && anchor(c.actor) ? c.actor : c.at);
-    for (const c of list) { const k = `${placeOf(c)}|${c.console || c.group || ""}`; (byKey.get(k) || byKey.set(k, []).get(k)).push(c); }
+    // (a console named after a person, as what Ada says, is an input that drives her too)
+    const person = (id) => id && world.sim.actor(id) && !world.sim.actor(id).external && anchor(id);
+    const placeOf = (c) => (c.event && person(c.actor) ? c.actor : !c.event && c.console && person(c.console) ? c.console : c.at);
+    for (const c of list) { const pl = placeOf(c); const k = `${pl}|${person(pl) ? "desk" : c.console || c.group || ""}`; /* a person's desk has one console */ (byKey.get(k) || byKey.set(k, []).get(k)).push(c); }
     const usedAt = new Map();
     for (const [k, cs] of byKey) {
       const at = placeOf(cs[0]); const a = anchor(at); if (!a) continue;
@@ -147,7 +154,7 @@ export function createControls({ scene, live, still = false }) {
         k2.cells[i].add(ui.group); ui.hit.userData.liveControl = c.id;
         items.set(c.id, { c, ui });
       });
-      consoles.push({ key: k, group: k2.group, at, desk: !!a.desk, actors: [...new Set(cs.map((c) => c.actor).filter(Boolean))], W: k2.W * sc });
+      consoles.push({ key: k, group: k2.group, back: k2.back * sc, at, desk: !!a.desk, actors: [...new Set([...cs.map((c) => c.actor).filter(Boolean), ...(a.desk ? [at] : [])])], W: k2.W * sc }); // a desk's console is its sitter's
     }
   }
 
@@ -217,26 +224,35 @@ export function createControls({ scene, live, still = false }) {
         ui.pivot.rotation.x = base + (ui.refused ? Math.sin(dp * 40) * 0.03 * dp : dp * 0.8);
         ui.capM.color.copy(en ? ui.color : ui.grey);
       } else {
-        // inert: dim and up, and it will not go down (a pressed inert cap only shivers in its bezel)
+        // dim: dark and sunk into its bezel, and it will not go down (a pressed dim cap only shivers there)
         const shake = ui.refused ? Math.sin(dp * 40) * 0.006 * dp : 0;
-        for (const m of ui.capG) { m.position.z = (m === ui.capG[0] ? 0.06 : 0.095) - (ui.refused ? 0 : dp * 0.03); m.position.x = shake; }
+        for (const m of ui.capG) { m.position.z = (m === ui.capG[0] ? 0.06 : 0.095) - (en ? 0 : 0.03) - (ui.refused || !en ? 0 : dp * 0.03); m.position.x = shake; }
         ui.capM.color.copy(en ? ui.color : ui.grey); ui.capM.emissive.copy(en ? ui.color : ui.grey);
       }
-      // a refusal says no on the control itself: the cap flashes red and the plate gives the reason, for 2.6 s
+      // a refusal says no on the control itself: the cap flashes red and the plate gives the reason, for 2.6 s;
+      // pointing at a dim control shows the reason too (without the flash), for as long as the pointer stays
       const no = ui.refused && ui.why && performance.now() - ui.pressedAt < 2600;
-      if (no !== !!ui.showingWhy) {
-        ui.showingWhy = no;
-        if (no) { if (ui.whyTex) ui.whyTex.dispose(); const p = ui.lab.geometry.parameters; ui.whyTex = labelTex(ui.why.toUpperCase(), { w: p.width, h: p.height, bg: "#b3261e", fg: "#fff4e6" }); ui.labM.map = ui.whyTex; }
+      const hovering = !no && hoverId === c.id && !en;
+      const why = no ? ui.why : hovering ? whyNot(c) : null;
+      const showKey = why ? `${no ? "no" : "hover"}|${why}` : "";
+      if (showKey !== (ui.showingWhy || "")) {
+        ui.showingWhy = showKey;
+        if (why) { if (ui.whyTex) ui.whyTex.dispose(); const p = ui.lab.geometry.parameters; ui.whyTex = labelTex(why.toUpperCase(), { w: p.width, h: p.height, bg: no ? "#b3261e" : "#5a2018", fg: "#fff4e6" }); ui.labM.map = ui.whyTex; }
         else ui.labM.map = ui.lab.userData.base;
         ui.labM.needsUpdate = true;
       }
       if (no) { const k = (performance.now() - ui.pressedAt) / 1000; const f = k < 1.2 ? 0.5 + 0.5 * Math.cos(k * 14) : 0; ui.capM.color.lerp(RED, 0.4 + 0.6 * f); ui.capM.emissive.copy(RED); }
-      ui.labM.color.setScalar(no ? 1 : en ? 1 : 0.55);
-      const breathe = !still && rest && en && !it.fixed || (!still && rest && en && (c.id === "time:advance"));
-      ui.capM.emissiveIntensity = no ? 0.5 : breathe ? 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(amb * 1.9)) : en ? 0.06 : 0;
+      // lit: a bright label, a lit ring and a glowing cap; dim: a dark label
+      ui.labM.color.setScalar(why ? 1 : en ? 1.15 : 0.38);
+      if (ui.ringM) ui.ringM.opacity = en && !no ? 0.95 : 0;
+      const breathe = !still && rest && en;
+      ui.capM.emissiveIntensity = no ? 0.5 : en ? 0.42 + (breathe ? 0.18 * (0.5 + 0.5 * Math.sin(amb * 1.9)) : 0) : 0;
     }
   }
 
+  let hoverId = null;
+  /** the pointer is over this control (or none): a dim one shows why it would do nothing */
+  function hover(id) { hoverId = id || null; }
   function hits() { const out = []; for (const it of items.values()) out.push(it.ui.hit); return out; }
   function pick(raycaster) { const h = raycaster.intersectObjects(hits(), false)[0]; return h ? items.get(h.object.userData.liveControl)?.c || null : null; }
   function screenOf(it, camera, w, h) { it.ui.group.getWorldPosition(tmp); const p = tmp.clone().project(camera); if (p.z > 1) return null; return { x: (p.x + 1) / 2 * w, y: (1 - p.y) / 2 * h }; }
@@ -252,8 +268,9 @@ export function createControls({ scene, live, still = false }) {
     return "not now";
   }
   /** press a control: true when taken; refused: false, and the control says why (also returned as `why`) */
-  function press(id) { const it = items.get(id); if (!it) return false; it.ui.pressedAt = performance.now(); it.ui.refused = !it.c.enabled; if (!it.c.enabled) { it.ui.why = whyNot(it.c); return false; } it.ui.why = null; Promise.resolve(it.c.press()).catch((e) => console.error(e)); return true; }
+  // judged on the configuration now, not at the last sync
+  function press(id) { sync(); const it = items.get(id); if (!it) return false; it.ui.pressedAt = performance.now(); it.ui.refused = !it.c.enabled; if (!it.c.enabled) { it.ui.why = whyNot(it.c); return false; } it.ui.why = null; Promise.resolve(it.c.press()).catch((e) => console.error(e)); return true; }
   const lastWhy = (id) => items.get(id)?.ui.why || null;
   function screenPositions(camera, w, h) { const out = []; for (const it of items.values()) { const s = screenOf(it, camera, w, h); const q = it.ui.group.getWorldQuaternion(new THREE.Quaternion()); const n = new THREE.Vector3(0, 0, 1).applyQuaternion(q); n.y = 0; n.normalize(); out.push({ id: it.c.id, label: it.c.label, at: it.c.at, enabled: !!it.c.enabled, kind: it.c.kind, x: s?.x, y: s?.y, world: it.ui.group.getWorldPosition(new THREE.Vector3()).toArray(), facing: n.toArray() }); } return out; }
-  return { root, rebuild, sync, update, pick, near, press, lastWhy, screenPositions, items, anchor, consoles: () => consoles };
+  return { root, rebuild, sync, update, pick, near, press, hover, lastWhy, whyNot, screenPositions, items, anchor, consoles: () => consoles };
 }

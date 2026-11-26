@@ -1,0 +1,12 @@
+[
+  {"do": "wait", "ms": 3000},
+  {"do": "tap", "control": "in:microwave:door.open", "after": 4000},
+  {"do": "tap", "control": "in:microwave:turn.on", "after": 4500},
+  {"do": "tap", "control": "in:microwave:door.close", "after": 4500},
+  {"do": "tap", "control": "time:advance", "after": 3000},
+  {"do": "tap", "control": "time:advance", "after": 3000},
+  {"do": "tap", "control": "time:advance", "after": 3000},
+  {"do": "tap", "control": "time:advance", "after": 3000},
+  {"do": "tap", "control": "time:advance", "after": 4000},
+  {"do": "tap", "control": "in:microwave:turn.off", "after": 4000}
+]

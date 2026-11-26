@@ -46,7 +46,7 @@ export function buildBuilding(scene, plan, { systems = [], current = "" } = {}) 
     up(W + 0.3, WALL_H - 0.9, 0.3, cx, R.z1); up(0.3, WALL_H - 0.9, D, R.x1, cz);
     inside.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } }); }
   // windows high on the north wall, where no station stands below
-  const taken = [...plan.stations.filter((s) => s.wall === "north").map((s) => s.x), plan.clock.x];
+  const taken = [...plan.stations.filter((s) => s.wall === "north").map((s) => s.x), plan.clock.x, ...(plan.board.wall === "north" ? [plan.board.x - plan.board.w / 2 + 1.3, plan.board.x, plan.board.x + plan.board.w / 2 - 1.3] : [])]; // no window behind a board
   for (let x = R.x0 + 3; x < R.x1 - 2; x += 5.5) { if (taken.some((t) => Math.abs(t - x) < 2.6)) continue; block(root, 2.6, 1.6, 0.1, WOOD_D, x, 2.2, R.z0 + 0.16); const g = block(root, 2.3, 1.3, 0.12, "#bfe3ff", x, 2.35, R.z0 + 0.18, { mat: { emissive: "#6fa6d6", emissiveIntensity: 0.55 } }); g.castShadow = false; }
   // plants in the corners
   const plant = (x, z, s = 1) => { block(root, 0.5 * s, 0.5 * s, 0.5 * s, "#b5643a", x, 0, z); for (let i = 0; i < 5; i++) { const l = box(0.18 * s, 0.6 * s, 0.18 * s, i % 2 ? "#3f8a3e" : "#4fa04a"); l.position.set(x + Math.sin(i * 2.4) * 0.15 * s, 0.75 * s + (i % 3) * 0.12, z + Math.cos(i * 2.4) * 0.15 * s); l.rotation.z = Math.sin(i * 2.4) * 0.5; l.rotation.x = Math.cos(i * 2.4) * 0.5; root.add(l); } };
@@ -70,7 +70,7 @@ export function buildBuilding(scene, plan, { systems = [], current = "" } = {}) 
   const clockMouth = new THREE.Vector3(plan.clock.x + 1.25, 2.45, R.z0 + 0.4); // beside the clock, never across its face
 
   // ---- the board's frame on the west wall ----
-  const bf = new THREE.Group(); bf.position.set(plan.board.x, 2.45, plan.board.z); root.add(bf);
+  const bf = new THREE.Group(); bf.position.set(plan.board.x, plan.board.y ?? 2.45, plan.board.z); if (plan.board.wall === "north") bf.rotation.y = -Math.PI / 2; root.add(bf); // its frame faces the room from its wall
   { const fr = box(0.12, plan.board.h + 0.3, plan.board.w + 0.3, "#2a2a2a"); fr.position.x = 0.02; bf.add(fr); block(bf, 0.4, 0.06, plan.board.w, "#555", 0.2, -plan.board.h / 2 - 0.2, 0); }
 
   // ---- the directory: one brass plate per system, by the door; the lit one is this floor ----

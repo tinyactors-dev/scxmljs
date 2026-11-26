@@ -38,7 +38,7 @@ side panels. This one is a PLACE you walk through and poke. Rules:
 |---|---|---|
 | WORLD | `index.html`, `main.js`, `core/` (sim, input, camera), `world/` (building, avatars, desks, tubes, capsules), `record.mjs`, `out/` | `index.html` |
 | HEAD | `head/` (what you see when you select someone: their nested state machines as machines) | `head/test.html` |
-| BOARD | `board/` (the telemetry board: a 2D surface in the world) | `board/test.html` |
+| BOARD | `board/` (the telemetry board: a 2D surface in the world) | `board/capture.mjs` (`board/old/test.html` is the earlier board's page) |
 
 ## Shared interfaces (ES modules; WORLD delivers `core/sim.js` FIRST, within ~10 minutes; until it
 exists HEAD and BOARD write a 30-line stub of the same shape in their own directory)

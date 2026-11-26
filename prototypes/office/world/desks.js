@@ -2,11 +2,12 @@
 // there, by type: number = flip counter, boolean = lamp on a switch, string = a card in a holder,
 // array = a letter tray with one sheet per item, object = pigeonholes with one card per key. Each
 // object stands on the back edge facing the visitor, with an engraved plate on the desk's front edge
-// naming the variable; when its value changes it hops once. Every desk also has what an office desk
-// has, each a recognisable thing: a monitor whose lit screen faces the sitter and shows the state
-// they are in, a keyboard, a telephone, a wire in-basket under the hatch where the tube ends, an egg
-// timer (turned over while a delayed send is pending, ringing when it comes due), a desk lamp (lit
-// while someone sits here) and a small red alarm lamp (lit in an exception). The hub's desk stands
+// naming the variable; when its value changes it hops once. The middle of the back half is the person's
+// marble machines as a tabletop model (world/models.js), so two value objects stand on the corners beside it
+// (the rest are in the head's gauges) and the monitor and the desk lamp gave way. Every desk also has what an
+// office desk has, each a recognisable thing: a keyboard, a telephone, a wire in-basket under the hatch where
+// the tube ends, an egg timer (turned over while a delayed send is pending, ringing when it comes due) and a
+// small red alarm lamp (lit in an exception). The hub's desk stands
 // inside the exchange: an octagonal counter with a switchboard behind (a jack per partner, a cord
 // while it talks to one). Positions come from world/layout.js (the seat frame), shared with the poses.
 // Static furniture of each group is ONE mesh (BoxBatch); the moving parts are separate.
@@ -74,8 +75,6 @@ export function deskFurniture(batch, grp, seat, opts = {}) {
   add(2.0, 0.5, 0.05, WOOD, [0, 0.17, DESK.z1 - 0.05]);
   // keyboard: a dark base with pale keys (rows)
   const [kx, , kz] = SPOT.keyboard; add(0.5, 0.025, 0.17, "#2e2f36", [kx, DESK.topY, kz]); for (let r = 0; r < 4; r++) add(0.44, 0.012, 0.025, "#e6e2d8", [kx, DESK.topY + 0.025, kz - 0.06 + r * 0.04]);
-  // monitor stand and the screen's housing (the lit screen itself is a moving part: it shows the state)
-  const [mx, , mz] = SPOT.monitor; add(0.26, 0.02, 0.18, "#2b2b30", [mx, DESK.topY, mz + 0.04]); add(0.06, 0.3, 0.06, "#2b2b30", [mx, DESK.topY + 0.02, mz + 0.05]);
   // the in-basket (wire) under the hatch
   const [bx, , bz] = SPOT.basket; add(0.36, 0.015, 0.27, STEEL, [bx, DESK.topY, bz]); for (const sz of [-1, 1]) add(0.36, 0.09, 0.015, STEEL, [bx, DESK.topY, bz + sz * 0.13]); for (const sx of [-1, 1]) add(0.015, 0.09, 0.27, STEEL, [bx + sx * 0.175, DESK.topY, bz]);
   // the telephone's base (the handset is a moving part)
@@ -85,13 +84,6 @@ export function deskFurniture(batch, grp, seat, opts = {}) {
   { const cm = opts.chairColor || "#3d4250"; const seatB = box(CHAIR.w, 0.07, CHAIR.d, cm); seatB.position.set(0, CHAIR.seatTop - 0.035, CHAIR.cz); chair.add(seatB); const back = box(CHAIR.w, CHAIR.backTop - CHAIR.seatTop - 0.05, 0.06, cm); back.position.set(0, (CHAIR.seatTop + CHAIR.backTop) / 2 + 0.03, CHAIR.backZ); chair.add(back); const post = box(0.07, CHAIR.seatTop - 0.07, 0.07, "#222"); post.position.set(0, (CHAIR.seatTop - 0.07) / 2, CHAIR.cz); chair.add(post); const foot = box(0.56, 0.04, 0.08, "#222"); foot.position.set(0, 0.02, CHAIR.cz); chair.add(foot); const foot2 = box(0.08, 0.04, 0.56, "#222"); foot2.position.set(0, 0.02, CHAIR.cz); chair.add(foot2); }
   const ch0 = P([CHAIR.aside[0], 0, CHAIR.aside[1]]); chair.position.copy(ch0); chair.rotation.y = ry + 0.5;
   const d = { chair };
-  // the screen: faces the sitter, shows the active state's name
-  const scr = canvasTex(256, 160, () => {}); scr.anisotropy = 8;
-  const mon = new THREE.Group(); mon.position.set(mx, DESK.topY + 0.46, mz); mon.rotation.y = 0.32; grp.add(mon);
-  const housing = box(0.6, 0.38, 0.05, "#2b2b30"); housing.position.z = 0.02; mon.add(housing);
-  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.54, 0.32), new THREE.MeshBasicMaterial({ map: scr, toneMapped: false })); screen.position.z = -0.006; screen.rotation.y = Math.PI; mon.add(screen);
-  let lastScr = null; d.screen = (text, on) => { const k = on ? text : ""; if (k === lastScr) return; lastScr = k; const g = scr.userData.ctx; g.fillStyle = on ? "#173a4e" : "#111418"; g.fillRect(0, 0, 256, 160); if (on) { g.fillStyle = "#8fe3ff"; g.fillRect(14, 16, 60, 8); g.fillStyle = "#e6fbff"; let fs = 34; g.font = `bold ${fs}px 'DejaVu Sans Mono', monospace`; while (fs > 14 && g.measureText(text).width > 228) { fs -= 2; g.font = `bold ${fs}px 'DejaVu Sans Mono', monospace`; } g.textBaseline = "middle"; g.fillText(text, 14, 84); g.fillStyle = "#4f8fa8"; g.fillRect(14, 120, 140, 6); g.fillRect(14, 132, 90, 6); } scr.needsUpdate = true; };
-  d.screen("", false);
   // the hatch: where the tube ends, a brass funnel over the in-basket with a flap
   const [hx, hy, hz] = SPOT.hatch; const hatch = new THREE.Group(); hatch.position.set(hx, hy, hz); grp.add(hatch);
   // the tube's end: a short brass sleeve with a hinged flap underneath, on a bracket from the desk
@@ -101,12 +93,6 @@ export function deskFurniture(batch, grp, seat, opts = {}) {
   d.flap = flap;
   // the handset
   d.receiver = block(grp, 0.28, 0.05, 0.07, "#1d1d1d", px, DESK.topY + 0.085, pz - 0.03);
-  // the desk lamp: lit while someone sits here
-  const [lx, , lz] = SPOT.lamp; const lampG = new THREE.Group(); lampG.position.set(lx, DESK.topY, lz); grp.add(lampG);
-  block(lampG, 0.18, 0.03, 0.18, "#2d4a3a", 0, 0, 0); const arm = box(0.03, 0.4, 0.03, "#2d4a3a"); arm.position.set(0, 0.2, 0); lampG.add(arm);
-  d.shadeM = new THREE.MeshLambertMaterial({ color: "#3f7a5a", emissive: "#ffd66b", emissiveIntensity: 0, side: THREE.DoubleSide });
-  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.13, 14, 1, true), d.shadeM); shade.position.set(0.05, 0.42, -0.02); shade.rotation.z = -0.5; lampG.add(shade);
-  d.bulbM = new THREE.MeshBasicMaterial({ color: "#5a5040" }); const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), d.bulbM); bulb.position.set(0.06, 0.38, -0.02); lampG.add(bulb);
   // the egg timer (an hourglass): turned over and running while a delayed send is pending
   const [tx, , tz] = SPOT.timer; const tim = new THREE.Group(); tim.position.set(tx, DESK.topY, tz); grp.add(tim);
   const glass = new THREE.Group(); glass.position.y = 0.11; tim.add(glass);
@@ -116,8 +102,9 @@ export function deskFurniture(batch, grp, seat, opts = {}) {
   d.timer = tim; d.timerParts = { glass, sandTop, sandBot };
   // the alarm lamp: a small red dome, lit in an exception
   d.alarmM = new THREE.MeshLambertMaterial({ color: "#5a2020", emissive: "#ff2a1a", emissiveIntensity: 0 });
-  const alarm = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), d.alarmM); alarm.position.set(-0.55, DESK.topY + 0.03, 1.28); grp.add(alarm); block(grp, 0.14, 0.03, 0.14, "#333", -0.55, DESK.topY, 1.28);
-  d.alarmLight = new THREE.PointLight("#ff3a2a", 0, 2.2, 1.6); d.alarmLight.position.set(-0.55, DESK.topY + 0.25, 1.1); grp.add(d.alarmLight);
+  const [ax, , az] = SPOT.alarm;
+  const alarm = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), d.alarmM); alarm.position.set(ax, DESK.topY + 0.03, az); grp.add(alarm); block(grp, 0.14, 0.03, 0.14, "#333", ax, DESK.topY, az);
+  d.alarmLight = new THREE.PointLight("#ff3a2a", 0, 2.2, 1.6); d.alarmLight.position.set(ax, DESK.topY + 0.25, az - 0.1); grp.add(d.alarmLight);
   return d;
 }
 
@@ -125,7 +112,7 @@ export function buildDesks(scene, sim, plan, cfg = {}) {
   const root = new THREE.Group(); scene.add(root);
   const desks = new Map(); // seat key -> desk
   const varsOf = new Map();
-  const chartVars = (chart) => { if (!varsOf.has(chart)) varsOf.set(chart, pickVariables(sim, chart, { max: 4, prefer: cfg.desk?.[chart] })); return varsOf.get(chart); };
+  const chartVars = (chart) => { if (!varsOf.has(chart)) varsOf.set(chart, pickVariables(sim, chart, { max: SPOT.vars.length, prefer: cfg.desk?.[chart] })); return varsOf.get(chart); };
   const keyOf = (s) => `${s.x.toFixed(2)},${s.z.toFixed(2)}`;
   const colliders = []; // world AABBs the camera keeps out of: [min, max] Vector3s
   for (const g of plan.groups) {
@@ -175,11 +162,7 @@ export function buildDesks(scene, sim, plan, cfg = {}) {
       const id = here ? occ.id : null;
       const v = id ? sim.valuesAt(id, t) : null;
       for (const sp of d.spots) sp.set(v ? v[sp.id] : null, amb);
-      const lit = here && !ctx.dark;
-      d.shadeM.emissiveIntensity = lit ? 0.6 : 0; d.bulbM.color.set(lit ? "#fff3c0" : "#5a5040");
       const sit = id ? ctx.situation(id) : null;
-      const leaf = id ? (sim.activeAt(id, t) || []).slice(-1)[0] : null;
-      d.screen(leaf ? String(leaf).split(/[.#/]/).pop() : "", !!id && !ctx.dark);
       d.receiver.visible = !(sit && sit.kind === "waiting" && sit.detail?.with && sim.actor(sit.detail.with)?.external);
       const exc = !!(sit && sit.kind === "exception");
       d.alarmM.emissiveIntensity = exc ? 1.2 + 0.6 * Math.sin(amb * 6) : 0; d.alarmM.color.set(exc ? "#ff5a4a" : "#5a2020"); d.alarmLight.intensity = exc ? 1.6 + 0.6 * Math.sin(amb * 6) : 0;

@@ -1,0 +1,8 @@
+[
+  {"do": "wait", "ms": 3000},
+  {"do": "tap", "control": "in:checkout:checkout", "after": 3500},
+  {"do": "tap", "control": "in:checkout:add", "after": 4000},
+  {"do": "tap", "control": "in:checkout:checkout", "after": 4000},
+  {"do": "tap", "control": "in:checkout:ship", "after": 4000},
+  {"do": "tap", "control": "in:checkout:pay", "after": 5000}
+]

@@ -36,6 +36,16 @@ do something breathe (a slow glow): the only idle motion. `&still=1` turns that 
 The board grows with the run; touching the past shows that moment (controls go inert, the TIME
 plate says `LOOKING BACK`); ADVANCE TIME or the clock returns to now.
 
+Since 2026-11-26 (build .5), the owner's "I still don't understand what the microwave is doing": the person's
+**marble machines stand on their desk** as a live tabletop model (`world/models.js`, the head's own builder with
+`{desk: true}`), legible from the start view; **controls are lit or dim** (a lit ring and a glowing cap when
+the event would be taken now; a dark sunk cap and a dark label otherwise; pointing at a dim one shows why, as
+pressing it does; in-head buttons the same); and the **printer says why** (`world/ticker.js`): what changed,
+named in its region (`engine on, idle`), the guard that decided (`engine off if timer >= cookTime`), the guards
+that did not let it go on (`not cooking: door is open`), and what it waits for (`timer 0/5 · time in 1 s`).
+A desk's console stands at the desk's front corner with the printer just behind it, its tape above the console;
+the start view frames console, tape, person and model as near as it can (`startView` in main.js).
+
 | `?live=` | What you can click | Charts |
 |---|---|---|
 | `microwave` (default) | OPEN/CLOSE DOOR, TURN ON/OFF at the hatch; the cooking tick waits for ADVANCE TIME | `charts/microwave/` (site/charts) |

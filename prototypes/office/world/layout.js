@@ -15,10 +15,13 @@ export const SPOT = {
   basket: [0.62, 0.76, 0.68],       // the in-basket the tube drops mail into (sitter's left)
   hatch: [0.62, 1.1, 0.68],       // the tube's hatch above the basket
   phone: [-0.86, 0.76, 0.66],       // the telephone (sitter's right)
-  timer: [0.36, 0.76, 0.98],        // the egg timer (delayed sends)
-  lamp: [-0.92, 0.76, 1.26],        // the desk lamp (lit while someone sits here)
-  vars: [[0.66, 1.24], [0.2, 1.24], [-0.26, 1.24], [-0.72, 1.24]], // value objects along the back edge (x, z)
+  timer: [0.97, 0.76, 0.7],         // the egg timer (delayed sends): beside the basket
+  alarm: [-0.5, 0.76, 0.68],        // the red alarm lamp (an exception): between the keyboard and the phone
+  vars: [[0.87, 1.2], [-0.87, 1.2]],  // value objects on the back corners (x, z): the middle is the model's
 };
+// the person's marble machines as a tabletop model (world/models.js): on the back half of the desk, between the
+// value objects, clear of the keyboard, the basket and the phone the hands reach; its footprint at most w x d, h tall
+export const MODEL = { x: 0, z: 1.16, w: 1.22, d: 0.5, h: 0.5 };
 export const RISER_X = 1.36; // where the tube rises, at the desk's outer corner (sitter's left)
 export const CHAIR = { seatTop: 0.43, cz: -0.05, w: 0.5, d: 0.48, backZ: -0.32, backTop: 0.98, aside: [-0.62, -0.2] };
 export const PARTITION = { x: 1.55, z0: -1.0, z1: 1.4, h: 1.12 };
@@ -28,9 +31,9 @@ export function deskBoxes() {
   const b = [];
   b.push({ name: "desk top", c: [0, DESK.topY - DESK.thick / 2, DESK.cz], s: [DESK.w, DESK.thick, DESK.d] });
   b.push({ name: "modesty panel", c: [0, 0.17 + 0.25, DESK.z1 - 0.05], s: [2.0, 0.5, 0.05] });
-  const [mx, my, mz] = SPOT.monitor;
-  b.push({ name: "monitor", c: [mx, my + 0.46, mz + 0.02], s: [0.6, 0.38, 0.06], ry: 0.32 });
-  b.push({ name: "monitor stand", c: [mx, my + 0.15, mz + 0.05], s: [0.06, 0.3, 0.06] });
+  b.push({ name: "model", c: [MODEL.x, DESK.topY + MODEL.h / 2, MODEL.z], s: [MODEL.w, MODEL.h, MODEL.d] }); // the tabletop model's envelope
+  const [ax, ay, az] = SPOT.alarm; b.push({ name: "alarm", c: [ax, ay + 0.03, az], s: [0.14, 0.06, 0.14], soft: true });
+  const [tx, ty, tz] = SPOT.timer; b.push({ name: "egg timer", c: [tx, ty + 0.11, tz], s: [0.13, 0.22, 0.13] });
   const [kx, ky, kz] = SPOT.keyboard; b.push({ name: "keyboard", c: [kx, ky + 0.015, kz], s: [0.5, 0.03, 0.17], soft: true });
   const [bx, by, bz] = SPOT.basket; b.push({ name: "basket", c: [bx, by + 0.045, bz], s: [0.36, 0.09, 0.27], soft: true });
   const [px, py, pz] = SPOT.phone; b.push({ name: "phone", c: [px, py + 0.05, pz], s: [0.24, 0.1, 0.2] });

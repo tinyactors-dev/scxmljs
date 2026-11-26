@@ -114,3 +114,24 @@ first log", has the evidence and the frames):
 - O7 Focus put the camera inside the arcs (a double scaling: the bounds were already in world units); a press inside
   a head built it again. Focus now frames the whole machine; the head refreshes in place.
 - O8 The receipt printer (world/ticker.js): one line per cause and what it caused.
+
+## "I still don't understand what the microwave example is doing" (2026-11-26, build .5)
+
+The owner pressed OPEN DOOR, TURN ON in `?live=microwave`: the tape said `off → idle` in small type on a mostly
+blank tape, the chart was two clicks away inside the head, and the four buttons looked alike. Now, from the start
+view alone (`tools/scripts/microwave-story.json`, replayed into `out/story/`):
+
+- M1 the machines are on the desk: `world/models.js` stands each person's head machines (the same `createHead`,
+  `{desk: true}`) on the desk's back half, legible from the start view (state names about 10 px and up at
+  1280 x 720); a big chart shows its regions closed with their current state, or its top machine open. The
+  monitor and desk lamp gave way; two value objects stand on the corners (`world/layout.js` MODEL; inspect 24/24).
+- M2 the printer says why: `engine on, idle · not cooking: door is open`, `door closed → engine cooking ·
+  timer 0/5 · time in 1 s` (the guard that decided, the guards that hold it back, what it waits for; names in
+  their region). The tape is as long as what is on it; the latest line large, the two before readable.
+- M3 lit and dim: a control whose event would be taken now has a lit ring and a glowing cap; the others a dark
+  sunk cap and a dark label, which shows why when pointed at or pressed (in a head too).
+- M4 fixed on the way: a live run's heads stopped mid-move after its last instant (warp(t) saturates): heads
+  now take the playhead second; a press within 0.4 s of the last was judged on stale controls.
+- M5 the board in a small live room hangs on the north wall left of the clock (`core/plan.js`, `cfg.boardNorth`,
+  3.3 m wide, its bottom above the people's heads) and the start view frames it whole with the desk model, the
+  console and the printer; big rooms keep it on the west wall (fulfillment's is still small from its start view).

@@ -127,7 +127,7 @@ for (const tp of taps) {
 // live: a press that the room did not answer (the run did not grow): an inert control, or the FLOW/STEP lever holding it back
 if (S.live) for (const a of acts.filter((e) => ["press", "advance", "headSend"].includes(e.type))) {
   const grew = L.by("world", "rebuild").some((e) => e.t > a.t && e.t < a.t + 2500); const play = modes.some((m) => m.t > a.t && m.t < a.t + 2500 && /\+playing/.test(m.data.to));
-  if (!grew && !play && !/^(reset|time:mode)$/.test(a.data.id || "")) add("live.no-effect", 2, a.t, `${a.type} ${a.data.id || a.data.event || ""}: nothing happened in the room (an inert control, or the run is held back)`);
+  if (!grew && !play && !/^(reset|time:mode|time:run)$/.test(a.data.id || "")) add("live.no-effect", 2, a.t, `${a.type} ${a.data.id || a.data.event || ""}: nothing happened in the room (an inert control, or the run is held back)`);
 }
 // live: a press whose consequence was not in view. Builds that log it say so directly (world/consequence: the people
 // the chain changed, and which of them were on screen, unhidden, two seconds later); for older logs the person an
@@ -146,7 +146,7 @@ if (S.live) {
     if (!seen && !/^(entering|head|machine|leaving):/.test(modeAt(p.t))) add("live.consequence-offscreen", 3, p.t, `press ${p.data.id}: ${who}, whom it drives, was not in view 1 to 2.5 s later (what it caused happened off screen)`);
   }
   // a refused press: did the build say why? (older builds: no reason, and nothing but a shiver of the cap)
-  for (const p of L.by("world", "press").filter((e) => e.data.ok === false && !/^(time:mode)$/.test(e.data.id || ""))) add("live.refused", p.data.why ? 0 : 2, p.t, p.data.why ? `press ${p.data.id} refused, and the control said why: "${p.data.why}"` : `press ${p.data.id} refused with no reason shown (the cap only shivers)`);
+  for (const p of L.by("world", "press").filter((e) => e.data.ok === false && !/^(time:mode|time:run)$/.test(e.data.id || ""))) add("live.refused", p.data.why ? 0 : 2, p.t, p.data.why ? `press ${p.data.id} refused, and the control said why: "${p.data.why}"` : `press ${p.data.id} refused with no reason shown (the cap only shivers)`);
   for (const p of L.by("world", "press").filter((e) => e.data.queued)) add("live.queued", 0, p.t, `press ${p.data.id} made while the last one still played: that one finished fast, then this one played`);
 }
 // a press inside a head must update it in place, not build it again (its marbles jump back to their starts)

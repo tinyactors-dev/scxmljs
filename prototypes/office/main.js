@@ -464,7 +464,7 @@ function perform(a, src = "input") {
       if (it && !it.fixed) pressLabels.push([evN, it.c.label]);
       const ok = liveControls.press(a.id); const why = ok ? null : liveControls.lastWhy(a.id);
       log.ev("world", "press", { id: a.id, ok, why, queued: ok && wasPlaying, stepping: !!live?.stepping, pending: live ? live.pendingTimers().length : 0 }); // log: taken, refused (and why), or queued behind what plays
-      if (!ok && it && a.id !== "time:mode") ticker.refuse(`YOU: ${it.c.label}`, why || "not now", playS);
+      if (!ok && it && !/^time:(mode|run)$/.test(a.id)) ticker.refuse(`YOU: ${it.c.label}`, why || "not now", playS);
       // a press made while the room still plays the last one: that one finishes fast, then this one plays
       if (ok && wasPlaying) catchUp = lastS;
       if (ok && it) pressWatch = { id: a.id, evN, actor: it.c.actor || null, at: amb };

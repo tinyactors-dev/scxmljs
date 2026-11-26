@@ -164,12 +164,13 @@ export function createControls({ scene, live, still = false }) {
     const { plan } = world;
     const R = plan.room;
     // the time console under the wall clock
-    const tc = makeConsole(3, { cols: 3, title: "NO TIMER SET", height: 1.0, tilt: 0.6 }); // its title plate says what is pending
+    const tc = makeConsole(4, { cols: 2, title: "NO TIMER SET", height: 1.0, tilt: 0.6 }); // its title plate says what is pending
     tc.group.position.set(plan.clock.x, 0, R.z0 + 1.3); root.add(tc.group);
     const timeCs = [
       { id: "time:advance", kind: "button", label: "ADVANCE TIME", color: "#e2b33c", press: () => (live.viewingPast ? live.returnToNow() : live.advance()) },
       { id: "time:hop", kind: "button", label: "ONE HOP", color: "#3d73c4", press: () => live.step() },
       { id: "time:mode", kind: "lever", label: "FLOW · STEP", color: "#3d73c4", press: () => live.setStepping(!live.stepping) },
+      { id: "time:run", kind: "lever", label: "CLOCK RUNS", color: "#3a9d5d", press: () => { running = !running; waited = 0; waitKey = null; } }, // on: timers fire when their time has really passed
     ];
     timeCs.forEach((c, i) => { const ui = c.kind === "lever" ? makeLever(c) : makeButton(c, c.color); tc.cells[i].add(ui.group); ui.hit.userData.liveControl = c.id; items.set(c.id, { c, ui, fixed: true }); });
     // what is pending: a plate on the wall under the clock, and a red flag on the clock
@@ -205,16 +206,27 @@ export function createControls({ scene, live, still = false }) {
     if (tm("time:advance")) tm("time:advance").c.enabled = timers.length > 0 && !live.busy && !live.viewingPast;
     if (tm("time:hop")) tm("time:hop").c.enabled = live.stepping && !live.atRest() || live.stepping && live.released() < live.restS() - 0.01;
     if (tm("time:mode")) { tm("time:mode").c.enabled = true; tm("time:mode").c.on = live.stepping; }
+    if (tm("time:run")) { tm("time:run").c.enabled = true; tm("time:run").c.on = running; }
     if (tm("reset")) tm("reset").c.enabled = !live.busy;
     if (live.viewingPast && tm("time:advance")) tm("time:advance").c.enabled = true;
     // the plate under the clock
-    const txt = live.viewingPast ? "LOOKING BACK: ADVANCE = NOW" : timers.length ? `TIMER DUE IN ${fmt(timers[0].in)}${timers.length > 1 ? ` (+${timers.length - 1})` : ""}` : "NO TIMER SET";
+    const txt = live.viewingPast ? "LOOKING BACK: ADVANCE = NOW" : timers.length ? `TIMER DUE IN ${fmt(running ? Math.max(0, timers[0].in - waited) : timers[0].in)}${timers.length > 1 ? ` (+${timers.length - 1})` : ""}` : "NO TIMER SET";
     if (fixed.pend && fixed.pend.last !== txt) { fixed.pend.last = txt; const t = labelTex(txt, { w: fixed.pend.w, h: 0.12, bg: timers.length ? "#f0c45a" : "#2a1d12", fg: timers.length ? "#2a1a06" : "#e9c46a" }); fixed.pend.group.material.map.dispose(); fixed.pend.group.material.map = t; fixed.pend.group.material.needsUpdate = true; }
     if (fixed.flag) fixed.flag.group.visible = timers.length > 0;
   }
   const fmt = (ms) => (ms < 1000 ? `${Math.max(0, Math.round(ms))} MS` : ms < 60000 ? `${+(ms / 1000).toFixed(1)} S` : `${+(ms / 60000).toFixed(1)} MIN`);
 
+  let running = false, waited = 0, waitKey = null, lastAmb = null; // CLOCK RUNS: the next timer fires once its delay has passed in real time
+  function runClock(amb) {
+    const d = lastAmb === null ? 0 : Math.min(0.25, Math.max(0, amb - lastAmb)); lastAmb = amb;
+    if (!running || live.busy || live.viewingPast || !live.atRest()) return;
+    const t = live.pendingTimers()[0]; if (!t) { waitKey = null; return; }
+    if (t.due !== waitKey) { waitKey = t.due; waited = 0; }
+    waited += d * 1000;
+    if (waited >= t.in) { waitKey = null; waited = 0; live.advance(); }
+  }
   function update(amb) {
+    runClock(amb);
     const rest = live.atRest();
     for (const it of items.values()) {
       const { c, ui } = it; const en = !!c.enabled;

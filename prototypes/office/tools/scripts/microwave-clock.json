@@ -1,0 +1,5 @@
+[
+  {"do": "wait", "ms": 2000},
+  {"do": "tap", "control": "time:run", "after": 1500},
+  {"do": "tap", "control": "in:microwave:turn.on", "after": 12000}
+]

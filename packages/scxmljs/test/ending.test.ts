@@ -82,8 +82,10 @@ for (const [name, entry] of [
         if (s.isActive("paid")) s.dispose();
       });
       let done: unknown;
+      let disposed: boolean | undefined;
       s.addEventListener("done", (e) => {
         done = e.data;
+        disposed = e.disposed;
       });
       s.start();
       s.send("pay");
@@ -91,6 +93,7 @@ for (const [name, entry] of [
       expect(s.status).toBe("done");
       expect(s.cancelled).toBe(false);
       expect(done).toEqual({ ref: "R-9" });
+      expect(disposed).toBe(false);
       expect(await s.done).toEqual({ ref: "R-9" });
     });
 
@@ -125,6 +128,10 @@ for (const [name, entry] of [
       s.addEventListener("log", (e) => logs.push(`${e.label} ${e.value}`));
       const errors: string[] = [];
       s.addEventListener("error", (e) => errors.push(e.message));
+      let disposed: boolean | undefined;
+      s.addEventListener("done", (e) => {
+        disposed = e.disposed;
+      });
       s.addEventListener("macrostep", (e) => {
         if (e.event?.name === "hold") s.dispose();
       });
@@ -132,6 +139,7 @@ for (const [name, entry] of [
       s.send("hold");
       clock.run();
       expect(s.cancelled).toBe(true);
+      expect(disposed).toBe(true);
       expect(log.slice(-5)).toEqual(["log:closing", "microstep:hold", "macrostep", "log:released", "done"]);
       // the exit handlers ran before the data model was released (they used to fail in QuickJS)
       expect(logs).toEqual(["closing SO-1", "released SO-1"]);
@@ -141,9 +149,14 @@ for (const [name, entry] of [
     test("dispose() of a session that never started dispatches done, once", async () => {
       const { s } = await make(doc(`<state id="draft"/>`));
       const log = record(s);
+      let disposed: boolean | undefined;
+      s.addEventListener("done", (e) => {
+        disposed = e.disposed;
+      });
       s.dispose();
       s.dispose();
       expect(log).toEqual(["done"]);
+      expect(disposed).toBe(true);
       expect(s.status).toBe("done");
       expect(s.cancelled).toBe(true);
       expect(await s.done).toBeUndefined();

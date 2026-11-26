@@ -47,12 +47,15 @@ export { parseSCXML, SCXMLSession } from "./session.ts";
 export {
   ChildSessionEvent,
   DoneEvent,
+  EnqueueEvent,
   InvokeEvent,
   LogEvent,
   MacrostepEvent,
   MicrostepEvent,
   SCXMLErrorEvent,
   type SCXMLErrorKind,
+  SendCancelledEvent,
   SendEvent,
+  SendScheduledEvent,
   type SessionEventMap,
 } from "./session-events.ts";

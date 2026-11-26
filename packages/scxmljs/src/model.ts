@@ -111,6 +111,13 @@ export interface Model {
   resources: Map<Element, string | Error>;
   /** Likely mistakes that are still valid SCXML (see `Diagnostic`); empty for most charts. */
   warnings: Diagnostic[];
+  /**
+   * The SCXML text the chart was parsed from, when the library knows it: `createSession` given
+   * text, an invoked chart read from `<invoke src>` or `<content expr>`, or
+   * `compile(root, { source })`. `undefined` for a model compiled from an element alone. It keeps
+   * what a DOM may not, such as the comments before `<scxml>` (happy-dom's `DOMParser` drops them).
+   */
+  source?: string;
 }
 
 /** The document isn't valid SCXML. `problems` lists every problem found. */
@@ -182,16 +189,18 @@ export function scxmlChildren(el: Element, ns: string | null): Element[] {
 /**
  * Compile an `<scxml>` element. `src` attributes on `<script>` and `<data>`
  * are fetched with `loader`; the result is synchronous when the loader is.
+ * `source`, the text `root` was parsed from, is kept as `model.source`.
  *
  * @throws {TypeError} when given text: parse it first with `parseSCXML()`.
  */
-export function compile(root: Element, opts: { loader?: Loader } = {}): Model | Promise<Model> {
+export function compile(root: Element, opts: { loader?: Loader; source?: string } = {}): Model | Promise<Model> {
   if (typeof root === "string")
     throw new TypeError(
       "compile() takes the parsed <scxml> Element, not SCXML text: parse it first with parseSCXML(text, domParser), " +
         "or pass the text to createSession()",
     );
   const model = build(root);
+  if (opts.source !== undefined) model.source = opts.source;
   const pending: Promise<void>[] = [];
   for (const el of [...model.scripts, ...scriptsIn(model), ...model.allData]) {
     const src = el.getAttribute("src");

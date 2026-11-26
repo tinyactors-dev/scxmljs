@@ -100,10 +100,12 @@ The session is an `EventTarget`. Its events are typed:
 |---|---|
 | `macrostep` | the session is stable again after an event. `configuration` lists the active states. |
 | `microstep` | after each set of transitions: `transitions`, `exited`, `entered` |
-| `done` | the chart reached a top-level final state, or was cancelled. `data` is the `<donedata>`. |
+| `done` | the chart reached a top-level final state, or was cancelled or disposed (`disposed` says which). `data` is the `<donedata>`. Always the last event. |
 | `error` | an `error.*` event was raised: `kind`, `message`, and the `element` that failed |
 | `log` | a `<log>` ran: `label`, `value` |
-| `send` | a `<send>` was dispatched, after its delay: `message` |
+| `send` | a `<send>` was dispatched, after its delay: `message`, the custom `processor` it went to, its `delay` |
+| `sendscheduled`, `sendcancelled` | a `<send>` with a delay was scheduled; one was discarded before its dispatch (`reason`: `cancel` or `exit`) |
+| `enqueue` | an event reached the session's external or internal queue, from any source: `id`, `event`, `queue`, `processor`, `dropped` |
 | `invoke`, `child` | an `<invoke>` started; an invoked SCXML child session was created |
 
 For UI, `macrostep` is usually what you want: render from `session.isActive(id)` or
@@ -115,6 +117,61 @@ const status = document.querySelector("#status")!;
 session.addEventListener("macrostep", () => {
   status.textContent = session.isActive("signed-in") ? `Hello, ${session.datamodel.evaluate("user")}` : "Signed out";
 });
+```
+
+### Observing everything a session does
+
+Tracers, logs and developer tools need more than the configuration: where each event came from
+and what it caused. The session tells them without being changed:
+
+- `enqueue` reports every event that reaches the session, whoever sent it: `session.send()`, an
+  I/O processor (`processor`), another session's `<send>` (`event.origin`), an invoked child or
+  service (`event.invokeid`), and the events the chart raises itself (`queue: "internal"`). Each
+  gets an `id`, and the `microstep` and `macrostep` that process the event carry it as `eventId`.
+  The ids are the host's alone: the chart's `_event` never sees them.
+- `send.triggerId` names the event that was being processed when the `<send>` ran.
+- A delayed `<send>` is seen when it is scheduled (`sendscheduled`), when it is dispatched (`send`,
+  with the same `message` object) and when it is discarded first (`sendcancelled`).
+- `session.processing` is true while a step runs; `session.options` are the options the session
+  was made with; `model.source` is the text a chart was parsed from.
+
+Listening costs nothing until you do: the events only observers need are only made for sessions
+that have a listener for them.
+
+<!-- doctest: run -->
+```ts
+import { createSession, VirtualClock } from "@tinyactors/scxmljs";
+
+const clock = new VirtualClock();
+const order = await createSession(
+  `<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript">
+     <state id="cart">
+       <transition event="checkout" target="paying"/>
+     </state>
+     <state id="paying">
+       <onentry><send event="payment.timeout" delay="30s"/></onentry>
+       <transition event="payment.timeout" target="cart"/>
+     </state>
+   </scxml>`,
+  { clock },
+);
+const cause = new Map<number, string>(); // event id → where it came from
+order.addEventListener("enqueue", (e) => cause.set(e.id, e.event.origin ? "the chart" : "the application"));
+order.addEventListener("microstep", (e) => {
+  if (e.eventId !== undefined) console.log(`${e.event!.name} from ${cause.get(e.eventId)} → ${e.entered.map((s) => s.id)}`);
+});
+order.addEventListener("sendscheduled", (e) => console.log(`${e.message.event} in ${e.delay} ms`));
+order.start();
+order.send("checkout");
+clock.run();
+order.dispose();
+```
+
+<!-- doctest: output -->
+```text
+payment.timeout in 30000 ms
+checkout from the application → paying
+payment.timeout from the chart → cart
 ```
 
 ## The chart as your markup

@@ -9,7 +9,7 @@
  */
 import type { SCXMLEvent } from "./events.ts";
 import type { StateNode, TransitionNode } from "./model.ts";
-import type { OutboundSend, SCXMLSession } from "./session.ts";
+import type { IOProcessor, OutboundSend, SCXMLSession } from "./session.ts";
 
 abstract class SessionEvent extends Event {
   /** The session that dispatched the event. */
@@ -24,6 +24,11 @@ abstract class SessionEvent extends Event {
 export class MicrostepEvent extends SessionEvent {
   /** The event being processed, or `undefined` for eventless transitions (and the initial step). */
   readonly event?: SCXMLEvent;
+  /**
+   * The id of `event`: the `id` of the `enqueue` event that queued it, so a host can tell which
+   * delivery this step processed. `undefined` when `event` is.
+   */
+  readonly eventId?: number;
   /** The transitions taken, in document order. */
   readonly transitions: TransitionNode[];
   /** States exited, in exit order (innermost first). */
@@ -32,10 +37,11 @@ export class MicrostepEvent extends SessionEvent {
   readonly entered: StateNode[];
   constructor(
     session: SCXMLSession,
-    init: { event?: SCXMLEvent; transitions: TransitionNode[]; exited: StateNode[]; entered: StateNode[] },
+    init: { event?: SCXMLEvent; eventId?: number; transitions: TransitionNode[]; exited: StateNode[]; entered: StateNode[] },
   ) {
     super("microstep", session);
     this.event = init.event;
+    this.eventId = init.eventId;
     this.transitions = init.transitions;
     this.exited = init.exited;
     this.entered = init.entered;
@@ -52,11 +58,14 @@ export class MicrostepEvent extends SessionEvent {
 export class MacrostepEvent extends SessionEvent {
   /** The external event that started the macrostep; `undefined` for the initial one. */
   readonly event?: SCXMLEvent;
+  /** The id of `event` (see `EnqueueEvent.id`); `undefined` when `event` is. */
+  readonly eventId?: number;
   /** The active states, in document order. */
   readonly configuration: StateNode[];
-  constructor(session: SCXMLSession, init: { event?: SCXMLEvent; configuration: StateNode[] }) {
+  constructor(session: SCXMLSession, init: { event?: SCXMLEvent; eventId?: number; configuration: StateNode[] }) {
     super("macrostep", session);
     this.event = init.event;
+    this.eventId = init.eventId;
     this.configuration = init.configuration;
   }
 }
@@ -98,11 +107,106 @@ export class SCXMLErrorEvent extends SessionEvent {
 
 /** A `<send>` was dispatched (after any delay) — to the SCXML processor or a custom one. */
 export class SendEvent extends SessionEvent {
-  /** What was sent: event, target, type, data and sendid. */
+  /**
+   * What was sent: event, target, type, data and sendid. For a delayed send it is the same object
+   * the `sendscheduled` event carried, so the two can be matched even without a sendid.
+   */
   readonly message: OutboundSend;
-  constructor(session: SCXMLSession, init: { message: OutboundSend }) {
+  /** The custom I/O processor `<send type>` resolved to (`message.type` is its canonical type); `undefined` for the SCXML processor. */
+  readonly processor?: IOProcessor;
+  /** The delay in ms the `<send>` asked for (`0` when it was not delayed). */
+  readonly delay: number;
+  /**
+   * The id of the event being processed when the `<send>` executed (see `EnqueueEvent.id`), also for a
+   * delayed send that is dispatched later; `undefined` when it executed in the initial step, an
+   * eventless transition of it, or while the session ended.
+   */
+  readonly triggerId?: number;
+  constructor(session: SCXMLSession, init: { message: OutboundSend; processor?: IOProcessor; delay?: number; triggerId?: number }) {
     super("send", session);
     this.message = init.message;
+    this.processor = init.processor;
+    this.delay = init.delay ?? 0;
+    this.triggerId = init.triggerId;
+  }
+}
+
+/**
+ * A `<send>` with a delay was scheduled: unless a `<cancel>` or the end of the session discards it
+ * first (a `sendcancelled` event), it is dispatched after `delay` ms of the session's clock (a `send`
+ * event with the same `message` object).
+ */
+export class SendScheduledEvent extends SessionEvent {
+  /** What will be sent, evaluated now (spec §6.2.3). The `send` event carries this same object. */
+  readonly message: OutboundSend;
+  /** The custom I/O processor it will go to; `undefined` for the SCXML processor. */
+  readonly processor?: IOProcessor;
+  /** The delay in ms. */
+  readonly delay: number;
+  /** The id of the event being processed when the `<send>` executed (see `SendEvent.triggerId`). */
+  readonly triggerId?: number;
+  constructor(session: SCXMLSession, init: { message: OutboundSend; processor?: IOProcessor; delay: number; triggerId?: number }) {
+    super("sendscheduled", session);
+    this.message = init.message;
+    this.processor = init.processor;
+    this.delay = init.delay;
+    this.triggerId = init.triggerId;
+  }
+}
+
+/** A delayed `<send>` was discarded before it was dispatched. */
+export class SendCancelledEvent extends SessionEvent {
+  /** The message of its `sendscheduled` event (the same object). */
+  readonly message: OutboundSend;
+  /** The custom I/O processor it would have gone to; `undefined` for the SCXML processor. */
+  readonly processor?: IOProcessor;
+  /** The delay in ms it was scheduled with. */
+  readonly delay: number;
+  /** `cancel`: a `<cancel>` named its sendid; `exit`: the session terminated (or was disposed) first. */
+  readonly reason: "cancel" | "exit";
+  constructor(session: SCXMLSession, init: { message: OutboundSend; processor?: IOProcessor; delay: number; reason: "cancel" | "exit" }) {
+    super("sendcancelled", session);
+    this.message = init.message;
+    this.processor = init.processor;
+    this.delay = init.delay;
+    this.reason = init.reason;
+  }
+}
+
+/**
+ * An event was placed on one of the session's queues: the external queue (`session.send()`, an I/O
+ * processor's `deliver`, a `<send>` from this or another session, `#_parent` and `#_<invokeid>`
+ * targets, an invoked child or service, `done.invoke.*`) or the internal one (`<raise>`, `#_internal`,
+ * `done.state.*`, `error.*`).
+ *
+ * `id` names the event from here on: the `microstep` and `macrostep` events that process it carry
+ * it as `eventId`. Ids are numbers unique within the JavaScript realm; compare them, don't
+ * interpret them. They are the host's: the chart never sees them (`_event` has no such field).
+ */
+export class EnqueueEvent extends SessionEvent {
+  /** The event's id. */
+  readonly id: number;
+  /** The event as the chart will see it as `_event` (a copy: changing it changes nothing). */
+  readonly event: SCXMLEvent;
+  /** Which queue it joined. */
+  readonly queue: "external" | "internal";
+  /** The custom I/O processor that delivered it (`event.origintype` is its type); `undefined` for every other source. */
+  readonly processor?: IOProcessor;
+  /**
+   * True when the session discarded the event instead of queueing it: it had terminated or was
+   * disposed, or the event came from an invocation the session had already cancelled.
+   */
+  readonly dropped: boolean;
+  constructor(
+    session: SCXMLSession,
+    init: { id: number; event: SCXMLEvent; queue: "external" | "internal"; processor?: IOProcessor; dropped?: boolean },
+  ) {
+    super("enqueue", session);
+    this.id = init.id;
+    this.event = init.event;
+    this.queue = init.queue;
+    this.processor = init.processor;
+    this.dropped = init.dropped ?? false;
   }
 }
 
@@ -142,9 +246,16 @@ export class ChildSessionEvent extends SessionEvent {
 export class DoneEvent extends SessionEvent {
   /** The top-level final state's `<donedata>`, or `undefined` (always `undefined` after a cancel). */
   readonly data: unknown;
-  constructor(session: SCXMLSession, init: { data: unknown }) {
+  /**
+   * True when `dispose()` ended the session (`session.cancelled` is then true too); false when it
+   * reached a top-level final state or was cancelled otherwise (`cancel()`, or by the session that
+   * invoked it).
+   */
+  readonly disposed: boolean;
+  constructor(session: SCXMLSession, init: { data: unknown; disposed?: boolean }) {
     super("done", session);
     this.data = init.data;
+    this.disposed = init.disposed ?? false;
   }
 }
 
@@ -160,6 +271,12 @@ export interface SessionEventMap {
   error: SCXMLErrorEvent;
   /** A `<send>` was dispatched. */
   send: SendEvent;
+  /** A `<send>` with a delay was scheduled. */
+  sendscheduled: SendScheduledEvent;
+  /** A delayed `<send>` was discarded before its dispatch. */
+  sendcancelled: SendCancelledEvent;
+  /** An event joined the external or internal queue (or was dropped). */
+  enqueue: EnqueueEvent;
   /** An `<invoke>` started. */
   invoke: InvokeEvent;
   /** An invoked SCXML child session was created. */

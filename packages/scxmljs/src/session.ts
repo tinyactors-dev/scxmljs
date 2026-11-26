@@ -42,13 +42,16 @@ import {
 import {
   ChildSessionEvent,
   DoneEvent,
+  EnqueueEvent,
   InvokeEvent,
   LogEvent,
   MacrostepEvent,
   MicrostepEvent,
   SCXMLErrorEvent,
   type SCXMLErrorKind,
+  SendCancelledEvent,
   SendEvent,
+  SendScheduledEvent,
   type SessionEventMap,
 } from "./session-events.ts";
 import { DOMParser as BuiltinDOMParser } from "./xml/index.ts";
@@ -227,14 +230,26 @@ interface ActiveInvoke {
 
 /** Marks events that came from an invoked child (for finalize and cancellation filtering). */
 const FROM_CHILD = Symbol("fromChild");
-type QueuedEvent = SCXMLEvent & { [FROM_CHILD]?: boolean };
+/** An event's id (`EnqueueEvent.id`): a symbol, so it never reaches `_event`. */
+const EVENT_ID = Symbol("eventId");
+type QueuedEvent = SCXMLEvent & { [FROM_CHILD]?: boolean; [EVENT_ID]?: number };
+/** The last event id handed out (ids are unique within the realm). */
+let eventCounter = 0;
+
+/** A delayed `<send>` waiting for its timer. */
+interface DelayedSend {
+  timer: unknown;
+  message: OutboundSend;
+  processor?: IOProcessor;
+  delay: number;
+}
 
 /**
  * SCXML text, an `<scxml>` element or a compiled model → a compiled model.
  * @internal used by the entry points' `createSession`
  */
 export function resolveModel(source: string | Element | Model, opts: SessionOptions = {}): Model | Promise<Model> {
-  if (typeof source === "string") return compile(parseSCXML(source, opts.domParser), { loader: opts.loader });
+  if (typeof source === "string") return compile(parseSCXML(source, opts.domParser), { loader: opts.loader, source });
   if ("root" in source && "states" in source) return source;
   return compile(source, { loader: opts.loader });
 }
@@ -310,7 +325,7 @@ export class SCXMLSession extends EventTarget {
   private readonly lateBound = new Set<StateNode>();
   private readonly invoked = new Map<string, ActiveInvoke>();
   private readonly invokeIds = new Map<InvokeNode, string>();
-  private readonly delayed = new Map<string, unknown>(); // send key → timer
+  private readonly delayed = new Map<string, DelayedSend>(); // send key → its timer and message
   private readonly delayedBySendid = new Map<string, Set<string>>();
   private readonly processors = new Map<string, IOProcessor>();
   private readonly ioSessions = new Map<IOProcessor, IOSession>();
@@ -323,6 +338,10 @@ export class SCXMLSession extends EventTarget {
   private busy = false;
   /** The session's last macrostep is being reported: it ends right after, however `cancel()` is called meanwhile. */
   private stopping = false;
+  /** The id of the event being processed (for `SendEvent.triggerId`). */
+  private triggerId?: number;
+  /** Event types with a listener (ever): the events only observers need are made only for them. */
+  private readonly listened = new Set<string>();
   private scheduled = false;
   private sendCounter = 0;
   private settleWaiters: (() => void)[] = [];
@@ -352,7 +371,8 @@ export class SCXMLSession extends EventTarget {
     for (const p of opts.ioprocessors ?? []) {
       const io: IOSession = {
         sessionId: this.sessionId,
-        deliver: (name, data, origin) => this.enqueueExternal({ name, type: "external", data, origin, origintype: p.type }),
+        deliver: (name, data, origin) =>
+          this.enqueueExternal({ name, type: "external", data, origin, origintype: p.type }, { processor: p }),
       };
       this.ioSessions.set(p, io);
       for (const key of [p.type, ...(p.aliases ?? [])]) {
@@ -402,6 +422,7 @@ export class SCXMLSession extends EventTarget {
   ): void;
   override addEventListener(type: string, listener: unknown, options?: boolean | AddEventListenerOptions): void {
     if (!listener) return;
+    this.listened.add(type);
     const key = `${type}\0${capture(options)}`;
     let byKey = this.wrapped.get(listener as object);
     if (!byKey) {
@@ -488,6 +509,29 @@ export class SCXMLSession extends EventTarget {
     return this.exited ? "done" : this.started ? "running" : "idle";
   }
 
+  /**
+   * True while the session is running a step: from taking an event (or `start()`) through its
+   * microsteps and invocations, and while it runs its exit handlers as it terminates. What a
+   * session does while `processing` (a `send`, `sendscheduled`, `enqueue` or `error` event) belongs
+   * to the step its next `microstep` event reports, or, as it terminates, to its end. It is false
+   * in `macrostep` listeners: the step is over.
+   */
+  get processing(): boolean {
+    return this.busy;
+  }
+
+  /**
+   * The options the session was created with, read-only. For an invoked child: its parent's
+   * options, with the invocation's params as `data` (and no `sessionId`, `elementEvents` or
+   * `reflect`). Nested objects (`invokers`, `ioprocessors`, `data`) are the ones the session uses:
+   * read them, don't change them.
+   */
+  get options(): Readonly<SessionOptions> {
+    this.frozenOptions ??= Object.freeze({ ...this.opts });
+    return this.frozenOptions;
+  }
+  private frozenOptions?: Readonly<SessionOptions>;
+
   /** The handle an I/O processor uses for this session. */
   ioSession(p: IOProcessor): IOSession | undefined {
     return this.ioSessions.get(p);
@@ -565,11 +609,13 @@ export class SCXMLSession extends EventTarget {
    * more than once; the session can't be used afterwards (`start()` throws).
    */
   dispose() {
-    if (this.exited) return void this.release();
     // never started: it ends here, cancelled, without having run
+    if (this.exited) return void this.release();
+    // from the listener of its last macrostep it has finished already: it ends as it would have
+    this.disposing = !this.stopping;
     if (!this.started) {
       this.exited = this.wasCancelled = true;
-      this.emit(new DoneEvent(this, { data: undefined }));
+      this.emit(new DoneEvent(this, { data: undefined, disposed: true }));
     }
     this.cancel();
     this.release();
@@ -594,6 +640,8 @@ export class SCXMLSession extends EventTarget {
   }
 
   private wasCancelled = false;
+  /** `dispose()` is ending it (for `DoneEvent.disposed`). */
+  private disposing = false;
   private disposedDm = false;
   private readonly lifetime = new AbortController();
 
@@ -829,7 +877,7 @@ export class SCXMLSession extends EventTarget {
     if (this.exited) return;
     this.stopping = !this.running;
     try {
-      this.emit(new MacrostepEvent(this, { event: ev && stripMarks(ev), configuration: this.configuration }));
+      this.emit(new MacrostepEvent(this, { event: ev && stripMarks(ev), eventId: ev?.[EVENT_ID], configuration: this.configuration }));
     } finally {
       this.stopping = false;
     }
@@ -841,13 +889,18 @@ export class SCXMLSession extends EventTarget {
     const ev = this.externalQueue.shift();
     if (!ev) return undefined;
     this.datamodel.setEvent(ev);
-    for (const state of this.configuration) {
-      for (const inv of state.invokes) {
-        const active = this.invoked.get(this.invokeIds.get(inv) ?? "");
-        if (!active) continue;
-        if (ev[FROM_CHILD] && ev.invokeid === active.id) this.applyFinalize(inv);
-        if (inv.autoforward) this.deliverToInvoke(active, stripMarks(ev)); // every external event (§6.4.1)
+    this.triggerId = ev[EVENT_ID];
+    try {
+      for (const state of this.configuration) {
+        for (const inv of state.invokes) {
+          const active = this.invoked.get(this.invokeIds.get(inv) ?? "");
+          if (!active) continue;
+          if (ev[FROM_CHILD] && ev.invokeid === active.id) this.applyFinalize(inv);
+          if (inv.autoforward) this.deliverToInvoke(active, stripMarks(ev)); // every external event (§6.4.1)
+        }
       }
+    } finally {
+      this.triggerId = undefined;
     }
     const enabled = this.selectTransitions(ev);
     if (enabled.length) this.microstep(enabled, ev);
@@ -885,15 +938,33 @@ export class SCXMLSession extends EventTarget {
     this.checkSettled();
   }
 
-  private enqueueExternal(ev: QueuedEvent) {
+  /**
+   * Place an event on the external queue. `from.processor`: the I/O processor that delivered it;
+   * `from.drop`: discard it whatever the session's state (an event of a cancelled invocation).
+   */
+  private enqueueExternal(ev: QueuedEvent, from?: { processor?: IOProcessor; drop?: boolean }) {
+    ev[EVENT_ID] = ++eventCounter;
     // before start() events wait in the queue; once the session has ended they are dropped
-    if (this.exited || this.disposedDm || (this.started && !this.running)) return;
-    this.externalQueue.push(ev);
-    if (this.started) this.schedule();
+    const dropped = !!from?.drop || this.exited || this.disposedDm || (this.started && !this.running);
+    if (!dropped) {
+      this.externalQueue.push(ev);
+      if (this.started) this.schedule();
+    }
+    if (this.listened.has("enqueue"))
+      this.emit(
+        new EnqueueEvent(this, { id: ev[EVENT_ID], event: stripMarks(ev), queue: "external", processor: from?.processor, dropped }),
+      );
+  }
+
+  /** Place an event on the internal queue (it is processed in the current macrostep, or in a deferred one). */
+  private pushInternal(ev: QueuedEvent) {
+    ev[EVENT_ID] = ++eventCounter;
+    this.internalQueue.push(ev);
+    if (this.listened.has("enqueue")) this.emit(new EnqueueEvent(this, { id: ev[EVENT_ID], event: stripMarks(ev), queue: "internal" }));
   }
 
   private enqueueInternal(ev: QueuedEvent) {
-    this.internalQueue.push(ev);
+    this.pushInternal(ev);
     if (!this.busy) this.schedule();
   }
 
@@ -924,12 +995,15 @@ export class SCXMLSession extends EventTarget {
         doneData = this.evaluateDoneData(s);
       }
     }
-    for (const t of this.delayed.values()) this.clock.clearTimeout(t);
+    for (const d of this.delayed.values()) {
+      this.clock.clearTimeout(d.timer);
+      this.sendCancelled(d, "exit");
+    }
     this.delayed.clear();
     for (const [p, io] of this.ioSessions) p.detach?.(io);
     sessions.delete(this.sessionId);
     if (reachedFinal && !this.wasCancelled) this.returnDoneEvent(doneData);
-    this.emit(new DoneEvent(this, { data: doneData }));
+    this.emit(new DoneEvent(this, { data: doneData, disposed: this.disposing }));
     this.bridge?.done(doneData);
     this.lifetime.abort();
     this.resolveDone(doneData);
@@ -998,16 +1072,24 @@ export class SCXMLSession extends EventTarget {
 
   // ───────────────────────────── microstep (App. D) ─────────────────────────
 
-  private microstep(enabled: TransitionNode[], event: SCXMLEvent | undefined) {
-    const exited = this.exitStates(enabled);
-    this.executeTransitionContent(enabled);
-    const entered = this.enterStates(enabled);
-    this.afterMicrostep(enabled, exited, entered, event && stripMarks(event));
+  private microstep(enabled: TransitionNode[], event: QueuedEvent | undefined) {
+    this.triggerId = event?.[EVENT_ID];
+    let exited: StateNode[];
+    let entered: StateNode[];
+    try {
+      exited = this.exitStates(enabled);
+      this.executeTransitionContent(enabled);
+      entered = this.enterStates(enabled);
+    } finally {
+      this.triggerId = undefined;
+    }
+    this.afterMicrostep(enabled, exited, entered, event);
   }
 
   /** The configuration is consistent again: tell the host (session event, then element events / attributes). */
-  private afterMicrostep(transitions: TransitionNode[], exited: StateNode[], entered: StateNode[], event: SCXMLEvent | undefined) {
-    this.emit(new MicrostepEvent(this, { event, transitions, exited, entered }));
+  private afterMicrostep(transitions: TransitionNode[], exited: StateNode[], entered: StateNode[], queued: QueuedEvent | undefined) {
+    const event = queued && stripMarks(queued);
+    this.emit(new MicrostepEvent(this, { event, eventId: queued?.[EVENT_ID], transitions, exited, entered }));
     this.bridge?.microstep(transitions, exited, entered, event);
   }
 
@@ -1065,10 +1147,10 @@ export class SCXMLSession extends EventTarget {
         const parent = s.parent!;
         if (parent === this.model.root) this.running = false;
         else {
-          this.internalQueue.push({ name: `done.state.${parent.id}`, type: "platform", data: this.evaluateDoneData(s) });
+          this.pushInternal({ name: `done.state.${parent.id}`, type: "platform", data: this.evaluateDoneData(s) });
           const grandparent = parent.parent;
           if (grandparent?.kind === "parallel" && grandparent.children.every((c) => this.isInFinalState(c)))
-            this.internalQueue.push({ name: `done.state.${grandparent.id}`, type: "platform" });
+            this.pushInternal({ name: `done.state.${grandparent.id}`, type: "platform" });
         }
       }
     }
@@ -1315,7 +1397,7 @@ export class SCXMLSession extends EventTarget {
     try {
       switch (a.localName) {
         case "raise":
-          this.internalQueue.push({ name: attr("event")!, type: "internal" });
+          this.pushInternal({ name: attr("event")!, type: "internal" });
           break;
         case "log":
           this.emit(
@@ -1366,8 +1448,11 @@ export class SCXMLSession extends EventTarget {
         case "cancel": {
           const sendid = attr("sendid") ?? String(this.datamodel.evaluate(attr("sendidexpr")!));
           for (const key of this.delayedBySendid.get(sendid) ?? []) {
-            this.clock.clearTimeout(this.delayed.get(key));
+            const d = this.delayed.get(key);
             this.delayed.delete(key);
+            if (!d) continue;
+            this.clock.clearTimeout(d.timer);
+            this.sendCancelled(d, "cancel");
           }
           this.delayedBySendid.delete(sendid);
           break;
@@ -1424,8 +1509,10 @@ export class SCXMLSession extends EventTarget {
     if (scxmlType && !isValidScxmlTarget(target)) throw new Error(`<send>: invalid target "${target}"`);
     if (delay > 0 && target === "#_internal") throw new Error(`<send>: cannot delay an event to #_internal`);
 
+    const message: OutboundSend = { event: event ?? "", target, type: processor?.type ?? SCXML_IOPROCESSOR, data, sendid };
+    const triggerId = this.triggerId;
     const dispatch = () => {
-      this.emit(new SendEvent(this, { message: { event: event ?? "", target, type: processor?.type ?? SCXML_IOPROCESSOR, data, sendid } }));
+      this.emit(new SendEvent(this, { message, processor, delay, triggerId }));
       if (processor) {
         try {
           processor.send({ event: event ?? "", target, type: processor.type, data, sendid }, this.ioSessions.get(processor)!);
@@ -1442,12 +1529,13 @@ export class SCXMLSession extends EventTarget {
         this.delayedBySendid.get(key)?.delete(key);
         if (this.running) dispatch();
       }, delay);
-      this.delayed.set(key, timer);
+      this.delayed.set(key, { timer, message, processor, delay });
       if (sendid) {
         const keys = this.delayedBySendid.get(sendid) ?? new Set();
         keys.add(key);
         this.delayedBySendid.set(sendid, keys);
       }
+      if (this.listened.has("sendscheduled")) this.emit(new SendScheduledEvent(this, { message, processor, delay, triggerId }));
     } else dispatch();
   }
 
@@ -1475,6 +1563,11 @@ export class SCXMLSession extends EventTarget {
     const active = this.invoked.get(target.slice(2));
     if (!active) return this.communicationError(sendid, `no invoked session "${target}"`);
     this.deliverToInvoke(active, ev);
+  }
+
+  private sendCancelled(d: DelayedSend, reason: "cancel" | "exit") {
+    if (this.listened.has("sendcancelled"))
+      this.emit(new SendCancelledEvent(this, { message: d.message, processor: d.processor, delay: d.delay, reason }));
   }
 
   private communicationError(sendid: string | undefined, e: unknown) {
@@ -1552,8 +1645,8 @@ export class SCXMLSession extends EventTarget {
 
   /** SCXML child sessions. Synchronous unless the loader is asynchronous. */
   private invokeScxml(ctx: InvokeContext): InvokedService | Promise<InvokedService> {
-    const make = (root: Element): InvokedService | Promise<InvokedService> => {
-      const m = compile(root, { loader: this.opts.loader });
+    const make = (root: Element, source?: string): InvokedService | Promise<InvokedService> => {
+      const m = compile(root, { loader: this.opts.loader, source });
       const spawn = (model: Model) => {
         // children don't inherit elementEvents/reflect: their elements live inside the parent's <content>
         const child = new SCXMLSession(model, {
@@ -1583,13 +1676,13 @@ export class SCXMLSession extends EventTarget {
       if (!root) throw new Error("<invoke>: inline <content> must contain an <scxml> document");
       return make(root);
     }
-    if (typeof ctx.content === "string") return make(parseSCXML(ctx.content, this.opts.domParser));
+    if (typeof ctx.content === "string") return make(parseSCXML(ctx.content, this.opts.domParser), ctx.content);
     if (ctx.src != null) {
       if (!this.opts.loader) throw new Error(`<invoke>: no loader for src "${ctx.src}"`);
       const text = this.opts.loader(ctx.src);
       return typeof text === "string"
-        ? make(parseSCXML(text, this.opts.domParser))
-        : text.then((t) => make(parseSCXML(t, this.opts.domParser)));
+        ? make(parseSCXML(text, this.opts.domParser), text)
+        : text.then((t) => make(parseSCXML(t, this.opts.domParser), t));
     }
     throw new Error("<invoke>: needs src, srcexpr or <content>");
   }
@@ -1615,15 +1708,15 @@ export class SCXMLSession extends EventTarget {
 
   /** An event from an invoked child (or done.invoke): stamped with its invokeid. */
   private receiveFromChild(invokeid: string, ev: SCXMLEvent) {
-    if (!this.invoked.has(invokeid)) return; // cancelled
-    this.enqueueExternal({ ...ev, invokeid, [FROM_CHILD]: true });
+    // after the invocation was cancelled its events are dropped
+    this.enqueueExternal({ ...ev, invokeid, [FROM_CHILD]: true }, this.invoked.has(invokeid) ? undefined : { drop: true });
   }
 
   // ─────────────────────────────── errors ───────────────────────────────
 
   private raiseExecutionError(e: unknown, element: Element | null, sendid?: string) {
     this.emitError("error.execution", message(e), element);
-    this.internalQueue.push({ name: "error.execution", type: "platform", sendid, data: { message: message(e) } });
+    this.pushInternal({ name: "error.execution", type: "platform", sendid, data: { message: message(e) } });
     if (!this.busy) this.schedule();
   }
 
@@ -1658,7 +1751,7 @@ function message(e: unknown) {
 }
 
 function stripMarks(ev: QueuedEvent): SCXMLEvent {
-  const { [FROM_CHILD]: _, ...rest } = ev;
+  const { [FROM_CHILD]: _, [EVENT_ID]: __, ...rest } = ev;
   return rest;
 }
 

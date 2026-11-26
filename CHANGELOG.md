@@ -18,6 +18,35 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+A host can now follow everything a session does through public events, without patching it: where
+each event came from, which step processed it, and what a step scheduled.
+
+### Added
+
+- **Observation.** See [observing everything a session does](docs/driving-charts.md#observing-everything-a-session-does).
+  - **`enqueue`** (`EnqueueEvent`): an event reached the session's external or internal queue, from
+    any source (`session.send()`, an I/O processor's `deliver`, a `<send>` of this or another
+    session, `#_parent`, `#_<invokeid>`, an invoked child or service, `done.invoke.*`, `<raise>`,
+    `done.state.*`, `error.*`). It carries an `id`, the event as `_event` will show it, the `queue`,
+    the I/O `processor` that delivered it, and `dropped` for an event the session discarded (it had
+    ended, or the invocation it came from was cancelled).
+  - **Event ids.** `MicrostepEvent.eventId` and `MacrostepEvent.eventId` name the event they process
+    by its `enqueue` id; `SendEvent.triggerId` names the event being processed when the `<send>`
+    ran. The chart never sees them: `_event` is unchanged.
+  - **`sendscheduled`** (`SendScheduledEvent`) and **`sendcancelled`** (`SendCancelledEvent`,
+    `reason: "cancel" | "exit"`): a delayed `<send>` when it is scheduled and when it is discarded
+    before its dispatch. Its `send` event carries the same `message` object, and now its `delay`.
+  - **`SendEvent.processor`**: the custom I/O processor a `<send type>` resolved to.
+  - **`DoneEvent.disposed`**: whether `dispose()` ended the session.
+  - **`session.processing`**: whether the session is running a step.
+  - **`session.options`**: the options a session was made with, read-only.
+  - **`model.source`**: the SCXML text a chart was parsed from, when the library has it
+    (`createSession` with text, an invoked chart, `compile(root, { source })`). It keeps the
+    comments before `<scxml>`, which happy-dom's `DOMParser` drops.
+
+  `enqueue`, `sendscheduled` and `sendcancelled` are only made for a session that has a listener
+  for them.
+
 ### Changed
 
 - **The last macrostep comes before `done`**, with the configuration the session ended in (its
@@ -29,7 +58,7 @@ private `--x-*` properties are not public API and can change in any release.
 
 ### Fixed
 
-- **`dispose()` of a session that was never started** dispatches `done`, as every
+- **`dispose()` of a session that was never started** dispatches `done` (`disposed: true`), as every
   other way a session ends does. Before, it ended without one.
 - **`dispose()` from a `macrostep` listener** ends the session at once, running its `<onexit>`
   handlers before the data model is released. Before, they ran after it: with the sandboxed data

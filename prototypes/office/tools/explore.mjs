@@ -143,7 +143,10 @@ async function scripted() {
   if (st.do === "esc") { await key("Escape"); return st.after ?? 1500; }
   if (st.do === "export") { await page.evaluate(() => window.api.perform({ do: "export" })).catch(() => {}); return 300; }
   if (st.do === "key") { const k = st.key.length === 1 ? st.key.toLowerCase() : st.key; await page.keyboard.down(k); await think(st.ms); await page.keyboard.up(k); return st.after ?? 400; }
-  if (st.do === "tap") { const p = await where(st); if (!p) { pageErrors.push("script: nothing on screen for " + label); return 500; } await hover(p.x, p.y); await sleep(80); await tap(p.x, p.y); return st.after ?? 1500; }
+  if (st.do === "tap") { let p = await where(st);
+    // a person walked out of view: the visitor looks for them the way a visitor can, with H (back to the start view)
+    if (!p && st.actor) { await key("h"); await think(1800); p = await where(st); }
+    if (!p) { pageErrors.push("script: nothing on screen for " + label); return 500; } await hover(p.x, p.y); await sleep(80); await tap(p.x, p.y); return st.after ?? 1500; }
   pageErrors.push("script: unknown step " + label); return 100;
 }
 if (SCRIPT) personas.script = scripted;

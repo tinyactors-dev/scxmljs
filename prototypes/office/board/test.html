@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telemetry board</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #05070a; color: #c9d1d9; font: 14px system-ui, sans-serif; overflow: hidden; height: 100%; }
+  #page { display: flex; gap: 24px; padding: 20px; box-sizing: border-box; height: 100%; }
+  #flatWrap { flex: none; position: relative; align-self: flex-start; }
+  #flat { display: block; width: min(1600px, calc(100vw - 620px)); height: auto; aspect-ratio: 16 / 9; touch-action: none; cursor: crosshair; border-radius: 6px; box-shadow: 0 0 0 2px #1c232c; }
+  #side { flex: 0 0 560px; width: 560px; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+  #wall { height: 420px; perspective: 1100px; perspective-origin: 50% 45%; background: linear-gradient(#3b3226, #2a241c 70%, #1c1712); border-radius: 8px; position: relative; overflow: hidden; }
+  #wall::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 70px; background: #4a3f30; border-top: 4px solid #5a4c3a; }
+  #skewed { position: absolute; left: 40px; top: 56px; width: 533px; height: 300px; transform: rotateY(-32deg) rotateX(4deg); transform-origin: left center; border: 10px solid #222; border-radius: 4px; box-shadow: 18px 18px 40px #000a; }
+  #log { flex: 1; min-height: 0; overflow: hidden; font: 13px ui-monospace, monospace; background: #0b0f14; border-radius: 8px; padding: 10px 12px; }
+  #log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.5; }
+  #log .seek { color: #8b949e; } #log .select { color: #ffe14d; } #log .world { color: #ff4fd8; }
+  #cursor { position: absolute; width: 34px; height: 34px; margin: -4px 0 0 -4px; pointer-events: none; display: none; z-index: 5; }
+  #cursor.down svg { transform: scale(0.85); }
+</style>
+</head>
+<body>
+<div id="page">
+  <div id="flatWrap">
+    <canvas id="flat" width="1600" height="900"></canvas>
+    <div id="cursor"><svg width="34" height="34" viewBox="0 0 34 34"><path d="M4 2 L4 28 L11 21 L16 32 L21 30 L16 19 L26 19 Z" fill="#fff" stroke="#000" stroke-width="2.5" stroke-linejoin="round"/></svg></div>
+  </div>
+  <div id="side">
+    <div id="wall"><canvas id="skewed" width="533" height="300"></canvas></div>
+    <div id="log"></div>
+  </div>
+</div>
+<script type="module">
+import { loadSim, createSim } from "../core/sim.js";
+import { createBoard } from "./board.js";
+
+const params = new URLSearchParams(location.search);
+const FILM = params.has("film");
+const sim = await loadSim(new URL("../data/llm-chat/trace.json", location.href));
+let filmClock = 0;
+const flat = document.getElementById("flat");
+const board = createBoard({ sim, width: 1600, height: 900, createSim, now: FILM ? () => filmClock : undefined });
+// the board draws on its own canvas; this page shows it twice, as WORLD would upload it to a texture
+const fctx = flat.getContext("2d");
+const skewed = document.getElementById("skewed"), kctx = skewed.getContext("2d");
+function blit() {
+  if (!board.dirty) return;
+  fctx.drawImage(board.canvas, 0, 0);
+  kctx.imageSmoothingQuality = "high"; kctx.drawImage(board.canvas, 0, 0, 533, 300);
+  board.dirty = false;
+}
+
+// playback: axis seconds, looping
+let s = 0, playing = true;
+const logEl = document.getElementById("log");
+function log(kind, obj) {
+  const d = document.createElement("div"); d.className = kind;
+  d.textContent = `${kind.padEnd(6)} ${JSON.stringify(obj)}`;
+  logEl.prepend(d); while (logEl.children.length > 40) logEl.lastChild.remove();
+}
+board.on("seek", (e) => { s = board.warp(e.t); log("seek", { t: Math.round(e.t) }); });
+board.on("select", (e) => log("select", e));
+board.on("world", (e) => log("world", e));
+
+// pointer: mouse, touch and pen; two fingers pinch-zoom
+const pts = new Map();
+const uv = (ev) => { const r = flat.getBoundingClientRect(); return [(ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height]; };
+let pinch = null;
+flat.addEventListener("pointerdown", (ev) => {
+  flat.setPointerCapture(ev.pointerId); pts.set(ev.pointerId, uv(ev));
+  if (pts.size === 2) { board.pointer("leave", 0, 0); const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], (a[1] - b[1]) * 9 / 16) }; return; }
+  board.pointer("down", ...uv(ev));
+});
+flat.addEventListener("pointermove", (ev) => {
+  if (pts.has(ev.pointerId)) pts.set(ev.pointerId, uv(ev));
+  if (pinch && pts.size === 2) {
+    const [a, b] = [...pts.values()]; const d = Math.hypot(a[0] - b[0], (a[1] - b[1]) * 9 / 16);
+    if (d > 0.01) { board.zoom(d / pinch.d, (a[0] + b[0]) / 2); pinch.d = d; } return;
+  }
+  board.pointer("move", ...uv(ev));
+});
+const end = (ev) => { pts.delete(ev.pointerId); if (pinch) { if (pts.size === 0) pinch = null; return; } board.pointer("up", ...uv(ev)); };
+flat.addEventListener("pointerup", end); flat.addEventListener("pointercancel", end);
+flat.addEventListener("pointerleave", () => { if (!pts.size) board.pointer("leave", 0, 0); });
+flat.addEventListener("wheel", (ev) => { ev.preventDefault(); const [u, v] = uv(ev); board.pointer("wheel", u, v, { dy: ev.deltaY, dx: ev.shiftKey ? ev.deltaY : ev.deltaX }); }, { passive: false });
+addEventListener("keydown", (ev) => { if (ev.key === " ") playing = !playing; });
+
+function step(dtSec, rate = 1) {
+  if (!playing) return;
+  s += dtSec * rate;
+  const end = board.warp(board.duration) + 1.5;
+  if (s > end) s = 0;
+  board.update(board.unwarp(s));
+}
+
+// ---------------------------------------------------------------- film: a scripted visitor
+const cursor = document.getElementById("cursor");
+const designToCss = (u, v) => { const r = flat.getBoundingClientRect(), w = flatWrap.getBoundingClientRect(); return [r.left - w.left + u * r.width, r.top - w.top + v * r.height]; };
+let cur = { u: 0.62, v: 0.6 }; let curDown = false;
+function showCursor() { const [x, y] = designToCss(cur.u, cur.v); cursor.style.display = "block"; cursor.style.left = x + "px"; cursor.style.top = y + "px"; cursor.className = curDown ? "down" : ""; }
+const ease = (x) => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const FPS = 30;
+// script: [startSec, kind, args]. Moves interpolate the cursor; taps press and release on frames.
+const at = (sec) => Math.round(sec * FPS);
+const script = [];
+const target = (q) => () => board.locate(q);
+function plan() {
+  const P = (sec, fn) => script.push([at(sec), fn]);
+  const move = (s0, s1, where) => { let from; P(s0, () => { from = { ...cur }; }); for (let f = at(s0) + 1; f <= at(s1); f++) script.push([f, () => { const to = typeof where === "function" ? where() : where; const k = ease((f - at(s0)) / (at(s1) - at(s0))); cur = { u: from.u + (to.u - from.u) * k, v: from.v + (to.v - from.v) * k }; board.pointer("move", cur.u, cur.v); }]); };
+  const tap = (sec) => { P(sec - 0.1, () => { curDown = true; board.pointer("down", cur.u, cur.v); }); P(sec, () => { curDown = false; board.pointer("up", cur.u, cur.v); }); };
+  const rate = (sec, r) => P(sec, () => { RATE = r; });
+  rate(0, 4);
+  move(1.6, 3.0, target({ storyId: "send-message" })); tap(3.4); rate(3.4, 2.2);
+  move(7.0, 8.4, target({ messageId: "e630" })); tap(8.8); rate(8.8, 0.8);
+  move(11.2, 12.0, { u: 0.55, v: 0.73 }); tap(12.3); tap(12.6); rate(12.6, 0);
+  move(12.8, 13.6, target({ worldId: "model-fails" })); tap(13.9); P(13.95, () => { s = board.warp(5200); }); rate(13.9, 9);
+  move(17.4, 18.2, target({ worldId: "stop-mid-answer" })); tap(18.6); P(18.65, () => { s = board.warp(5000); }); rate(18.6, 3);
+  P(21.0, () => { s = board.warp(6150); }); rate(21.0, 0);
+  move(21.0, 21.8, target({ t: 6330, actorId: "host" }));
+  for (let i = 0; i < 8; i++) P(22.0 + i * 0.12, () => board.pointer("wheel", cur.u, cur.v, { dy: -120 }));
+  move(23.2, 24.0, () => board.locate({ t: board.unwarp(s) }));
+  P(24.1, () => { curDown = true; board.pointer("down", cur.u, cur.v); });
+  let p0, p1;
+  P(24.15, () => { p0 = board.locate({ t: board.unwarp(s) }); p1 = board.locate({ t: 6900 }); p1.u = Math.min(p1.u, 0.95); });
+  for (let f = at(24.2); f <= at(25.4); f++) script.push([f, () => { const k = ease((f - at(24.2)) / (at(25.4) - at(24.2))); cur = { u: p0.u + (p1.u - p0.u) * k, v: p0.v }; board.pointer("move", cur.u, cur.v); }]);
+  P(25.5, () => { curDown = false; board.pointer("up", cur.u, cur.v); }); rate(25.5, 0);
+  move(25.7, 26.4, target({ worldId: null })); tap(26.8); rate(26.8, 3);
+  script.sort((a, b) => a[0] - b[0]);
+}
+let RATE = 1, lastFrame = -1;
+window.FILM_FRAMES = at(28.5);
+window.frame = async (i) => {
+  for (let f = lastFrame + 1; f <= i; f++) {
+    filmClock = (f * 1000) / FPS;
+    for (const [ff, fn] of script) if (ff === f) fn();
+    await Promise.resolve(); await Promise.resolve();
+    step(1 / FPS, RATE);
+  }
+  lastFrame = i; showCursor(); blit();
+};
+window.board = board;
+window.setT = (tt) => { s = board.warp(tt); board.update(tt); blit(); };
+window.blit = blit;
+
+if (FILM) {
+  playing = true; plan();
+  await Promise.all(["model-fails", "stop-mid-answer"].map((id) => board.loadWorld(id)));
+  board.update(0); blit();
+} else {
+  let last = performance.now();
+  const loop = (now) => { step(Math.min(0.1, (now - last) / 1000)); last = now; blit(); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+}
+window.READY = true;
+</script>
+</body>
+</html>

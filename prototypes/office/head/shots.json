@@ -1,0 +1,114 @@
+{
+ "host-d0": {
+  "actor": "host",
+  "t": 1700,
+  "detail": 0,
+  "focus": null,
+  "az": 0.25,
+  "el": 0.55
+ },
+ "host-d05": {
+  "actor": "host",
+  "t": 1700,
+  "detail": 0.5,
+  "focus": null,
+  "az": 0.25,
+  "el": 0.55
+ },
+ "host-d1": {
+  "actor": "host",
+  "t": 1700,
+  "detail": 1,
+  "focus": null,
+  "az": 0.25,
+  "el": 0.55
+ },
+ "host-travel": {
+  "actor": "host",
+  "move": [
+   "conversation",
+   "turn",
+   0.5
+  ],
+  "detail": 0.75,
+  "focus": "conversation",
+  "az": 0.1,
+  "el": 0.7
+ },
+ "zoom-1": {
+  "actor": "host",
+  "t": 1450,
+  "detail": 0.3,
+  "focus": "requesting",
+  "az": 0.15,
+  "el": 0.75
+ },
+ "zoom-2": {
+  "actor": "host",
+  "t": 1450,
+  "detail": 0.65,
+  "focus": "requesting",
+  "az": 0.15,
+  "el": 0.75
+ },
+ "zoom-3": {
+  "actor": "host",
+  "t": 1450,
+  "detail": 1,
+  "focus": "requesting",
+  "az": 0.15,
+  "el": 0.95
+ },
+ "client-ada": {
+  "actor": "ada",
+  "t": 1100,
+  "detail": 0.55,
+  "focus": null,
+  "az": 0.2,
+  "el": 0.6
+ },
+ "client-ada-d0": {
+  "actor": "ada",
+  "t": 1100,
+  "detail": 0,
+  "focus": null,
+  "az": 0.2,
+  "el": 0.6
+ },
+ "host-capsule": {
+  "actor": "host",
+  "move": [
+   "conversation",
+   "turn",
+   -0.3
+  ],
+  "detail": 0.75,
+  "focus": "conversation",
+  "az": 0.1,
+  "el": 0.7
+ },
+ "package-d1": {
+  "actor": "package:pkg-python",
+  "t": 9000,
+  "detail": 1,
+  "focus": null,
+  "az": 0.2,
+  "el": 0.6
+ },
+ "terminal-d1": {
+  "actor": "terminal",
+  "t": 7000,
+  "detail": 1,
+  "focus": null,
+  "az": 0.2,
+  "el": 0.7
+ },
+ "workspace": {
+  "actor": "workspace",
+  "t": 7000,
+  "detail": 1,
+  "focus": null,
+  "az": 0.2,
+  "el": 0.6
+ }
+}

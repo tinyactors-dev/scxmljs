@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Head test bench</title>
+<style>
+  :root { --bg: #1b1d22; --fg: #e9e2cf; --mute: #9a968a; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px ui-monospace, Menlo, monospace; overflow: hidden; }
+  canvas { display: block; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: #0008; }
+  #bar input[type=range] { flex: 1; }
+  #bar select, #bar button { background: #2a2d35; color: var(--fg); border: 1px solid #444; border-radius: 4px; padding: 3px 6px; font: inherit; }
+  #info { color: var(--mute); min-width: 230px; }
+  body.rec #bar { display: none; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <select id="actor"></select>
+  <button id="play">pause</button>
+  <input id="scrub" type="range" min="0" max="1000" value="0">
+  <span id="info"></span>
+</div>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/jsm/" } }</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { createHead } from "./head.js";
+
+const q = new URLSearchParams(location.search);
+const REC = q.has("rec"); if (REC) document.body.classList.add("rec");
+import { loadSim } from "../core/sim.js";
+const sim = await loadSim(new URL("../data/llm-chat/trace.json", location.href).href);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: REC });
+renderer.setPixelRatio(REC ? 1 : Math.min(2, devicePixelRatio));
+renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = false;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b1d22);
+scene.add(new THREE.HemisphereLight(0xfff3dd, 0x30343e, 1.25));
+const sun = new THREE.DirectionalLight(0xffffff, 1.7); sun.position.set(4, 10, 7); scene.add(sun);
+const fill = new THREE.DirectionalLight(0x9fc3ff, 0.5); fill.position.set(-6, 3, -4); scene.add(fill);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.01, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableZoom = false; controls.enableDamping = !REC; controls.target.set(0, 0, 0);
+camera.position.set(0, 7, 13);
+
+// the person's head, as WORLD would mount it
+const ids = ["host", "ada", "bo", "terminal", "python", "workspace", ...sim.actors.filter((a) => a.id.startsWith("package:")).map((a) => a.id), "director"];
+const sel = document.getElementById("actor");
+for (const id of ids) { const o = document.createElement("option"); o.value = o.textContent = id; sel.append(o); }
+let head = null, detail = 0, focusId = null, playing = !REC, sec = 0;
+const view = { az: 0, el: 0.5, dist: null };
+function mount(id) {
+  if (head) head.dispose();
+  head = createHead({ THREE, sim, actorId: id }); scene.add(head.group);
+  sel.value = id; focusId = null; head.focus(null); head.setDetail(detail);
+}
+mount(q.get("actor") || "host");
+sel.onchange = () => mount(sel.value);
+
+// camera: wheel = detail; distance and target follow detail and focus
+function camGoal() {
+  const fb = head.focusBounds;
+  const far = 17, near = Math.max(0.5, fb.radius * 2.3);
+  const k = focusId ? Math.pow(detail, 0.8) : detail * 0.55;
+  const dist = view.dist ?? (far * Math.pow(near / far, k));
+  const tgt = new THREE.Vector3(0, -0.6, 0).lerp(fb.center, focusId ? Math.min(1, detail * 1.6) : 0);
+  return { dist, tgt };
+}
+function placeCamera() {
+  const { dist, tgt } = camGoal();
+  const dir = new THREE.Vector3(Math.sin(view.az) * Math.cos(view.el), Math.sin(view.el), Math.cos(view.az) * Math.cos(view.el));
+  camera.position.copy(tgt).addScaledVector(dir, dist); controls.target.copy(tgt); camera.lookAt(tgt);
+  camera.near = Math.max(0.005, dist * 0.02); camera.updateProjectionMatrix();
+}
+renderer.domElement.addEventListener("wheel", (e) => { e.preventDefault(); detail = Math.min(1, Math.max(0, detail - e.deltaY * 0.0012)); head.setDetail(detail); placeCamera(); }, { passive: false });
+controls.addEventListener("change", () => { const off = camera.position.clone().sub(controls.target); view.el = Math.asin(off.y / off.length()); view.az = Math.atan2(off.x, off.z); });
+const ray = new THREE.Raycaster(); const ptr = new THREE.Vector2();
+let down = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  ptr.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
+  const hit = head.pick(ray);
+  console.log("pick", hit && hit.kind, hit && hit.id);
+  if (hit && hit.kind === "state") { focusId = hit.id === focusId ? null : hit.id; head.focus(focusId); placeCamera(); }
+  else if (!hit) { focusId = null; head.focus(null); placeCamera(); }
+});
+addEventListener("keydown", (e) => { if (e.key === "Escape") { focusId = null; head.focus(null); detail = 0; head.setDetail(0); placeCamera(); } if (e.key === " ") playing = !playing; });
+
+// time: playback seconds through the sim's warp, looping
+const PLAY = sim.playDuration || sim.duration / 1000;
+const scrub = document.getElementById("scrub"), info = document.getElementById("info"), playBtn = document.getElementById("play");
+scrub.oninput = () => { sec = (scrub.value / 1000) * PLAY; };
+playBtn.onclick = () => { playing = !playing; playBtn.textContent = playing ? "pause" : "play"; };
+const tOf = (s) => (sim.unwarp ? sim.unwarp(s) : s * 1000);
+
+function frame(dt) {
+  const t = tOf(sec);
+  head.update(t, dt);
+  renderer.render(scene, camera);
+  if (!REC) { scrub.value = String(Math.round((sec / PLAY) * 1000)); info.textContent = `t=${t.toFixed(0)}ms  detail=${detail.toFixed(2)}  ${focusId ? "focus " + focusId : ""}`; }
+}
+placeCamera();
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (playing) sec = (sec + dt) % PLAY;
+  controls.update(); frame(dt);
+  requestAnimationFrame(loop);
+}
+addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+
+// film/test hooks: everything from (actor, playback second, detail, focus, camera angles)
+window.PLAY = PLAY; window.DURATION = sim.duration; window.sim = sim;
+window.setView = (v) => {
+  if (v.actor && v.actor !== sel.value) mount(v.actor);
+  if (v.detail != null) { detail = v.detail; head.setDetail(detail); }
+  if ("focus" in v) { focusId = v.focus; head.focus(focusId); }
+  if (v.az != null) view.az = v.az; if (v.el != null) view.el = v.el; view.dist = v.dist ?? null;
+  if (v.move) { const [mid, to, u] = v.move; const mv = head.movesOf(mid).find((x) => x.to === to); if (mv) sec = mv.start + u * (mv.end - mv.start); }
+  else if (v.sec != null) sec = v.sec; else if (v.t != null) sec = sim.warp ? sim.warp(v.t) : v.t / 1000;
+  placeCamera(); frame(0);
+  return { t: tOf(sec), focus: head.focusBounds.center.toArray(), radius: head.focusBounds.radius };
+};
+window.head = () => head;
+window.pickAt = (x, y) => { ptr.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1); ray.setFromCamera(ptr, camera); const h = head.pick(ray); return h && { kind: h.kind, id: h.id }; };
+if (!REC) requestAnimationFrame(loop); else frame(0);
+window.ready = true;
+</script>
+</body>
+</html>

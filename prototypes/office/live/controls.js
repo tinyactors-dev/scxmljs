@@ -11,11 +11,15 @@
 // idle motion of live mode (`still` turns it off, for tests).
 import * as THREE from "three";
 import { canvasTex, cyl, mat } from "../world/kit.js";
+import { seatPoint } from "../world/desks.js";
 
+const RED = new THREE.Color("#e0321f");
 const BAKELITE = "#2a1f1a", BAKELITE_L = "#4a382c", BRASS = "#c9a14a", BRASS_D = "#8a6a22";
 const CAPS = ["#d8432f", "#3b9a5a", "#e2b33c", "#3d73c4", "#2fa3a3", "#9a4fb0"];
 const hash = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
 const CELL_W = 0.48, CELL_H = 0.42;
+const SCALE_DESK = 0.72; // a console beside a desk is smaller than a station's: it must not hide the person
+export const SIDE = [-2.05, 0, 2.05], SIDE_TURN = 0.55; // where a desk's console stands, in the seat frame (world/layout.js)
 
 // an engraved label: dark letters cut into brass, on two lines when long; drawn at a resolution
 // that keeps the letters crisp at 2 m whatever the plate's size
@@ -46,10 +50,12 @@ function makeButton(c, color) {
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.09, 0.07, 20), capM); cap.rotation.x = Math.PI / 2; cap.position.set(0, 0.05, 0.06); cap.castShadow = true; g.add(cap);
   const dome = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), capM); dome.rotation.x = Math.PI / 2; dome.scale.set(1, 0.35, 1); dome.position.set(0, 0.05, 0.095); g.add(dome);
   const lab = textPlate(c.label, 0.44, 0.13); lab.position.set(0, -0.13, 0.012); g.add(lab);
+  // a refusal: the reason replaces the label for a while, white on red (labelTex for the reason is made on demand)
+  lab.userData.base = lab.material.map;
   // a hit area bigger than the cap: the cell, so a thumb finds it
   const hit = new THREE.Mesh(new THREE.PlaneGeometry(CELL_W - 0.02, CELL_H - 0.02), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(0, -0.02, 0.1); g.add(hit);
   const capG = [cap, dome];
-  return { group: g, hit, capM, capG, color: new THREE.Color(color), grey: new THREE.Color("#5b5650"), labM: lab.material, pressedAt: -1, enabled: null };
+  return { group: g, hit, capM, capG, color: new THREE.Color(color), grey: new THREE.Color("#5b5650"), labM: lab.material, lab, pressedAt: -1, enabled: null };
 }
 
 /** A lever: a slot, an arm with a ball handle. Pulled = rotated toward the visitor. */
@@ -64,7 +70,8 @@ function makeLever(c, { color = "#c43b2e", size = 1 } = {}) {
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.07 * size, 14, 10), knobM); knob.position.y = 0.38 * size; knob.castShadow = true; pivot.add(knob);
   const lab = textPlate(c.label, 0.44 * Math.max(1, size * 0.8), 0.13 * Math.max(1, size * 0.8)); lab.position.set(0, -0.08 * size, 0.02); g.add(lab);
   const hit = new THREE.Mesh(new THREE.BoxGeometry(0.4 * size, 0.8 * size, 0.3 * size), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(0, 0.05, 0.1); g.add(hit);
-  return { group: g, hit, pivot, capM: knobM, capG: [], color: new THREE.Color(color), grey: new THREE.Color("#5b5650"), labM: lab.material, pressedAt: -1, enabled: null, lever: true };
+  lab.userData.base = lab.material.map;
+  return { group: g, hit, pivot, capM: knobM, capG: [], color: new THREE.Color(color), grey: new THREE.Color("#5b5650"), labM: lab.material, lab, pressedAt: -1, enabled: null, lever: true };
 }
 
 /** A lectern holding a grid of controls, facing local +z. Returns its group and each cell's frame. */
@@ -105,7 +112,13 @@ export function createControls({ scene, live, still = false }) {
     const sim = world.sim; const a = sim.actor(at);
     if (a && !a.external) {
       const t = world.t(); const seat = plan.seatOf(at, t);
-      if (seat && Number.isFinite(seat.x)) { if (seat.hub) return { x: seat.x + 2.6, z: seat.z + 2.6, ry: 0 }; if (seat.visitor) return { x: seat.x + 0.9, z: seat.z + 0.5, ry: 0 }; return { x: seat.x + 1.15, z: seat.z + 2.45, ry: 0 }; }
+      if (seat && Number.isFinite(seat.x)) {
+        if (seat.hub) return { x: seat.x + 2.6, z: seat.z + 2.6, ry: 0 };
+        if (seat.visitor) return { x: seat.x + 0.9, z: seat.z + 0.5, ry: 0 };
+        // beside the desk's front corner on the sitter's right (the machine side is their left), past the
+        // partition's end, turned toward where a visitor stands in front of the desk: never between them
+        const p = seatPoint(seat, SIDE); return { x: p.x, z: p.z, ry: (seat.facing || 0) + SIDE_TURN, desk: true };
+      }
     }
     return null;
   }
@@ -115,23 +128,26 @@ export function createControls({ scene, live, still = false }) {
     for (const k of consoles) { root.remove(k.group); disposeTree(k.group); }
     consoles = []; for (const [, it] of items) if (!it.fixed) items.delete(it.c.id);
     const byKey = new Map();
-    for (const c of list) { const k = `${c.at}|${c.console || c.group || ""}`; (byKey.get(k) || byKey.set(k, []).get(k)).push(c); }
+    // an input that drives one person stands beside that person's desk, whoever sends it
+    const placeOf = (c) => (c.event && c.actor && world.sim.actor(c.actor) && !world.sim.actor(c.actor).external && anchor(c.actor) ? c.actor : c.at);
+    for (const c of list) { const k = `${placeOf(c)}|${c.console || c.group || ""}`; (byKey.get(k) || byKey.set(k, []).get(k)).push(c); }
     const usedAt = new Map();
     for (const [k, cs] of byKey) {
-      const at = cs[0].at; const a = anchor(at); if (!a) continue;
+      const at = placeOf(cs[0]); const a = anchor(at); if (!a) continue;
       const n = usedAt.get(at) || 0; usedAt.set(at, n + 1);
       const deskish = !world.stations.byId.has(at);
-      const title = cs[0].title ?? (cs[0].group && cs[0].group !== at ? world.nameOf(cs[0].group) : null);
-      const k2 = makeConsole(cs.length, { cols: deskish ? 2 : Math.min(4, Math.ceil(Math.sqrt(cs.length * 2))), title: title ? String(title).toUpperCase() : null });
-      // several consoles at one place stand side by side
-      const side = new THREE.Vector3((n % 2 ? 1 : -1) * Math.ceil(n / 2) * (k2.W + 0.3), 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), a.ry);
+      const title = cs[0].title ?? (cs[0].group && cs[0].group !== at ? world.nameOf(cs[0].group) : deskish ? world.nameOf(at) : null);
+      const k2 = makeConsole(cs.length, { cols: deskish ? 2 : Math.min(4, Math.ceil(Math.sqrt(cs.length * 2))), title: title ? String(title).toUpperCase() : null, height: a.desk ? 1.05 : 0.95 });
+      const sc = a.desk ? SCALE_DESK : 1; k2.group.scale.setScalar(sc);
+      // several consoles at one place stand side by side (outward, away from the desk)
+      const side = new THREE.Vector3((a.desk ? -1 : n % 2 ? 1 : -1) * (a.desk ? n : Math.ceil(n / 2)) * (k2.W * sc + 0.3), 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), a.ry);
       k2.group.position.set(a.x + side.x, 0, a.z + side.z); k2.group.rotation.y = a.ry; root.add(k2.group);
       cs.forEach((c, i) => {
         const ui = c.kind === "lever" ? makeLever(c) : makeButton(c, c.color || CAPS[hash(c.event || c.label) % CAPS.length]);
         k2.cells[i].add(ui.group); ui.hit.userData.liveControl = c.id;
         items.set(c.id, { c, ui });
       });
-      consoles.push({ key: k, group: k2.group });
+      consoles.push({ key: k, group: k2.group, at, desk: !!a.desk, actors: [...new Set(cs.map((c) => c.actor).filter(Boolean))], W: k2.W * sc });
     }
   }
 
@@ -206,9 +222,18 @@ export function createControls({ scene, live, still = false }) {
         for (const m of ui.capG) { m.position.z = (m === ui.capG[0] ? 0.06 : 0.095) - (ui.refused ? 0 : dp * 0.03); m.position.x = shake; }
         ui.capM.color.copy(en ? ui.color : ui.grey); ui.capM.emissive.copy(en ? ui.color : ui.grey);
       }
-      ui.labM.color.setScalar(en ? 1 : 0.55);
+      // a refusal says no on the control itself: the cap flashes red and the plate gives the reason, for 2.6 s
+      const no = ui.refused && ui.why && performance.now() - ui.pressedAt < 2600;
+      if (no !== !!ui.showingWhy) {
+        ui.showingWhy = no;
+        if (no) { if (ui.whyTex) ui.whyTex.dispose(); const p = ui.lab.geometry.parameters; ui.whyTex = labelTex(ui.why.toUpperCase(), { w: p.width, h: p.height, bg: "#b3261e", fg: "#fff4e6" }); ui.labM.map = ui.whyTex; }
+        else ui.labM.map = ui.lab.userData.base;
+        ui.labM.needsUpdate = true;
+      }
+      if (no) { const k = (performance.now() - ui.pressedAt) / 1000; const f = k < 1.2 ? 0.5 + 0.5 * Math.cos(k * 14) : 0; ui.capM.color.lerp(RED, 0.4 + 0.6 * f); ui.capM.emissive.copy(RED); }
+      ui.labM.color.setScalar(no ? 1 : en ? 1 : 0.55);
       const breathe = !still && rest && en && !it.fixed || (!still && rest && en && (c.id === "time:advance"));
-      ui.capM.emissiveIntensity = breathe ? 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(amb * 1.9)) : en ? 0.06 : 0;
+      ui.capM.emissiveIntensity = no ? 0.5 : breathe ? 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(amb * 1.9)) : en ? 0.06 : 0;
     }
   }
 
@@ -217,7 +242,18 @@ export function createControls({ scene, live, still = false }) {
   function screenOf(it, camera, w, h) { it.ui.group.getWorldPosition(tmp); const p = tmp.clone().project(camera); if (p.z > 1) return null; return { x: (p.x + 1) / 2 * w, y: (1 - p.y) / 2 * h }; }
   /** The control nearest to a screen point within `radius` px (for thumbs on small screens). */
   function near(x, y, camera, w, h, radius = 26) { let best = null, bd = radius; for (const it of items.values()) { const s = screenOf(it, camera, w, h); if (!s) continue; const d = Math.hypot(s.x - x, s.y - y); if (d < bd) { bd = d; best = it.c; } } return best; }
-  function press(id) { const it = items.get(id); if (!it) return false; it.ui.pressedAt = performance.now(); it.ui.refused = !it.c.enabled; if (!it.c.enabled) return false; Promise.resolve(it.c.press()).catch((e) => console.error(e)); return true; }
+  /** why a control would not do anything now, in plain words */
+  function whyNot(c) {
+    if (live.viewingPast && c.id !== "time:advance") return "looking back: press advance";
+    if (live.busy) return "busy";
+    if (c.event && c.actor && live.whyNot) return live.whyNot(c.actor, c.event);
+    if (c.id === "time:advance") return "no timer is due";
+    if (c.id === "time:hop") return live.stepping ? "nothing to step" : "only in step mode";
+    return "not now";
+  }
+  /** press a control: true when taken; refused: false, and the control says why (also returned as `why`) */
+  function press(id) { const it = items.get(id); if (!it) return false; it.ui.pressedAt = performance.now(); it.ui.refused = !it.c.enabled; if (!it.c.enabled) { it.ui.why = whyNot(it.c); return false; } it.ui.why = null; Promise.resolve(it.c.press()).catch((e) => console.error(e)); return true; }
+  const lastWhy = (id) => items.get(id)?.ui.why || null;
   function screenPositions(camera, w, h) { const out = []; for (const it of items.values()) { const s = screenOf(it, camera, w, h); const q = it.ui.group.getWorldQuaternion(new THREE.Quaternion()); const n = new THREE.Vector3(0, 0, 1).applyQuaternion(q); n.y = 0; n.normalize(); out.push({ id: it.c.id, label: it.c.label, at: it.c.at, enabled: !!it.c.enabled, kind: it.c.kind, x: s?.x, y: s?.y, world: it.ui.group.getWorldPosition(new THREE.Vector3()).toArray(), facing: n.toArray() }); } return out; }
-  return { root, rebuild, sync, update, pick, near, press, screenPositions, items, anchor };
+  return { root, rebuild, sync, update, pick, near, press, lastWhy, screenPositions, items, anchor, consoles: () => consoles };
 }

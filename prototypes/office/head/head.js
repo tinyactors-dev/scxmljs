@@ -409,13 +409,14 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     m.namePlate = plate(m.label, 1, Infinity, { kind: "machine", m, comp: false }); m.beamG.add(m.namePlate);
     if (m.level === 1 && actorRec && actorRec.incarnation > 1) { m.incPlate = plate(`#${actorRec.incarnation}`, 1, Infinity, { kind: "machine", m, comp: false }); m.beamG.add(m.incPlate); }
     if (m.kind === "machine") { m.window = new THREE.Mesh(geo.plane, mat.none); m.window.visible = false; m.beamG.add(m.window); m.windowText = null; }
-    if (m.receives) { // a funnel on a short chute into the roof: mail arrives here
-      m.chute = new THREE.Mesh(geo.rod, mat.brass); m.chute.scale.set(2.2, 0.4, 2.2); C.add(m.chute);
-      m.funnel = new THREE.Mesh(geo.funnel, mat.funnel); C.add(m.funnel);
-    }
+    if (m.receives) addFunnel(m);
     m.hopper = new THREE.Object3D(); C.add(m.hopper);
     if (m.doorX != null && !big) addDoor(m);
     fitChrome(m);
+  }
+  function addFunnel(m) { // a funnel on a short chute into the roof: mail arrives here
+    m.chute = new THREE.Mesh(geo.rod, mat.brass); m.chute.scale.set(2.2, 0.4, 2.2); m.chrome.add(m.chute);
+    m.funnel = new THREE.Mesh(geo.funnel, mat.funnel); m.chrome.add(m.funnel);
   }
   function addDoor(m) { // the door: lit while the marble is in here (a big chart's closed machines have none)
     if (m.doorMesh) return; const C = m.chrome;
@@ -496,7 +497,10 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
     if (!st.door) { // the name, on the floor in front of the pad, tilted up to the viewer
       const p = plate(node.id, PLATE_H, st.initial ? 0.98 : 1.16, { m }); p.position.set(st.initial ? 0.07 : 0, 0.03 + 0.37 * p.userData.plate.hh, 0.47); p.rotation.x = -0.75; g.add(p); st.plate = p;
     }
-    if (st.timers) { // a clock on a post beside the station: its face to the viewer; the hand and an amber wedge sweep from set to due
+    if (st.timers) addClock(st, g);
+  }
+  function addClock(st, g) { // a clock on a post beside the station: its face to the viewer; the hand and an amber wedge sweep from set to due
+    const node = st.node; {
       const cx = st.door ? -0.55 : 0.5, cz = st.door ? 0.12 : 0.05;
       const post = new THREE.Mesh(geo.rod, mat.brass); post.scale.set(0.9, 0.42, 0.9); post.position.set(cx, 0.21, cz); g.add(post);
       st.clock = new THREE.Group(); st.clock.position.set(cx, 0.6, cz); st.clock.rotation.x = -0.25; g.add(st.clock);
@@ -735,118 +739,139 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
   for (const r of recs) r.grows = !big && r.parent && r.parent.kind === "machine" && r.parent.parts <= GROW_PARTS;
 
   // ---------- data: lives, moves, capsules, kicks ----------
-  const END = (sim.duration || 1e9) + 10;
+  // computed from the run; refresh() computes it again as a live run grows (the machines stay, their marbles keep
+  // moving from where they are)
   const atOf = (e) => (e.at != null ? e.at : e.t);
-  const evs = (sim.eventsBetween ? sim.eventsBetween(-1, END) : ((sim.trace && sim.trace.events) || [])).filter((e) => e.actor === actorId || (e.type === "message" && e.to === actorId));
-  const allMsgs = evs.filter((e) => e.type === "message");
-  const arrive = (msg) => (sim.flight ? sim.flight(msg)[1] : warp(atOf(msg)));
-  let lives = sim.lifetimes ? sim.lifetimes(actorId) : null;
-  if (!lives || !lives.length) { const a = sim.actor ? sim.actor(actorId) : null; lives = [[a && a.bornAt != null ? a.bornAt : 0, a && a.diedAt != null ? a.diedAt : Infinity]]; }
-  const livesS = lives.map(([a, b]) => [warp(a), b === Infinity || b > END ? Infinity : warp(b)]);
-  const capsules = []; const usedMsg = new Set(); const pendingKicks = [];
-  const cur = new Map(compound.map((m) => [m, null]));
-  const groups = []; let gEvent = null;
-  let currentEvent = null;
-  const push = (m, mv) => { m.moves.push(mv); cur.set(m, mv.to); if (gEvent !== currentEvent) { groups.push([]); gEvent = currentEvent; } groups[groups.length - 1].push({ m, mv }); };
-  for (const e of evs) {
-    const at = atOf(e); currentEvent = e;
-    if (e.type === "transition") {
-      const from = e.from || [], to = e.to || [];
-      const msg = e.event ? allMsgs.find((x) => !usedMsg.has(x.id) && x.name === e.event && Math.abs(atOf(x) - at) < 1e-6) : null;
-      if (!from.length && !to.length) { pendingKicks.push({ at, name: e.event, msg }); if (msg) usedMsg.add(msg.id); continue; }
-      if (msg) usedMsg.add(msg.id);
-      const base = msg ? arrive(msg) + CAP_LEAD : warp(at) + 0.04;
-      let outer = null, outerBoth = null;
-      for (const m of compound) {
-        const ex = kids(m.node).find((c) => from.includes(c.id)); const en = kids(m.node).find((c) => to.includes(c.id) && c.kind !== "history");
-        if (!ex && !en) continue;
-        push(m, { base, from: ex ? ex.id : null, to: en ? en.id : null, ev: e.event || "" });
-        if (!outer || m.level < outer.level) outer = m;
-        if (ex && en && (!outerBoth || m.level < outerBoth.level)) outerBoth = m;
-      }
-      if (msg) capsules.push({ s0: arrive(msg), m: outerBoth || outer || regions[0] });
-    } else if (e.type === "config") {
-      const act = new Set(e.active || []);
-      for (const m of compound) { const c = kids(m.node).find((x) => act.has(x.id)); const want = c ? c.id : null; if (want !== cur.get(m)) push(m, { base: warp(at) + 0.04, from: cur.get(m), to: want, ev: "" }); }
-    } else if (e.type === "end") {
-      if (e.reason !== "disposed" && e.reason !== "killed") for (const m of compound) if (cur.get(m)) push(m, { base: warp(at), from: cur.get(m), to: null, ev: "", death: true });
-    }
-  }
-  if (!evs.some((e) => e.type === "transition" || e.type === "config") && sim.activeAt) {
-    const act = new Set(sim.activeAt(actorId, lives[0][0]));
-    currentEvent = "birth"; for (const m of compound) { const c = kids(m.node).find((x) => act.has(x.id)); if (c) push(m, { base: livesS[0][0] + 0.04, from: null, to: c.id, ev: "" }); }
-  }
-  for (const msg of allMsgs) if (!usedMsg.has(msg.id)) pendingKicks.push({ at: atOf(msg), name: msg.name, msg });
-  for (const k of pendingKicks) {
-    const act = sim.activeAt ? sim.activeAt(actorId, k.at - 1e-7) : [];
-    let best = null, bestDepth = -1;
-    for (const id of act) { const n = nodeById.get(id); if (!n || !(n.transitions || []).some((tr) => matches(tr.event, k.name))) continue; let dd = 0; for (let x = n; parentOf.get(x.id); x = parentOf.get(x.id)) dd++; if (dd > bestDepth) { best = n; bestDepth = dd; } }
-    const s0 = k.msg ? arrive(k.msg) : warp(k.at); const sk = s0 + (k.msg ? CAP_LEAD : 0.04);
-    if (!best) { if (k.msg) capsules.push({ s0, m: regions[0], lost: true }); continue; }
-    const st = stations.get(best.id), sm = machById.get(best.id);
-    if (st && (!sm || sm.kind === "solo")) { st.kicks.push(sk); if (k.msg) capsules.push({ s0, m: st.m }); continue; }
-    let mm = sm; while (mm && mm.kind === "bench") mm = mm.parent;
-    if (!mm) mm = regions[0];
-    if (mm) { mm.hopperKicks.push(sk); if (k.msg) capsules.push({ s0, m: mm }); }
-  }
-  // who takes mail gets a funnel: the machines that receive, and the region (level 1) above each, which takes it while they are shut
-  for (const c of capsules) { let m = c.m; while (m && m.kind === "bench") m = m.parent || null; c.m = m; if (!m) continue; m.receives = true; let r = m; while (r.parent && !(r.parent.kind === "bench" && !r.parent.parent)) r = r.parent; if (r.kind !== "bench") r.receives = true; }
-  // timers: a delayed send set by a state runs the clock on that station until it fires or is cancelled
-  {
-    const all = (sim.trace && sim.trace.events) || [];
-    const sets = all.filter((e) => e.type === "timer" && e.actor === actorId && e.action === "set");
-    if (sets.length) {
-      const endBy = new Map();
-      for (const e of all) { if (e.type === "message" && e.timer && e.to === actorId) endBy.set(e.timer, Math.min(endBy.get(e.timer) ?? Infinity, e.t)); if (e.type === "timer" && e.action === "cancel" && e.timer) endBy.set(e.timer, Math.min(endBy.get(e.timer) ?? Infinity, e.t)); }
-      const byId = new Map(all.map((e) => [e.id, e]));
-      const depthOf = (id) => { let dd = 0; for (let x = nodeById.get(id); x && parentOf.get(x.id); x = parentOf.get(x.id)) dd++; return dd; };
-      for (const e of sets) {
-        const c = e.cause && byId.get(e.cause);
-        let ids = c && c.type === "transition" && (c.to || []).length ? c.to : (sim.activeAt ? sim.activeAt(actorId, e.t) : []);
-        ids = ids.filter((id) => stations.has(id)).sort((a, b) => depthOf(b) - depthOf(a));
-        if (!ids.length) continue;
-        const st = stations.get(ids[0]);
-        (st.timers ||= []).push({ t0: e.t, t1: Math.min(endBy.get(e.id) ?? Infinity, e.due ?? e.t + (e.delay || 0)), delay: e.delay || Math.max(1, (e.due || e.t + 1) - e.t) });
+  let lives, livesS, capsules, capS;
+  function computeData() {
+    const END = (sim.duration || 1e9) + 10;
+    const evs = (sim.eventsBetween ? sim.eventsBetween(-1, END) : ((sim.trace && sim.trace.events) || [])).filter((e) => e.actor === actorId || (e.type === "message" && e.to === actorId));
+    const allMsgs = evs.filter((e) => e.type === "message");
+    const arrive = (msg) => (sim.flight ? sim.flight(msg)[1] : warp(atOf(msg)));
+    lives = sim.lifetimes ? sim.lifetimes(actorId) : null;
+    if (!lives || !lives.length) { const a = sim.actor ? sim.actor(actorId) : null; lives = [[a && a.bornAt != null ? a.bornAt : 0, a && a.diedAt != null ? a.diedAt : Infinity]]; }
+    livesS = lives.map(([a, b]) => [warp(a), b === Infinity || b > END ? Infinity : warp(b)]);
+    capsules = []; const usedMsg = new Set(); const pendingKicks = [];
+    const cur = new Map(compound.map((m) => [m, null]));
+    const groups = []; let gEvent = null;
+    let currentEvent = null;
+    const push = (m, mv) => { m.moves.push(mv); cur.set(m, mv.to); if (gEvent !== currentEvent) { groups.push([]); gEvent = currentEvent; } groups[groups.length - 1].push({ m, mv }); };
+    for (const e of evs) {
+      const at = atOf(e); currentEvent = e;
+      if (e.type === "transition") {
+        const from = e.from || [], to = e.to || [];
+        const msg = e.event ? allMsgs.find((x) => !usedMsg.has(x.id) && x.name === e.event && Math.abs(atOf(x) - at) < 1e-6) : null;
+        if (!from.length && !to.length) { pendingKicks.push({ at, name: e.event, msg }); if (msg) usedMsg.add(msg.id); continue; }
+        if (msg) usedMsg.add(msg.id);
+        const base = msg ? arrive(msg) + CAP_LEAD : warp(at) + 0.04;
+        let outer = null, outerBoth = null;
+        for (const m of compound) {
+          const ex = kids(m.node).find((c) => from.includes(c.id)); const en = kids(m.node).find((c) => to.includes(c.id) && c.kind !== "history");
+          if (!ex && !en) continue;
+          push(m, { base, from: ex ? ex.id : null, to: en ? en.id : null, ev: e.event || "" });
+          if (!outer || m.level < outer.level) outer = m;
+          if (ex && en && (!outerBoth || m.level < outerBoth.level)) outerBoth = m;
+        }
+        if (msg) capsules.push({ s0: arrive(msg), m: outerBoth || outer || regions[0] });
+      } else if (e.type === "config") {
+        const act = new Set(e.active || []);
+        for (const m of compound) { const c = kids(m.node).find((x) => act.has(x.id)); const want = c ? c.id : null; if (want !== cur.get(m)) push(m, { base: warp(at) + 0.04, from: cur.get(m), to: want, ev: "" }); }
+      } else if (e.type === "end") {
+        if (e.reason !== "disposed" && e.reason !== "killed") for (const m of compound) if (cur.get(m)) push(m, { base: warp(at), from: cur.get(m), to: null, ev: "", death: true });
       }
     }
-  }
-  capsules.sort((a, b) => a.s0 - b.s0);
-  for (const st of stations.values()) st.kicks.sort((a, b) => a - b);
-  for (const m of machines) m.hopperKicks.sort((a, b) => a - b);
-  // schedule: the moves of one trace event go outside in when entering (the parent's marble reaches the door, then
-  // the inner marble rolls in) and inside out when leaving; a machine's moves never overlap; bursts shorten and blur
-  const endOf = new Map(compound.map((m) => [m, -Infinity])), countOf = new Map();
-  for (const g of groups) {
-    const base = Math.min(...g.map((x) => x.mv.base));
-    let t0 = Math.max(base, ...g.map((x) => endOf.get(x.m)));
-    const lag = t0 - base;
-    const phase = ({ m, mv }) => (mv.death ? 0 : mv.from && !mv.to ? 100 - m.level : mv.from && mv.to ? 200 : 300 + m.level);
-    const order = [...new Set(g.map(phase))].sort((a, b) => a - b);
-    for (const ph of order) {
-      let next = t0;
-      for (const x of g) {
-        if (phase(x) !== ph) continue; const { m, mv } = x;
-        mv.start = Math.max(t0, endOf.get(m));
-        const k = countOf.get(m) || 0; countOf.set(m, k + 1);
-        if (!mv.from && mv.to && !mv.death && m.histPad && mv.to !== initialOf(m.node) && k > 0) mv.viaHist = true;
-        let dur = mv.from && mv.to ? TRAVEL : mv.viaHist ? 0.7 : 0.32;
-        if (mv.death) dur = 0.9;
-        else if (lag > LAG_HARD) { dur = 0.03; mv.fast = true; }
-        else if (lag > LAG_SOFT) { dur *= Math.max(0.15, 1 - (lag - LAG_SOFT) / (LAG_HARD - LAG_SOFT)); mv.fast = dur < 0.2; }
-        mv.end = mv.start + dur; endOf.set(m, mv.end); next = Math.max(next, mv.end);
-        mv.track = null;
-      }
-      t0 = next;
+    if (!evs.some((e) => e.type === "transition" || e.type === "config") && sim.activeAt) {
+      const act = new Set(sim.activeAt(actorId, lives[0][0]));
+      currentEvent = "birth"; for (const m of compound) { const c = kids(m.node).find((x) => act.has(x.id)); if (c) push(m, { base: livesS[0][0] + 0.04, from: null, to: c.id, ev: "" }); }
     }
+    for (const msg of allMsgs) if (!usedMsg.has(msg.id)) pendingKicks.push({ at: atOf(msg), name: msg.name, msg });
+    for (const k of pendingKicks) {
+      const act = sim.activeAt ? sim.activeAt(actorId, k.at - 1e-7) : [];
+      let best = null, bestDepth = -1;
+      for (const id of act) { const n = nodeById.get(id); if (!n || !(n.transitions || []).some((tr) => matches(tr.event, k.name))) continue; let dd = 0; for (let x = n; parentOf.get(x.id); x = parentOf.get(x.id)) dd++; if (dd > bestDepth) { best = n; bestDepth = dd; } }
+      const s0 = k.msg ? arrive(k.msg) : warp(k.at); const sk = s0 + (k.msg ? CAP_LEAD : 0.04);
+      if (!best) { if (k.msg) capsules.push({ s0, m: regions[0], lost: true }); continue; }
+      const st = stations.get(best.id), sm = machById.get(best.id);
+      if (st && (!sm || sm.kind === "solo")) { st.kicks.push(sk); if (k.msg) capsules.push({ s0, m: st.m }); continue; }
+      let mm = sm; while (mm && mm.kind === "bench") mm = mm.parent;
+      if (!mm) mm = regions[0];
+      if (mm) { mm.hopperKicks.push(sk); if (k.msg) capsules.push({ s0, m: mm }); }
+    }
+    // who takes mail gets a funnel: the machines that receive, and the region (level 1) above each, which takes it while they are shut
+    for (const c of capsules) { let m = c.m; while (m && m.kind === "bench") m = m.parent || null; c.m = m; if (!m) continue; m.receives = true; let r = m; while (r.parent && !(r.parent.kind === "bench" && !r.parent.parent)) r = r.parent; if (r.kind !== "bench") r.receives = true; }
+    // timers: a delayed send set by a state runs the clock on that station until it fires or is cancelled
+    {
+      const all = (sim.trace && sim.trace.events) || [];
+      const sets = all.filter((e) => e.type === "timer" && e.actor === actorId && e.action === "set");
+      if (sets.length) {
+        const endBy = new Map();
+        for (const e of all) { if (e.type === "message" && e.timer && e.to === actorId) endBy.set(e.timer, Math.min(endBy.get(e.timer) ?? Infinity, e.t)); if (e.type === "timer" && e.action === "cancel" && e.timer) endBy.set(e.timer, Math.min(endBy.get(e.timer) ?? Infinity, e.t)); }
+        const byId = new Map(all.map((e) => [e.id, e]));
+        const depthOf = (id) => { let dd = 0; for (let x = nodeById.get(id); x && parentOf.get(x.id); x = parentOf.get(x.id)) dd++; return dd; };
+        for (const e of sets) {
+          const c = e.cause && byId.get(e.cause);
+          let ids = c && c.type === "transition" && (c.to || []).length ? c.to : (sim.activeAt ? sim.activeAt(actorId, e.t) : []);
+          ids = ids.filter((id) => stations.has(id)).sort((a, b) => depthOf(b) - depthOf(a));
+          if (!ids.length) continue;
+          const st = stations.get(ids[0]);
+          (st.timers ||= []).push({ t0: e.t, t1: Math.min(endBy.get(e.id) ?? Infinity, e.due ?? e.t + (e.delay || 0)), delay: e.delay || Math.max(1, (e.due || e.t + 1) - e.t) });
+        }
+      }
+    }
+    capsules.sort((a, b) => a.s0 - b.s0);
+    for (const st of stations.values()) st.kicks.sort((a, b) => a - b);
+    for (const m of machines) m.hopperKicks.sort((a, b) => a - b);
+    // schedule: the moves of one trace event go outside in when entering (the parent's marble reaches the door, then
+    // the inner marble rolls in) and inside out when leaving; a machine's moves never overlap; bursts shorten and blur
+    const endOf = new Map(compound.map((m) => [m, -Infinity])), countOf = new Map();
+    for (const g of groups) {
+      const base = Math.min(...g.map((x) => x.mv.base));
+      let t0 = Math.max(base, ...g.map((x) => endOf.get(x.m)));
+      const lag = t0 - base;
+      const phase = ({ m, mv }) => (mv.death ? 0 : mv.from && !mv.to ? 100 - m.level : mv.from && mv.to ? 200 : 300 + m.level);
+      const order = [...new Set(g.map(phase))].sort((a, b) => a - b);
+      for (const ph of order) {
+        let next = t0;
+        for (const x of g) {
+          if (phase(x) !== ph) continue; const { m, mv } = x;
+          mv.start = Math.max(t0, endOf.get(m));
+          const k = countOf.get(m) || 0; countOf.set(m, k + 1);
+          if (!mv.from && mv.to && !mv.death && m.histPad && mv.to !== initialOf(m.node) && k > 0) mv.viaHist = true;
+          let dur = mv.from && mv.to ? TRAVEL : mv.viaHist ? 0.7 : 0.32;
+          if (mv.death) dur = 0.9;
+          else if (lag > LAG_HARD) { dur = 0.03; mv.fast = true; }
+          else if (lag > LAG_SOFT) { dur *= Math.max(0.15, 1 - (lag - LAG_SOFT) / (LAG_HARD - LAG_SOFT)); mv.fast = dur < 0.2; }
+          mv.end = mv.start + dur; endOf.set(m, mv.end); next = Math.max(next, mv.end);
+          mv.track = null;
+        }
+        t0 = next;
+      }
+    }
+    for (const m of compound) { m.moves.sort((a, b) => a.start - b.start); m.moveStarts = m.moves.map((x) => x.start); }
+    capS = capsules.map((c) => c.s0);
+    for (const m of compound) if (m.histPad) { const mark = (x) => { for (const c of x.children) { if (c.kind === "machine") c.remembers = true; mark(c); } }; m.remembers = true; if (m.histDeep) mark(m); }
+    const allActors = sim.actors || sim.actorsList || [];
+    const childrenOf = allActors.filter((a) => a.parent === actorId);
+    for (const st of stations.values()) if ((st.node.invokes || []).length) { st.invokes = st.node.invokes;
+      st.childIds = childrenOf.filter((a) => st.invokes.some((iv) => (iv.id && a.id.includes(iv.id)) || (iv.src && a.chart && iv.src.replace(/^.*\//, "").replace(/\.scxml$/, "") === a.chart))).map((a) => a.id);
+      if (!st.childIds.length) st.childIds = childrenOf.map((a) => a.id);
+    }
+
   }
-  for (const m of compound) { m.moves.sort((a, b) => a.start - b.start); m.moveStarts = m.moves.map((x) => x.start); }
-  const capS = capsules.map((c) => c.s0);
-  for (const m of compound) if (m.histPad) { const mark = (x) => { for (const c of x.children) { if (c.kind === "machine") c.remembers = true; mark(c); } }; m.remembers = true; if (m.histDeep) mark(m); }
-  const allActors = sim.actors || sim.actorsList || [];
-  const childrenOf = allActors.filter((a) => a.parent === actorId);
-  for (const st of stations.values()) if ((st.node.invokes || []).length) { st.invokes = st.node.invokes;
-    st.childIds = childrenOf.filter((a) => st.invokes.some((iv) => (iv.id && a.id.includes(iv.id)) || (iv.src && a.chart && iv.src.replace(/^.*\//, "").replace(/\.scxml$/, "") === a.chart))).map((a) => a.id);
-    if (!st.childIds.length) st.childIds = childrenOf.map((a) => a.id);
+  computeData();
+  /** a live run grew: the moves, mail, kicks and timers again, on the same machines. false when the new run needs
+   *  parts the head was built without (a first timer on a built station, a first funnel): then build it again */
+  function refresh() {
+    const recv = machines.map((m) => !!m.receives);
+    for (const m of machines) { m.moves = []; m.moveStarts = []; m.hopperKicks = []; }
+    for (const st of stations.values()) { st.kicks = []; if (st.timers) st.timers = []; }
+    computeData();
+    // parts the new run needs that were not built: a first funnel, a first clock (added in place)
+    for (const m of machines) if (m.receives && !m.funnel && m.chromeBuilt) { addFunnel(m); fitChrome(m); }
+    for (const st of stations.values()) if (st.group && st.timers && st.timers.length && !st.clock) addClock(st, st.group);
+    void recv;
+    for (const m of machines) if (m.interiorBuilt) for (const mv of m.moves) { mv.track = trackFor(m, mv.from, mv.to, mv.ev); const t = mv.track && mv.track.viaBus ? mv.track.bus : mv.track; if (t) t.firstTaken = Math.min(t.firstTaken, mv.start); }
+    return true;
   }
 
   // ---------- lazy building ----------
@@ -1440,7 +1465,7 @@ export function createHead({ THREE, sim, actorId, options = {} }) {
   }
 
   const api = {
-    group, update, setDetail, pick, focus, dispose, room,
+    group, update, setDetail, pick, focus, dispose, room, refresh,
     get focusBounds() { return targetBounds(focusId); },
     get detail() { return detail; },
     get focusId() { return focusId; },

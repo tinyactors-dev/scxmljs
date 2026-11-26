@@ -129,6 +129,47 @@ if (S.live) for (const a of acts.filter((e) => ["press", "advance", "headSend"].
   const grew = L.by("world", "rebuild").some((e) => e.t > a.t && e.t < a.t + 2500); const play = modes.some((m) => m.t > a.t && m.t < a.t + 2500 && /\+playing/.test(m.data.to));
   if (!grew && !play && !/^(reset|time:mode)$/.test(a.data.id || "")) add("live.no-effect", 2, a.t, `${a.type} ${a.data.id || a.data.event || ""}: nothing happened in the room (an inert control, or the run is held back)`);
 }
+// live: a press whose consequence was not in view. Builds that log it say so directly (world/consequence: the people
+// the chain changed, and which of them were on screen, unhidden, two seconds later); for older logs the person an
+// input drives (in:<actor>:<event>) is looked for in the view sampled 1 to 2.5 s after the press
+if (S.live) {
+  const cons = L.by("world", "consequence");
+  if (cons.length) for (const c of cons) {
+    if (c.data.head) { if (c.data.machines?.length && !c.data.seen?.length) add("live.consequence-offscreen", 3, c.t - 2000, `${c.data.id}: the machine whose marble moved (${c.data.machines.join(", ")}) was not in view`); continue; }
+    const miss = (c.data.actors || []).filter((a) => !(c.data.seen || []).includes(a));
+    if (miss.length || c.data.control === false) add("live.consequence-offscreen", 3, c.t - 2000, `press ${c.data.id}: what it caused was off screen 2 s later (${[...miss.map((a) => `actor ${a}`), ...(c.data.control === false ? ["the control"] : [])].join(", ")} not in view${c.data.flew ? ", after a reveal flight" : ""})`);
+  }
+  else for (const p of L.by("world", "press").filter((e) => e.data.ok)) {
+    const who = /^in:([^:]+):/.exec(p.data.id || "")?.[1]; if (!who) continue;
+    const vs = views.filter((v) => v.t >= p.t + 1000 && v.t <= p.t + 2500); if (!vs.length) continue;
+    const seen = vs.some((v) => (v.data.in || []).some((x) => x[0] === "actor" && x[1] === who && x[6] >= 0.2));
+    if (!seen && !/^(entering|head|machine|leaving):/.test(modeAt(p.t))) add("live.consequence-offscreen", 3, p.t, `press ${p.data.id}: ${who}, whom it drives, was not in view 1 to 2.5 s later (what it caused happened off screen)`);
+  }
+  // a refused press: did the build say why? (older builds: no reason, and nothing but a shiver of the cap)
+  for (const p of L.by("world", "press").filter((e) => e.data.ok === false && !/^(time:mode)$/.test(e.data.id || ""))) add("live.refused", p.data.why ? 0 : 2, p.t, p.data.why ? `press ${p.data.id} refused, and the control said why: "${p.data.why}"` : `press ${p.data.id} refused with no reason shown (the cap only shivers)`);
+  for (const p of L.by("world", "press").filter((e) => e.data.queued)) add("live.queued", 0, p.t, `press ${p.data.id} made while the last one still played: that one finished fast, then this one played`);
+}
+// a press inside a head must update it in place, not build it again (its marbles jump back to their starts)
+for (const a of acts.filter((e) => e.type === "headSend")) {
+  const built = L.by("world", "head").find((e) => e.t >= a.t && e.t < a.t + 1000 && e.data.how === "built") || L.by("frame", "long").find((e) => e.t >= a.t && e.t < a.t + 1000 && (e.data.tags || []).includes("head-built"));
+  if (built) add("head.rebuilt-on-press", 2, a.t, `pressing ${a.data.event} inside the head built the head again (a long frame; marbles reset)`);
+}
+// walking must not change the selection: a deselect (or a selected person's mode left for the overview) right after
+// a walking key went down
+{ const walkKeys = new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "q", "e"]);
+  const kd = L.by("input", "key").filter((e) => e.data.down && walkKeys.has(String(e.data.key).toLowerCase()));
+  const lostAt = (t) => kd.some((k) => t >= k.t - 50 && t <= k.t + 400);
+  for (const a of L.by("act", "deselect").filter((e) => e.data.src !== "replay" && lostAt(e.t))) add("selection.lost-walking", 2, a.t, `walking (a key) deselected the selected person`);
+  for (const m of modes.filter((m) => /^(person|station):/.test(m.data.from) && /^overview/.test(m.data.to) && m.data.cause !== "deselect" && m.data.cause !== "back" && m.data.cause !== "home" && lostAt(m.t))) add("selection.lost-walking", 2, m.t, `walking left ${m.data.from.replace(/ .*/, "")} for the overview`); }
+// inside a head: the camera inside a machine (geometry in the near plane), plates cut by the frame's edge (builds that
+// log view.head); older logs: a single plate filling the frame while a machine is in focus (bestGlyph)
+{ const hv = views.filter((v) => v.data.head);
+  const spansOf = (pred) => { const out = []; let cur = null; for (const v of hv) { if (pred(v.data.head)) { if (!cur) cur = { t0: v.t, t1: v.t, v }; else cur.t1 = v.t; } else if (cur) { out.push(cur); cur = null; } } if (cur) out.push(cur); return out; };
+  for (const sp of spansOf((h) => h.inside)) add("head.camera-inside", 3, sp.t0, `inside a head the camera was inside ${sp.v.data.head.inside} for ${((sp.t1 - sp.t0) / 1000 + 0.5).toFixed(1)} s (geometry within the near plane)`);
+  for (const sp of spansOf((h) => h.focus && h.clipped > 0)) add("head.plate-clipped", 2, sp.t0, `machine ${sp.v.data.head.focus} in focus with ${sp.v.data.head.clipped} of its ${sp.v.data.head.shown} plates cut by the frame's edge, ${((sp.t1 - sp.t0) / 1000 + 0.5).toFixed(1)} s`);
+  if (!hv.length) { const H = S.viewport?.[1] || 720; let cur = null; const out = []; for (const v of views) { const m = modeAt(v.t); const bad = /^machine:/.test(m) && v.data.bestGlyph > 0.1 * H; if (bad) { if (!cur) cur = { t0: v.t, t1: v.t, g: v.data.bestGlyph }; else { cur.t1 = v.t; cur.g = Math.max(cur.g, v.data.bestGlyph); } } else if (cur) { out.push(cur); cur = null; } } if (cur) out.push(cur);
+    for (const sp of out) add("head.too-near", 2, sp.t0, `a machine in focus seen from too near: plates ${Math.round(sp.g)} px tall (over a tenth of the screen), clipped by the frame, ${((sp.t1 - sp.t0) / 1000 + 0.5).toFixed(1)} s`); }
+}
 for (let i = 1; i < taps.length; i++) { const a = taps[i - 1], b = taps[i]; if (b.t - a.t < TH.repeatMs && Math.hypot(a.data.x - b.data.x, a.data.y - b.data.y) < TH.repeatPx && a.data.act === b.data.act && isDead(b)) add("tap.repeat", 2, b.t, `the same spot tapped again with the same (lack of) result: ${label(b.data.hit)} -> ${b.data.act || "nothing"}`); }
 for (let i = 0; i < taps.length; i++) { const w = taps.filter((e) => e.t >= taps[i].t && e.t < taps[i].t + TH.rageMs); if (w.length >= TH.rage) { add("tap.rage", 2, taps[i].t, `${w.length} taps within ${TH.rageMs / 1000}s (${w.map((e) => e.data.act || "nothing").join(", ")})`); i += w.length - 1; } }
 { const fur = taps.filter((e) => e.data.hit?.[0] === "furniture"); if (fur.length) add("tap.scenery", fur.length > 3 ? 2 : 1, fur[0].t, `${fur.length} taps on desks and their objects, which look like things but do nothing`, { at: fur.slice(0, 10).map((e) => [+(e.t / 1000).toFixed(1), e.data.x, e.data.y]) }); }

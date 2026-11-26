@@ -27,7 +27,13 @@ export function makePlan(sim, cfg = {}) {
   const W = sim.warp;
   const pairW = new Map(); const key = (a, b) => (a < b ? a + "|" + b : b + "|" + a);
   const partners = new Map();
-  for (const m of msgs) { for (const to of sim.recipients(m)) { if (!to || to === m.from) continue; pairW.set(key(m.from, to), (pairW.get(key(m.from, to)) || 0) + 1); (partners.get(m.from) || partners.set(m.from, new Set()).get(m.from)).add(to); (partners.get(to) || partners.set(to, new Set()).get(to)).add(m.from); } }
+  const link = (a, b) => { pairW.set(key(a, b), (pairW.get(key(a, b)) || 0) + 1); (partners.get(a) || partners.set(a, new Set()).get(a)).add(b); (partners.get(b) || partners.set(b, new Set()).get(b)).add(a); };
+  for (const m of msgs) { for (const to of sim.recipients(m)) { if (!to || to === m.from) continue; link(m.from, to); } }
+  // live: the links the run WILL have (an input's sender and the actor it drives), so the room is laid out as it
+  // will be used before anyone has used it, and a press does not rearrange it
+  for (const [a, b] of cfg.links || []) if (sim.actor(a) && sim.actor(b) && a !== b && !pairW.has(key(a, b))) link(a, b);
+  // live: the previous plan of the same run; what it decided stays decided (nothing moves under the visitor)
+  const prev = cfg.prev || null;
   const w = (a, b) => pairW.get(key(a, b)) || 0;
 
   // ---- invoked children ----
@@ -99,6 +105,8 @@ export function makePlan(sim, cfg = {}) {
     const top = ps.sort((a, b) => w(x.id, b) - w(x.id, a))[0];
     const kind = classifyExternal(x, cfg);
     if (kind === "bus") continue; // the tubes are the bus
+    if (prev && prev.attached.has(x.id) && groupOf.get(prev.attached.get(x.id))) { attached.set(x.id, prev.attached.get(x.id)); continue; }
+    if (prev && prev.stations.some((s) => s.id === x.id)) { stations.push({ id: x.id, kind, label: cfg.names?.[x.id] || x.label || x.id, weight: tot }); continue; }
     // a small system (one or two people) is a cosy office: every external it uses but the clock stands
     // at arm's length beside the desk it talks to (the person using it as a control panel, a service
     // as a machine), not on a far wall
@@ -127,7 +135,10 @@ export function makePlan(sim, cfg = {}) {
   const placed = [];
   const AISLE = 2.2;
   const overlaps = (x, z, g) => placed.some((p) => Math.abs(x - p.x) * 2 < g.w + p.w + 2 * AISLE && Math.abs(z - p.z) * 2 < g.d + p.d + 2 * AISLE);
+  const prevG = new Map((prev?.groups || []).map((g) => [g.id, g]));
   for (const g of order) {
+    const pg = prevG.get(g.id); // live: a group keeps its place while it fits there
+    if (pg && !overlaps(pg.x, pg.z, g)) { g.x = pg.x; g.z = pg.z; placed.push(g); continue; }
     if (!placed.length) { g.x = 0; g.z = g.kind === "hub" ? 0 : 0; placed.push(g); continue; }
     let best = null;
     for (let r = 0; r < 60 && (!best || r < best.r + 6); r++) {
@@ -193,10 +204,12 @@ export function makePlan(sim, cfg = {}) {
   if (room.x1 - room.x0 < needW) { const extra = (needW - (room.x1 - room.x0)) / 2; room.x0 -= extra; room.x1 += extra; }
   if (room.x1 - room.x0 < MIN_W) { const extra = (MIN_W - (room.x1 - room.x0)) / 2; room.x0 -= extra; room.x1 += extra; }
   if (room.z1 - room.z0 < MIN_D) { const extra = MIN_D - (room.z1 - room.z0); room.z0 -= extra * 0.5; room.z1 += extra * 0.5; }
+  if (prev) room = { x0: Math.min(room.x0, prev.room.x0), x1: Math.max(room.x1, prev.room.x1), z0: Math.min(room.z0, prev.room.z0), z1: Math.max(room.z1, prev.room.z1) }; // live: a room only grows
   const span = room.x1 - room.x0 - 4; const step = north.length ? Math.min(STW + 1.5, span / north.length) : 0;
   north.forEach((s, i) => { s.x = room.x0 + 2 + step * (i + 0.5); s.z = room.z0 + 2.2; s.facing = 0; s.wall = "north"; });
   // keep each north station roughly above its partners when there is room
   for (let pass = 0; pass < 3; pass++) for (let i = 0; i < north.length; i++) { const want = Math.max(room.x0 + 2.2, Math.min(room.x1 - 2.2, centroidX(north[i].id))); const lo = i ? north[i - 1].x + STW : room.x0 + 2.2; const hi = i < north.length - 1 ? north[i + 1].x - STW : room.x1 - 2.2; if (lo <= hi) north[i].x = Math.max(lo, Math.min(hi, want)); }
+  if (prev) { const same = ["x0", "x1", "z0", "z1"].every((k) => Math.abs(room[k] - prev.room[k]) < 1e-9); if (same) for (const s of north) { const ps = prev.stations.find((q) => q.id === s.id && q.wall === "north"); if (ps) s.x = ps.x; } }
   const door = { x: room.x0, z: room.z1 - (small ? 2.2 : 3.2) };
   const users = stations.filter((s) => s.kind === "user"); users.forEach((s, i) => { s.x = room.x0 + 1.3; s.z = door.z - 2.8 - i * 3.0; s.facing = Math.PI / 2; s.wall = "west"; });
   const clocks = stations.filter((s) => s.kind === "timer"); clocks.forEach((s, i) => { s.x = room.x1 - 3.5 - i * 3; s.z = room.z0 + 0.2; s.wall = "north"; s.clock = true; });

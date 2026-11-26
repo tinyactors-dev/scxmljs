@@ -220,6 +220,26 @@ export async function bootLive(name, opts = {}) {
     }
     return false;
   }
+  /** Why `s` would not take `event` now, in a few plain words, derived from the chart alone: the region that would
+   *  take it is in another state ("door is closed"), its cond is false ("only if cart.length > 0"), nothing takes it. */
+  function whyNot(s, event) {
+    if (!s || s.status !== "running") return "not running";
+    const active = new Set([...s.configuration].map((x) => x.id));
+    const takers = s.model.states.filter((st) => (st.transitions || []).some((t) => t.events?.length && nameMatch(t.events, event)));
+    if (!takers.length) return "nothing takes it";
+    for (const st of takers) if (active.has(st.id)) { const t = st.transitions.find((x) => x.events?.length && nameMatch(x.events, event)); if (t && t.cond) return `only if ${t.cond}`.slice(0, 48); }
+    let best = null;
+    for (const st of takers) {
+      // the nearest active ancestor of the state that would take it, and what that ancestor is doing instead
+      let child = st, a = st.parent; while (a && !active.has(a.id) && a.parent) { child = a; a = a.parent; }
+      if (!a) continue; const now = (a.children || []).find((c) => active.has(c.id));
+      if (!now || now === child) continue;
+      const depth = a.depth ?? 0; if (!best || depth > best.depth) best = { depth, a, now };
+    }
+    if (!best) return "not now";
+    const who = best.a.parent ? best.a.id : "it";
+    return `${who} is ${best.now.id}`.replace(/[._]/g, " ");
+  }
   const payloadOf = (actorId, event) => { const p = def.inputs?.payloads?.[event]; return typeof p === "function" ? p(actorId, ctx) : p; };
   const labelOf = (event) => def.inputs?.labels?.[event] || event.replace(/[._]/g, " ").toUpperCase();
 
@@ -241,6 +261,8 @@ export async function bootLive(name, opts = {}) {
     for (const c of def.controls ? def.controls(ctx) : []) out.push({ kind: "button", ...c, enabled: !viewingPast && !busy && c.enabled !== false, press: () => act(() => c.press()) });
     return out;
   }
+  /** [sender, actor] for every input: who will send to whom when the visitor presses (the room is laid out for it) */
+  function links() { const app = (def.app || { id: "user" }).id; const out = new Map(); for (const c of controls()) if (c.event && c.actor) out.set(`${app}|${c.actor}`, [app, c.actor]); return [...out.values()]; }
   function pendingTimers() {
     if (!run) return [];
     const now = run.clock.now() + run.offset();
@@ -293,7 +315,7 @@ export async function bootLive(name, opts = {}) {
   const atRest = () => !viewingPast && playS >= Math.min(restS(), cursor) - 1e-6;
   const live = {
     id, def, title: def.title || id, sim, trace: sim.trace, office: { ...(def.office || {}), plan: { showIdleExternals: true, ...(def.office?.plan || {}) } }, systems: SYSTEMS,
-    controls, pendingTimers, advance, step, setStepping, reset, snapshot,
+    controls, links, pendingTimers, advance, step, setStepping, reset, snapshot,
     get stepping() { return stepping; }, get busy() { return !!busy; }, get viewingPast() { return viewingPast; },
     on: bus.on,
     /** The playback second the room may play up to now. */
@@ -305,6 +327,7 @@ export async function bootLive(name, opts = {}) {
     returnToNow,
     send: (actorId, event, data) => act(() => sendTo(actorId, event, data)),
     accepts: (actorId, event) => accepts(allSessions().get(actorId), event),
+    whyNot: (actorId, event) => whyNot(allSessions().get(actorId), event),
     ctx,
   };
   ctx.live = live;

@@ -95,3 +95,22 @@ head); before/after pairs in `out/quality/pair-*.png`.
   responds; hidden things take no clicks.
 - Small systems: a cosy room; the externals stand at arm's length (the person using it is a control
   panel beside the desk).
+
+## The owner's first flight-recorder log (2026-11-26, live microwave, 120 fps on an M4 Max)
+
+"I have no clue what I just did in there." What the log showed, and what changed (FINDINGS.md, "The owner's
+first log", has the evidence and the frames):
+
+- O1 Start and walking: the start view stood high above the room; WASD speed scaled with the distance to the orbit
+  target. Now live starts in front of the person the inputs drive (console and printer in frame); walking is a
+  steady 2.2 m/s (Shift x2), Q/E turn, it slides along furniture, works inside a head (in its scale, under its
+  dome), and never changes the selection.
+- O2 The first press rearranged the room (the plan was made again from the grown run: the user station jumped from
+  the door wall to the desk, the console with it) while the camera stayed. The plan is now sticky and laid out for
+  the links the inputs will make; and a press whose consequence is off screen turns the camera to show it.
+- O3 The console stood in front of the desk, hiding the person: now beside the desk's front corner, smaller.
+- O4 A refused press said nothing: now it flashes red and its plate says why (derived from the chart).
+- O5 Walking deselected; O6 presses 1 s apart played 4 s each, silently queued: now the last one finishes 6x faster.
+- O7 Focus put the camera inside the arcs (a double scaling: the bounds were already in world units); a press inside
+  a head built it again. Focus now frames the whole machine; the head refreshes in place.
+- O8 The receipt printer (world/ticker.js): one line per cause and what it caused.

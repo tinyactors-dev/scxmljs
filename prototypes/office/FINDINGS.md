@@ -1,5 +1,16 @@
 # What the flight recorder found (2026-11-26)
 
+## The owner's first log (2026-11-26, `?live=microwave`, 120 fps on an Apple M4 Max)
+
+"I have no clue what I just did in there." The log: `433e41fb-office-log-2026-11-26T16-20-11.json.gz` (105 s);
+replayed into `out/owner1/sheet-1..9.png`. The same visit done again on the new build by
+`tools/explore.mjs --live microwave --script tools/scripts/owner1.json` (the owner's presses, walking, the head and
+its buttons, step for step) and replayed into `out/owner1-after/`. `node tools/analyse.mjs` on the owner's log now
+reports each point below; on the after log it reports none of them.
+
+@@OWNER@@
+
+
 How these were found: `tools/explore.mjs` drove the real page (animation loop running, real pointer,
 wheel, key and touch events) as five kinds of first-time visitor over six targets, 15 sessions of 40
 app-seconds each (`?live=microwave` clicker, impatient, phone; `?live=llm-chat` clicker, orbiter;

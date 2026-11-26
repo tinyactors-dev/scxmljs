@@ -12,6 +12,9 @@
 //   impatient  taps fast, double-taps, presses Escape
 //   phone      touch at 390 x 800: taps, one-finger drags, pinches
 //   lost       taps empty floor and walls, drags a little, presses keys at random
+//   script     --script <file.json>: a list of steps done in order with real input (a visit to reproduce, e.g. the
+//              owner's own from a log): {do: "key", key, ms} holds a key for ms of app time; {do: "tap", control: id}
+//              | {actor: id} | {headEvent: event} | {headState: id}; {do: "wait", ms}; {do: "esc"}; {do: "export"}
 // Software rendering makes frame rates meaningless here; the log says it ran on SwiftShader and the
 // analyser excludes feel findings and scales app-paced thresholds by the measured slowdown.
 import { createRequire } from "node:module"; import http from "node:http"; import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs"; import path from "node:path"; import { gzipSync } from "node:zlib"; import { spawnSync } from "node:child_process";
@@ -21,7 +24,8 @@ const here = path.dirname(new URL(import.meta.url).pathname); const root = path.
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const SYS = opt("--system", null), LIVE = opt("--live", null), PERSONA = opt("--persona", "clicker"), SECONDS = Number(opt("--seconds", 60)), SEED = Number(opt("--seed", 1));
-const name = `${LIVE ? "live-" + LIVE : SYS || "llm-chat"}--${PERSONA}`;
+const SCRIPT = opt("--script", null) ? JSON.parse(readFileSync(opt("--script"), "utf8")) : null;
+const name = `${LIVE ? "live-" + LIVE : SYS || "llm-chat"}--${SCRIPT ? "script" : PERSONA}`;
 const OUT = opt("--out", path.join(here, "../out/explore", name)); mkdirSync(OUT, { recursive: true });
 const query = (LIVE ? `live=${LIVE}` : `system=${SYS || "llm-chat"}`) + (args.includes("--arm") ? "&log=1" : "");
 
@@ -118,7 +122,32 @@ const personas = {
     await tap(rnd() * vw, rnd() * vh); return 2000;
   },
 };
-const act = personas[PERSONA]; if (!act) { console.error("unknown persona", PERSONA); process.exit(2); }
+// ---- a scripted visit: real keys and taps at the screen points the page reports for what each step names
+let si = 0;
+async function where(step) {
+  return page.evaluate((st) => {
+    const api = window.api, cam = api.camera, W = innerWidth, H = innerHeight; const V = (p) => { const q = p.clone().project(cam); return q.z > 1 || Math.abs(q.x) > 1 || Math.abs(q.y) > 1 ? null : { x: (q.x + 1) / 2 * W, y: (1 - q.y) / 2 * H }; };
+    cam.updateMatrixWorld();
+    if (st.control) { const c = window.live.screen().find((x) => x.id === st.control); return c && c.x != null ? { x: c.x, y: c.y } : null; }
+    if (st.actor) { const c = api.people.headCenter(st.actor, api.getPlay()); return c ? V(c.clone().add({ x: 0, y: -0.05, z: 0 })) : null; }
+    const h = window.state().sel && api.heads.get(window.state().sel.id); if (!h) return null;
+    if (st.headEvent) { const a = h.affordances().find((x) => x.event === st.headEvent && x.object); if (!a) return null; const p = a.object.getWorldPosition(cam.position.clone()); return V(p); }
+    if (st.headState) { const b = h.boundsOf(st.headState); return V(b.center); }
+    return null;
+  }, step);
+}
+async function scripted() {
+  if (si >= SCRIPT.length) return -1;
+  const st = SCRIPT[si++]; const label = JSON.stringify(st);
+  if (st.do === "wait") return st.ms;
+  if (st.do === "esc") { await key("Escape"); return st.after ?? 1500; }
+  if (st.do === "export") { await page.evaluate(() => window.api.perform({ do: "export" })).catch(() => {}); return 300; }
+  if (st.do === "key") { const k = st.key.length === 1 ? st.key.toLowerCase() : st.key; await page.keyboard.down(k); await think(st.ms); await page.keyboard.up(k); return st.after ?? 400; }
+  if (st.do === "tap") { const p = await where(st); if (!p) { pageErrors.push("script: nothing on screen for " + label); return 500; } await hover(p.x, p.y); await sleep(80); await tap(p.x, p.y); return st.after ?? 1500; }
+  pageErrors.push("script: unknown step " + label); return 100;
+}
+if (SCRIPT) personas.script = scripted;
+const act = personas[SCRIPT ? "script" : PERSONA]; if (!act) { console.error("unknown persona", PERSONA); process.exit(2); }
 // think time is APP time (the app's own clock, which a software renderer slows down: a visitor reacts
 // to what they see move), and every persona but the impatient one waits for a camera flight to end
 const appNow = () => page.evaluate(() => window.officeLog.appNow());
@@ -129,7 +158,7 @@ async function think(ms) {
 // --seconds is APP seconds: the visit lasts as long for the app whatever the renderer's speed
 let steps = 0; const appStart = await appNow();
 await think(1500); // a first look
-while ((await appNow()) - appStart < SECONDS * 1000) { const wait = await act().catch((e) => { pageErrors.push("explore: " + e.message); return 1000; }); steps++; await think(wait); }
+while (SCRIPT || (await appNow()) - appStart < SECONDS * 1000) { const wait = await act().catch((e) => { pageErrors.push("explore: " + e.message); return 1000; }); if (wait < 0) break; steps++; await think(wait); }
 await think(2500); // let the last action finish
 const json = await page.evaluate(() => JSON.stringify(window.officeLog.toJSON()));
 const file = path.join(OUT, "log.json.gz"); writeFileSync(file, gzipSync(json));

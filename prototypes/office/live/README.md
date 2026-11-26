@@ -16,6 +16,20 @@ still. Nothing moves until the visitor presses something in the room:
   joins, LEAVE at one's desk);
 - **START OVER**, the big red lever by the door, boots the system again.
 
+Where things stand (2026-11-26, after the owner's first log): an input that drives one person is a console
+beside that person's desk (the front corner on their right, past the partition, turned toward the visitor,
+smaller than a station's), never between the visitor and the person. Next to the first console stands the
+**receipt printer** (`world/ticker.js`): one line per cause and what it caused, from the trace's cause links
+(`YOU: TURN ON  →  microwave: off → idle → cooking · timer 1 s started`); tap a line to ring the people and
+light the mail involved. The visitor starts in front of that person, the console and the printer in frame. A
+press whose consequence is not in view turns the camera gently until the control and the people it changed
+are (`fly {kind: reveal}`). A refused press flashes red and its plate says why, derived from the chart: the
+region that would take the event is in another state (`DOOR IS CLOSED`), its cond is false (`ONLY IF ...`),
+or nothing takes it. A press made while the room still plays the last one plays that one six times faster to
+its end, then its own (the printer shows the new line at once, waiting with `…`). The room's plan does not
+move under the visitor: it is laid out for the links the inputs will make, and each rebuild keeps what the
+previous plan placed (`core/plan.js`, `links` and `prev`).
+
 The engine runs a press's whole causal chain at once; the room then plays it back, capsule by
 capsule, at the replay's pace (`sim.hopSec`), and comes to rest. At rest, the controls that would
 do something breathe (a slow glow): the only idle motion. `&still=1` turns that off (tests).

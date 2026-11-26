@@ -218,8 +218,8 @@ await emit(
 const PROTOTYPES = ["office"];
 const devOnly = (rel: string) =>
   /\.(md|mjs)$/.test(rel) ||
-  /(^|\/)(test\.html|shots\.json)$/.test(rel) ||
-  /^(tracer|reports|out|node_modules)(\/|$)|\/out(\/|$)/.test(rel);
+  /(^|\/)(test\.html|gallery\.html|bench\.js|shots\.json|\.gitignore)$/.test(rel) ||
+  /^(tracer|reports|out|node_modules)(\/|$)|\/(out|fixtures)(\/|$)/.test(rel);
 for (const name of PROTOTYPES) {
   const tmp = await mkdtemp(join(tmpdir(), "site-prototype-"));
   try {

@@ -1,0 +1,15 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="login" initial="signed-out">
+  <datamodel>
+    <data id="user" expr="null"/>
+  </datamodel>
+  <state id="signed-out">
+    <transition event="login" cond="_event.data.user" target="signed-in">
+      <assign location="user" expr="_event.data.user"/>
+    </transition>
+  </state>
+  <state id="signed-in">
+    <transition event="logout" target="signed-out">
+      <assign location="user" expr="null"/>
+    </transition>
+  </state>
+</scxml>

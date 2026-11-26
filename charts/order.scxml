@@ -1,0 +1,15 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="order" initial="saving">
+  <state id="saving">
+    <onentry>
+      <send type="api" target="/orders" event="order.create">
+        <param name="item" expr="'tea'"/>
+      </send>
+    </onentry>
+    <transition event="order.created" target="saved"/>
+    <transition event="error.communication" target="failed"/>
+  </state>
+  <final id="saved">
+    <donedata><param name="id" expr="_event.data.id"/></donedata>
+  </final>
+  <final id="failed"/>
+</scxml>

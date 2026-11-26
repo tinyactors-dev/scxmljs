@@ -1,0 +1,38 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" name="player" initial="stopped">
+  <datamodel>
+    <data id="volume" expr="5"/>
+    <data id="track" expr="1"/>
+  </datamodel>
+  <state id="stopped">
+    <!-- the sound history brings back "muted" if the player was muted when it stopped -->
+    <transition event="play" target="playing sound-history"/>
+  </state>
+  <parallel id="active">
+    <transition event="stop" target="stopped"/>
+    <state id="transport" initial="playing">
+      <state id="playing">
+        <transition event="pause" target="paused"/>
+        <transition event="next" type="internal">
+          <assign location="track" expr="track + 1"/>
+        </transition>
+      </state>
+      <state id="paused">
+        <transition event="play" target="playing"/>
+      </state>
+    </state>
+    <state id="sound" initial="audible">
+      <history id="sound-history" type="shallow">
+        <transition target="audible"/>
+      </history>
+      <state id="audible">
+        <transition event="mute" target="muted"/>
+        <transition event="volume" cond="_event.data.value &gt;= 0 &amp;&amp; _event.data.value &lt;= 10" type="internal">
+          <assign location="volume" expr="_event.data.value"/>
+        </transition>
+      </state>
+      <state id="muted">
+        <transition event="mute" target="audible"/>
+      </state>
+    </state>
+  </parallel>
+</scxml>

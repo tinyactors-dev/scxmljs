@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event data and &lt;scxml-data&gt; · scxmljs</title>
+<meta name="description" content="Many events carry data: an add names a product and a quantity, a pay a card or a voucher. A chart can say what that data is, with an XML Schema inside it, and &lt;scxml-view&gt; then asks for it with a…">
+<link rel="canonical" href="https://scxmljs.tinyactors.dev/docs/data/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scxmljs">
+<meta property="og:title" content="Event data and &lt;scxml-data&gt; · scxmljs">
+<meta property="og:description" content="Many events carry data: an add names a product and a quantity, a pay a card or a voucher. A chart can say what that data is, with an XML Schema inside it, and &lt;scxml-view&gt; then asks for it with a…">
+<meta property="og:url" content="https://scxmljs.tinyactors.dev/docs/data/">
+<meta property="og:image" content="https://scxmljs.tinyactors.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F4EEE2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18120D" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/assets/site-dk05k6vy.css">
+<script>(function(){var r=document.documentElement,s=null;try{s=localStorage.getItem("theme")}catch(e){}r.setAttribute("data-theme",s||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"))})();</script>
+<script type="module" src="/assets/common-4k6dvc24.js"></script>
+<script src="https://ampcode.com/w/pw_0Om200aLtVMrM967bnSOCQY6JLhet2RH2BrJ86VESO0.js" async></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="/">scxmljs</a>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a href="/demos/">Demos</a>
+      <a href="/playground/">Playground</a>
+      <a href="/api/">API</a>
+      <a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <form class="search-form" role="search" action="/search/" method="get">
+        <label class="visually-hidden" for="site-search">Search the docs</label>
+        <input id="site-search" type="search" name="q" placeholder="Search docs…" autocomplete="off">
+      </form>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch between light and dark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z" fill="currentColor"/></svg></button>
+      <button class="icon-button menu-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="docs">
+<nav class="docs-nav" aria-label="Documentation">
+  <button class="icon-button docs-nav-toggle" type="button" aria-expanded="false">Documentation menu</button>
+  <div class="groups">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="/docs/">Overview</a></li>
+      <li><a href="/docs/getting-started/">Getting started</a></li>
+      <li><a href="/docs/sandboxed-vs-trusted/">Sandboxed or trusted</a></li>
+      <li><a href="/docs/driving-charts/">Driving charts from the page</a></li>
+      <li><a href="/docs/playback/">Playback and stepping</a></li>
+      <li><a href="/docs/testing/">Testing charts</a></li>
+    </ul>
+    <h2>Elements</h2>
+    <ul>
+      <li><a href="/docs/view/">&lt;scxml-view&gt;</a></li>
+      <li><a href="/docs/explorer/">&lt;scxml-explorer&gt;</a></li>
+      <li><a href="/docs/data/" aria-current="page">Event data and &lt;scxml-data&gt;</a></li>
+      <li><a href="/docs/theming/">Theming</a></li>
+      <li><a href="/docs/custom-ui/">Custom UI and translations</a></li>
+      <li><a href="/docs/design-principles/">Design principles</a></li>
+      <li><a href="/docs/frameworks/">Frameworks</a></li>
+      <li><a href="/docs/large-charts/">Large charts</a></li>
+    </ul>
+    <h2>Interpreter</h2>
+    <ul>
+      <li><a href="/docs/io-processors/">Custom I/O processors</a></li>
+      <li><a href="/docs/invokers/">Custom invokers</a></li>
+      <li><a href="/docs/node-and-servers/">Node, Bun and servers</a></li>
+    </ul>
+    <h2>Operations</h2>
+    <ul>
+      <li><a href="/docs/bundling/">Bundling, CDNs and classic scripts</a></li>
+      <li><a href="/docs/csp/">Content-Security-Policy</a></li>
+      <li><a href="/docs/security/">Security</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="/docs/conformance/">Conformance</a></li>
+      <li><a href="/docs/deviations/">Deviations from the SCXML specification</a></li>
+      <li><a href="/docs/measurements/">Measurements</a></li>
+      <li><a href="/docs/changelog/">Changelog</a></li>
+      <li><a href="/api/">API reference</a></li>
+    </ul>
+  </div>
+</nav>
+<article class="prose" data-pagefind-body>
+<h1 id="event-data-and">Event data and <code>&lt;scxml-data&gt;</code></h1>
+<p>Many events carry data: an <code>add</code> names a product and a quantity, a <code>pay</code> a card or a voucher. A
+chart can say what that data is, with an XML Schema inside it, and <code>&lt;scxml-view&gt;</code> then asks for it
+with a form when someone clicks the event&#39;s label. The form is <code>&lt;scxml-data&gt;</code>, an element you can
+use on its own to show, edit and compose any value a schema describes.</p>
+<h2 id="describe-an-events-data">Describe an event&#39;s data<a class="anchor" href="#describe-an-events-data" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>Put an <code>&lt;xs:schema&gt;</code> in the chart, in XML Schema&#39;s namespace. Each top-level <code>&lt;xs:element name&gt;</code>
+describes the <code>_event.data</code> of the event with that name. The interpreter ignores elements of other
+namespaces, so the schema changes nothing about how the chart runs.</p>
+<div class="code-with-action"><pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> xmlns</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"http://www.w3.org/2005/07/scxml"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> xmlns:xs</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"http://www.w3.org/2001/XMLSchema"</span></span>
+<span class="line"><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF">       version</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"1.0"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> datamodel</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"ecmascript"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> initial</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"cart"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:schema</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:element</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"add"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:annotation</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:documentation</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>Put a product in the cart.&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:documentation</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:annotation</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:complexType</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:sequence</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">          &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:element</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"sku"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">            &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:simpleType</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:restriction</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> base</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"xs:string"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">              &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:enumeration</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> value</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"notebook"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/>&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:enumeration</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> value</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"pen"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">            &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:restriction</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:simpleType</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">          &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:element</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">          &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:element</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"quantity"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"xs:positiveInteger"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> default</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"1"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">          &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:element</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> name</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"gift"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"xs:boolean"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> minOccurs</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"0"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">        &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:sequence</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">      &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:complexType</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:element</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">xs:schema</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">datamodel</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">data</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> id</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"items"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> expr</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"[]"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">/>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">datamodel</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">state</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> id</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"cart"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">    &#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">transition</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> event</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"add"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>items.push(_event.data)&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">transition</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  &#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">state</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span></code></pre><a class="open-in-playground" href="/playground/#chart=fVPBjtMwEL33K0ZzgkucghBSFeeOBAIJDkgIIdeZba2N7aw9btO_R7a7bbZlyckz8-a9N_aki3q2I8x2dFHinnnaCHE8Hpvj-8aHnXjXth9E-1EUGFbcZn4NuhY_v3z-rvdkFa6gfgcK0Xgncd20CINiZf1Ao0TSVkUdzMQIxhk2apSoVWDsVwDdHDexMOWoxjSSJcfglCWJahgK8rmqnPOs2HjX53DwOmV0zXxLDAqm4IekGYwD3hNksaYTd-CSWtAtRLS300jzj9NEz-mzV3pK5PQi-y_P8TFdPC96TSYtnDkMFDkYnaVhqyJJzBgOxu1ums8SLlkKxSoc1JhIovNMW-8fUfSvICZyKG6siJfi9R4W5pajiets_x_5KSnHhk8IfJrqLJOPhs2BPjmmHQWEgR5UGlni-qWne7adeeAF09b7kZRDsMZ91TqFKLFdctQRbt6mJO9e8nak2npZwe6yun05ghkkGiYbEWiegsRfv_N1iysud0VWTAV7WW2AjoNy-Q68AzqQ4_M2d_V_6AttM6W4f_On1JtM-rYT53onrgTVapHpVxkx27H_Cw">Open in playground</a></div><p>A click on <code>add</code> now opens a form with a select for <code>sku</code>, a number box for <code>quantity</code> (1 at least)
+and an optional <code>gift</code>. The label shows <code>add …</code>: a click asks for the event&#39;s data (a label whose data the page gives
+with <code>event-data</code> doesn&#39;t, since its click sends at once). Send (or Enter) sends the
+event with the form&#39;s value; Cancel (or Escape) sends nothing. A value the schema refuses isn&#39;t
+sent: its problems show at their fields.</p>
+<p><code>docs/examples/checkout.scxml</code> is a whole checkout: products, an address with a country and a
+delivery date, and a payment that is a card or a voucher.</p>
+<h3 id="without-a-schema">Without a schema<a class="anchor" href="#without-a-schema" aria-label="Link to this section" data-pagefind-ignore>#</a></h3>
+<p>A chart with no schema for an event still gets a form when it reads the event&#39;s data: each name it
+reads as <code>_event.data.name</code> (or <code>_event.data[&quot;name&quot;]</code>) where it handles the event becomes a field.
+Such a field takes any JSON value, or text when what&#39;s typed isn&#39;t JSON (<code>12.5</code> is a number, <code>pen</code>
+the text &quot;pen&quot;), and is left out when left empty.</p>
+<h3 id="when-the-form-shows">When the form shows<a class="anchor" href="#when-the-form-shows" aria-label="Link to this section" data-pagefind-ignore>#</a></h3>
+<p>The <code>event-forms</code> attribute of <code>&lt;scxml-view&gt;</code> decides:</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>A click on an event that takes data</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>auto</code> (the default)</td>
+<td>opens the form, unless <code>event-data</code> gives data for that event: then it sends that, as before</td>
+</tr>
+<tr>
+<td><code>always</code></td>
+<td>opens the form, filled in from <code>event-data</code> when it gives some</td>
+</tr>
+<tr>
+<td><code>off</code></td>
+<td>sends at once, with <code>event-data</code>&#39;s data or none</td>
+</tr>
+</tbody></table>
+<p>A page can still change the data in an <code>scxml-send</code> listener, after the form.</p>
+<h2 id="what-the-schema-can-say">What the schema can say<a class="anchor" href="#what-the-schema-can-say" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<p>In the ECMAScript data model a value is JSON, and the schema maps onto it:</p>
+<table>
+<thead>
+<tr>
+<th>XML Schema</th>
+<th>The value</th>
+<th>The form</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>xs:string</code>, <code>xs:token</code>, …</td>
+<td>a string</td>
+<td>a text box (a <code>maxLength</code> facet limits it)</td>
+</tr>
+<tr>
+<td><code>xs:decimal</code>, <code>xs:double</code>, <code>xs:integer</code>, <code>xs:positiveInteger</code>, …</td>
+<td>a number</td>
+<td>a number box, with the type&#39;s and the facets&#39; bounds</td>
+</tr>
+<tr>
+<td><code>xs:boolean</code></td>
+<td><code>true</code> or <code>false</code></td>
+<td>a checkbox</td>
+</tr>
+<tr>
+<td><code>xs:date</code>, <code>xs:dateTime</code>, <code>xs:time</code></td>
+<td>its text (<code>2026-12-01</code>)</td>
+<td>the browser&#39;s date box</td>
+</tr>
+<tr>
+<td><code>xs:enumeration</code> facets</td>
+<td>one of the values</td>
+<td>a select</td>
+</tr>
+<tr>
+<td><code>xs:pattern</code></td>
+<td>a string matching it (whole)</td>
+<td>a text box, checked</td>
+</tr>
+<tr>
+<td><code>xs:list</code></td>
+<td>an array</td>
+<td>a text box of values separated by spaces</td>
+</tr>
+<tr>
+<td><code>xs:complexType</code> with <code>xs:sequence</code> or <code>xs:all</code>, and <code>xs:attribute</code>s</td>
+<td>an object: a field per child element and attribute</td>
+<td>a group of fields</td>
+</tr>
+<tr>
+<td><code>minOccurs=&quot;0&quot;</code>, <code>use=&quot;optional&quot;</code></td>
+<td>the field may be left out</td>
+<td>a button that adds it, and one that removes it</td>
+</tr>
+<tr>
+<td><code>maxOccurs</code> more than 1, or <code>unbounded</code></td>
+<td>an array</td>
+<td>a list that grows to the bound</td>
+</tr>
+<tr>
+<td><code>xs:choice</code></td>
+<td>an object with one of the options&#39; fields</td>
+<td>a select of the options, then the chosen one&#39;s fields</td>
+</tr>
+<tr>
+<td><code>default</code>, <code>fixed</code></td>
+<td>the first value (<code>fixed</code> can&#39;t be changed)</td>
+<td>filled in</td>
+</tr>
+<tr>
+<td><code>xs:annotation/xs:documentation</code></td>
+<td></td>
+<td>shown under the field, or under the form&#39;s title</td>
+</tr>
+</tbody></table>
+<p>A named type (<code>type=&quot;Address&quot;</code>, a top-level <code>xs:complexType</code> or <code>xs:simpleType</code>) can be used by
+several elements, and can refer to itself: a tree is composed to any depth. <code>ref=&quot;other&quot;</code> uses
+another top-level element. What the reader doesn&#39;t know (<code>xs:any</code>, <code>xs:union</code>, imports, substitution
+groups) takes any JSON value. The schema has no target namespace to declare: names are matched by
+their local part.</p>
+<h2 id="on-its-own"><code>&lt;scxml-data&gt;</code> on its own<a class="anchor" href="#on-its-own" aria-label="Link to this section" data-pagefind-ignore>#</a></h2>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-data</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> id</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"ship"</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> element</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"ship"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">>&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">scxml-data</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> type</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"module"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  import</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/data"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">  const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> form</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> document.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">querySelector</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"#ship"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  form.schema </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> `&#x3C;xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">    &#x3C;xs:element name="ship"></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">      &#x3C;xs:complexType>&#x3C;xs:sequence></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">        &#x3C;xs:element name="city" type="xs:string"/></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">        &#x3C;xs:element name="deliverOn" type="xs:date" minOccurs="0"/></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">      &#x3C;/xs:sequence>&#x3C;/xs:complexType></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">    &#x3C;/xs:element></span></span>
+<span class="line"><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">  &#x3C;/xs:schema>`</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">  form.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">addEventListener</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"input"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, () </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">=></span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(form.value, form.valid));</span></span>
+<span class="line"><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">&#x3C;/</span><span style="--shiki-light:#116329;--shiki-dark:#7EE787">script</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">></span></span></code></pre><table>
+<thead>
+<tr>
+<td></td>
+<td></td>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>schema</code></td>
+<td>the schema: XML text, a document or element holding <code>&lt;xs:schema&gt;</code>s (a chart), or <code>readSchemas(...)</code>&#39;s result</td>
+</tr>
+<tr>
+<td><code>element</code> (attribute)</td>
+<td>the top-level element whose value this is</td>
+</tr>
+<tr>
+<td><code>field</code></td>
+<td>what the value may be, given directly instead of <code>schema</code> and <code>element</code></td>
+</tr>
+<tr>
+<td><code>value</code> (also an attribute, as JSON)</td>
+<td>the value; before one is set, the schema&#39;s first value</td>
+</tr>
+<tr>
+<td><code>readonly</code> (attribute), <code>readOnly</code></td>
+<td>show the value, don&#39;t edit it</td>
+</tr>
+<tr>
+<td><code>valid</code>, <code>problems</code></td>
+<td>whether the value is what the schema says, and each problem with its path (<code>[&quot;items&quot;, 2, &quot;price&quot;]</code>) and message</td>
+</tr>
+<tr>
+<td><code>reportValidity()</code></td>
+<td>show every problem (not only those of fields already left), focus the first, return <code>valid</code></td>
+</tr>
+<tr>
+<td><code>strings</code></td>
+<td>the words it shows (<code>defaultDataStrings</code>), to translate it</td>
+</tr>
+<tr>
+<td><code>input</code>, <code>change</code> events</td>
+<td>the value changed; an edit was committed</td>
+</tr>
+</tbody></table>
+<p>It uses the shared theme&#39;s <code>--scxml-*</code> properties (<a href="/docs/theming/">theming</a>) and its <code>form</code> part.</p>
+<p>The schema reader is exported too, for forms of your own:</p>
+<pre class="shiki shiki-themes github-light-default github-dark-default" style="--shiki-light:#1f2328;--shiki-dark:#e6edf3;--shiki-light-bg:#ffffff;--shiki-dark-bg:#0d1117" tabindex="0"><code><span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">import</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> { check, defaultDataStrings, initialValue, readSchemas } </span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">from</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF"> "@tinyactors/scxmljs/data"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> schema</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> readSchemas</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">new</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF"> DOMParser</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">().</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">parseFromString</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"&#x3C;scxml/>"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">, </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"application/xml"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">));</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">const</span><span style="--shiki-light:#0550AE;--shiki-dark:#79C0FF"> add</span><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72"> =</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> schema.elements.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">get</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"add"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">);</span></span>
+<span class="line"><span style="--shiki-light:#CF222E;--shiki-dark:#FF7B72">if</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> (add) console.</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">log</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(</span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">initialValue</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(add), </span><span style="--shiki-light:#8250DF;--shiki-dark:#D2A8FF">check</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3">(add, { sku: </span><span style="--shiki-light:#0A3069;--shiki-dark:#A5D6FF">"pen"</span><span style="--shiki-light:#1F2328;--shiki-dark:#E6EDF3"> }, defaultDataStrings));</span></span></code></pre>
+<nav class="pager" aria-label="Previous and next page">
+  <a class="prev" href="/docs/explorer/"><small>Previous</small>&lt;scxml-explorer&gt;</a>
+  <a class="next" href="/docs/theming/"><small>Next</small>Theming</a>
+</nav>
+</article>
+<aside class="toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ul>
+    <li class="depth-2"><a href="#describe-an-events-data">Describe an event&#39;s data</a></li>
+    <li class="depth-3"><a href="#without-a-schema">Without a schema</a></li>
+    <li class="depth-3"><a href="#when-the-form-shows">When the form shows</a></li>
+    <li class="depth-2"><a href="#what-the-schema-can-say">What the schema can say</a></li>
+    <li class="depth-2"><a href="#on-its-own">&lt;scxml-data&gt; on its own</a></li>
+  </ul>
+  <a class="edit" href="https://github.com/tinyactors-dev/scxmljs/edit/main/docs/data.md">Edit this page on GitHub</a>
+</aside>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <a class="org" href="https://github.com/tinyactors-dev"><img src="/tinyactors.png" width="32" height="32" alt="">tinyactors</a>
+    <span class="meta"><span>@tinyactors/scxmljs 0.5.1 ·</span> <span>MIT licence ·</span> <a href="https://github.com/tinyactors-dev/scxmljs/commit/d6123850ee5573c7dbec2ea3b0197b799dd19573">d612385</a></span>
+    <span class="links"><span><a href="https://www.npmjs.com/package/@tinyactors/scxmljs">npm</a> ·</span> <span><a href="https://github.com/tinyactors-dev/scxmljs">GitHub</a> ·</span> <span><a href="/docs/security/">Security</a> ·</span> <a href="/docs/changelog/">Changelog</a></span>
+  </div>
+</footer>
+</body>
+</html>

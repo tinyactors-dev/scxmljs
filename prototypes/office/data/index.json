@@ -1,0 +1,86 @@
+{
+  "default": "llm-chat",
+  "systems": [
+    {
+      "id": "llm-chat",
+      "title": "llm-chat",
+      "office": true
+    },
+    {
+      "id": "llm-chat-dynamic",
+      "title": "llm-chat-dynamic"
+    },
+    {
+      "id": "pi-durable",
+      "title": "pi-durable"
+    },
+    {
+      "id": "fulfillment",
+      "title": "fulfillment"
+    },
+    {
+      "id": "github-issues",
+      "title": "github-issues"
+    },
+    {
+      "id": "downloads",
+      "title": "downloads"
+    },
+    {
+      "id": "frameworks-player",
+      "title": "frameworks-player"
+    },
+    {
+      "id": "gatekeeper-sample",
+      "title": "gatekeeper-sample"
+    },
+    {
+      "id": "launch",
+      "title": "launch"
+    },
+    {
+      "id": "many",
+      "title": "many"
+    },
+    {
+      "id": "order-api",
+      "title": "order-api"
+    },
+    {
+      "id": "pi-durable-tour-crashes",
+      "title": "pi-durable-tour-crashes"
+    },
+    {
+      "id": "pi-durable-tour-multiplayer",
+      "title": "pi-durable-tour-multiplayer"
+    },
+    {
+      "id": "pi-durable-tour-tasks",
+      "title": "pi-durable-tour-tasks"
+    },
+    {
+      "id": "single-blank",
+      "title": "single-blank"
+    },
+    {
+      "id": "single-checkout",
+      "title": "single-checkout"
+    },
+    {
+      "id": "single-login",
+      "title": "single-login"
+    },
+    {
+      "id": "single-microwave",
+      "title": "single-microwave"
+    },
+    {
+      "id": "single-player",
+      "title": "single-player"
+    },
+    {
+      "id": "support-desk",
+      "title": "support-desk"
+    }
+  ]
+}

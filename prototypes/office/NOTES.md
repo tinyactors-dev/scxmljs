@@ -12,6 +12,9 @@ Checks (node, no browser):
 - `node core/check-plan.mjs [system...]`: the floor plan as an ASCII map, and fails if two lives
   share a seat at the same time or two groups overlap.
 
+Flight recorder (what a visitor did and saw, captured on their machine, replayed and analysed here):
+LOGGING.md; what it found: FINDINGS.md.
+
 Films: `node record.mjs --system <name>` writes `out/<name>.mp4` and `-small.mp4`.
 Stills of the live page: `node tools/shoot.mjs <system> <dir> '<json>'`; every system at once (overview,
 eye level, after a click, after leaving a head): `node tools/sweep.mjs <dir>`.

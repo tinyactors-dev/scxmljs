@@ -162,7 +162,7 @@ export function makePlan(sim, cfg = {}) {
       const ps = seatOfLife(p, pLife); if (!ps) return null;
       const row = Math.floor(k / 3), col = k % 3;
       if (ps.hub) { const a = Math.PI * (0.25 + 0.5 * (k / Math.max(1, sideSlots.get(p) - 1))); return { x: ps.x + Math.cos(a) * 4.2, z: ps.z + Math.sin(a) * 4.2 - 0.6, facing: Math.atan2(-Math.cos(a), -Math.sin(a)), visitor: true, parentSeat: ps, side: k }; }
-      return { x: ps.x - 0.75 + col * 0.75, z: ps.z + 2.05 + row * 0.75, facing: Math.PI, visitor: true, parentSeat: ps, side: k };
+      return { x: ps.x - 1.0 + col * 1.0, z: ps.z + 2.05 + row * 0.85, facing: Math.PI, visitor: true, parentSeat: ps, side: k };
     }
     return seats.get(`${gid}#${k}`);
   };

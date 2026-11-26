@@ -39,9 +39,12 @@ export function canvasTex(w, h, draw, opts = {}) {
 }
 
 // a small engraved plate with text: brass or paper. Returns a mesh lying in its local XY plane.
+// every plate made, for the flight recorder's view sampler (engine/view.js); detached ones are pruned there
+export const PLATES = new Set();
 export function plate(text, { w = 0.9, h = 0.22, bg = "#c9a24a", fg = "#3a2a0c", font = "bold 46px Georgia, serif", border = "#8a6a22" } = {}) {
   // drawn once, at a resolution that keeps the letters ~60 % of the plate's height, mipmapped and
   // anisotropic, so it reads crisply near and fades cleanly far (no shimmer)
+  let glyph = 0.6;
   const px = 768, py = Math.max(48, Math.round((768 * h) / w)); const bw = Math.max(4, Math.round(py * 0.07));
   const tex = canvasTex(px, py, (g) => {
     g.fillStyle = bg; g.fillRect(0, 0, px, py);
@@ -49,9 +52,10 @@ export function plate(text, { w = 0.9, h = 0.22, bg = "#c9a24a", fg = "#3a2a0c",
     g.fillStyle = fg; g.font = font; g.textAlign = "center"; g.textBaseline = "middle";
     let size = Math.round(py * 0.6);
     while (size > 12) { g.font = font.replace(/\d+px/, size + "px"); if (g.measureText(text).width < px - 3 * bw - 16) break; size -= 2; }
-    g.fillText(text, px / 2, py / 2 + 2);
+    g.fillText(text, px / 2, py / 2 + 2); glyph = size / py; // the font size that fitted, as a share of the plate (head/inspect counts the same way)
   });
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: tex }));
+  m.userData.plate = { text, glyph }; PLATES.add(m); // log: the view sampler counts readable plates
   return m;
 }
 

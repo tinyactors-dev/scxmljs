@@ -38,3 +38,16 @@ place instead of in each builder's copy.
   modes as a person in the room: the prototype explains itself with itself.
 - Done means `main.js` is wiring only (target: under 120 lines, no dense one-liners), and each
   engine module has a header saying what it owns and what it must never know about.
+
+## Started: the flight recorder (2026-11-26)
+
+The first real piece of `harness` is in `engine/`: `log.js` (one event stream per session),
+`view.js` (what is in frame, readable plates) and `recorder.js` (the box by the door), with
+`tools/replay.mjs`, `tools/analyse.mjs` and `tools/explore.mjs` (LOGGING.md). Built for the pieces
+that come next: `perform(action)` in main.js is the one place where a visitor's intent becomes
+behaviour (the seed of `modes`: its actions are the statechart's events, and the log's `act` channel
+replays them); the camera rig reports flights, arrivals, interruptions and pushes through one `log`
+callback (`camera` adopts it as is); the recorder keeps the app's clock (`appNow`) beside the wall
+clock (`clock` replaces both); `?replay=1` takes time and pose from outside, which is the `clock`
+and `camera` interface a director will need anyway.
+

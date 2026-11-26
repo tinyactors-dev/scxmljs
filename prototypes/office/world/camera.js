@@ -11,6 +11,8 @@ import { ease, clamp01 } from "./kit.js";
 
 export function makeCameraRig(env) {
   const { camera, controls, wallH, colliders, people } = env; // env.room is read each time (it may be rebuilt)
+  const log = env.log || (() => {}); // log: (type, data) on the recorder's camera channel
+  const xyz = (p) => [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)];
   const R = 0.28; // the camera's sphere
   let flight = null;
   const v = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -21,7 +23,8 @@ export function makeCameraRig(env) {
     const pc = dedup(P), tc = dedup(T);
     const curve = (A) => (A.length < 2 ? { getPoint: () => A[0].clone() } : A.length === 2 ? new THREE.LineCurve3(A[0], A[1]) : new THREE.CatmullRomCurve3(A, false, "centripetal"));
     // a flight replaced mid-way still finishes what it promised (a lid closes, a stage ends)
-    const old = flight; flight = null; if (old) { if (old.onProgress) old.onProgress(1); if (old.onDone) old.onDone(); }
+    const old = flight; flight = null; if (old) { log("interrupt", { kind: old.kind, k: +(old.t / old.dur).toFixed(2), by: opts.kind || "move" }); if (old.onProgress) old.onProgress(1); if (old.onDone) old.onDone(); } // log:
+    log("fly", { kind: opts.kind || "move", dur, from: xyz(P[0]), to: xyz(P[P.length - 1]), tgt: xyz(T[T.length - 1]), via: P.length - 2 }); // log:
     flight = { pc: curve(pc), tc: curve(tc), start: null, dur, kind: opts.kind || "move", onProgress: opts.onProgress, onDone: opts.onDone, t: 0 };
     return flight;
   }
@@ -31,15 +34,15 @@ export function makeCameraRig(env) {
     const f = flight; f.t += dt; const k = clamp01(f.t / f.dur), e = ease(k);
     camera.position.copy(f.pc.getPoint(e)); controls.target.copy(f.tc.getPoint(e));
     if (f.onProgress) f.onProgress(k);
-    if (k >= 1) { flight = null; if (f.onDone) f.onDone(); }
+    if (k >= 1) { flight = null; log("arrive", { kind: f.kind }); if (f.onDone) f.onDone(); } // log:
     return f;
   }
-  const stop = () => { flight = null; };
+  const stop = (reason = "stop") => { if (flight) log("interrupt", { kind: flight.kind, k: +(flight.t / flight.dur).toFixed(2), by: reason }); flight = null; }; // log:
 
   // the boxes: static (desks, partitions, stations) plus everyone standing or sitting now
   function boxes(skipId) {
     const out = colliders();
-    for (const b of people.boxes(skipId)) out.push(b);
+    for (const b of people.boxes(skipId)) { b.person = true; out.push(b); }
     return out;
   }
   function resolve(p, opts = {}) {
@@ -51,13 +54,14 @@ export function makeCameraRig(env) {
     if (opts.free) return q;
     for (let it = 0; it < 3; it++) {
       let moved = false;
-      for (const [lo, hi] of boxes(opts.skip)) {
+      for (const b of boxes(opts.skip)) { const [lo, hi] = b;
         if (q.x < lo.x - R || q.x > hi.x + R || q.y < lo.y - R || q.y > hi.y + R || q.z < lo.z - R || q.z > hi.z + R) continue;
         // shortest way out (never down through the floor)
         const c = [[lo.x - R - q.x, 0], [hi.x + R - q.x, 0], [hi.y + R - q.y, 1], [lo.z - R - q.z, 2], [hi.z + R - q.z, 2]];
         if (lo.y - R > 0.3) c.push([lo.y - R - q.y, 1]);
         c.sort((a, b) => Math.abs(a[0]) - Math.abs(b[0])); const [d, ax] = c[0];
         if (ax === 0) q.x += d; else if (ax === 1) q.y += d; else q.z += d; moved = true;
+        if (opts.out) opts.out.push({ box: [xyz(lo), xyz(hi)], person: b.person || undefined, axis: "xyz"[ax], d: +d.toFixed(3) }); // log: who pushed
       }
       if (!moved) break;
     }

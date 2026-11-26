@@ -165,8 +165,8 @@ const clock = new VirtualClock();
 const session = await createSession(await readFile("traffic-light.scxml", "utf8"), { clock });
 
 session.addEventListener("macrostep", (e) => {
-  // after the chart ends, the last macrostep reports an empty configuration
-  const states = e.configuration.map((s) => s.id).join(" ") || "(terminated)";
+  // the last macrostep, just before the session ends, reports its final state
+  const states = e.configuration.map((s) => s.id).join(" ");
   console.log(`${clock.now()} ms: ${states}`);
 });
 session.start();
@@ -183,7 +183,7 @@ session.dispose();
 3000 ms: on green
 6000 ms: on yellow
 7000 ms: on red
-7000 ms: (terminated)
+7000 ms: off
 done {"cycles":1}
 ```
 

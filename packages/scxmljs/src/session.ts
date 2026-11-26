@@ -321,6 +321,8 @@ export class SCXMLSession extends EventTarget {
   private started = false;
   private exited = false;
   private busy = false;
+  /** The session's last macrostep is being reported: it ends right after, however `cancel()` is called meanwhile. */
+  private stopping = false;
   private scheduled = false;
   private sendCounter = 0;
   private settleWaiters: (() => void)[] = [];
@@ -534,7 +536,7 @@ export class SCXMLSession extends EventTarget {
     } finally {
       this.busy = false;
     }
-    this.emit(new MacrostepEvent(this, { configuration: this.configuration }));
+    this.endMacrostep(undefined);
     this.schedule();
     this.checkSettled();
     return this;
@@ -546,6 +548,8 @@ export class SCXMLSession extends EventTarget {
    */
   cancel() {
     if (!this.started || this.exited) return;
+    // its last macrostep is being reported: it has ended already, it only has to exit
+    if (this.stopping) return this.exitInterpreter();
     this.running = false;
     this.wasCancelled = true;
     if (!this.busy) this.exitInterpreter();
@@ -561,13 +565,24 @@ export class SCXMLSession extends EventTarget {
    * more than once; the session can't be used afterwards (`start()` throws).
    */
   dispose() {
+    if (this.exited) return void this.release();
     // never started: it ends here, cancelled, without having run
-    if (!this.started) this.exited = this.wasCancelled = true;
+    if (!this.started) {
+      this.exited = this.wasCancelled = true;
+      this.emit(new DoneEvent(this, { data: undefined }));
+    }
     this.cancel();
+    this.release();
+  }
+
+  /** What `dispose()` frees, once the session has ended. */
+  private release() {
     this.bridge?.cleanup();
     this.lifetime.abort();
-    this.disposedDm = true;
-    this.datamodel.dispose();
+    if (!this.disposedDm) {
+      this.disposedDm = true;
+      this.datamodel.dispose();
+    }
     // a session disposed before it ever started never ran exitInterpreter
     this.resolveDone(undefined);
     this.checkSettled();
@@ -803,13 +818,28 @@ export class SCXMLSession extends EventTarget {
       if (this.internalQueue.length) continue;
       break;
     }
+  }
+
+  /**
+   * Report the macrostep that just finished, then, when the session stopped running during it
+   * (a top-level final state, `cancel()`, the microstep limit), terminate it: the last
+   * macrostep comes before `done`, never after.
+   */
+  private endMacrostep(ev: QueuedEvent | undefined) {
+    if (this.exited) return;
+    this.stopping = !this.running;
+    try {
+      this.emit(new MacrostepEvent(this, { event: ev && stripMarks(ev), configuration: this.configuration }));
+    } finally {
+      this.stopping = false;
+    }
     if (!this.running) this.exitInterpreter();
   }
 
-  /** Process one external event: the second half of `mainEventLoop`. */
-  private processExternalEvent() {
+  /** Process one external event: the second half of `mainEventLoop`. Returns the event (`undefined`: none was queued). */
+  private processExternalEvent(): QueuedEvent | undefined {
     const ev = this.externalQueue.shift();
-    if (!ev) return;
+    if (!ev) return undefined;
     this.datamodel.setEvent(ev);
     for (const state of this.configuration) {
       for (const inv of state.invokes) {
@@ -822,7 +852,7 @@ export class SCXMLSession extends EventTarget {
     const enabled = this.selectTransitions(ev);
     if (enabled.length) this.microstep(enabled, ev);
     this.mainEventLoop();
-    this.emit(new MacrostepEvent(this, { event: stripMarks(ev), configuration: this.configuration }));
+    return ev;
   }
 
   private schedule() {
@@ -836,16 +866,21 @@ export class SCXMLSession extends EventTarget {
     this.scheduled = false;
     if (!this.running || this.busy) return;
     this.busy = true;
+    let stepped = true;
+    let ev: QueuedEvent | undefined;
     try {
       if (this.internalQueue.length) {
         // internal events that arrived asynchronously (delayed #_internal sends, late errors)
         this.mainEventLoop();
-        this.emit(new MacrostepEvent(this, { configuration: this.configuration }));
-      } else this.processExternalEvent();
+      } else {
+        ev = this.processExternalEvent();
+        stepped = !!ev;
+      }
     } finally {
       this.busy = false;
     }
-    if (!this.running && !this.exited) this.exitInterpreter();
+    if (stepped) this.endMacrostep(ev);
+    else if (!this.running) this.exitInterpreter();
     this.schedule();
     this.checkSettled();
   }
@@ -867,6 +902,17 @@ export class SCXMLSession extends EventTarget {
     if (this.exited) return;
     this.exited = true;
     this.running = false;
+    // its exit handlers run as part of the step that ends it
+    const wasBusy = this.busy;
+    this.busy = true;
+    try {
+      this.exitStatesAndSends();
+    } finally {
+      this.busy = wasBusy;
+    }
+  }
+
+  private exitStatesAndSends() {
     let doneData: unknown;
     let reachedFinal = false;
     for (const s of [...this.configurationSet].sort(exitOrder)) {

@@ -18,6 +18,23 @@ private `--x-*` properties are not public API and can change in any release.
 
 ## [Unreleased]
 
+### Changed
+
+- **The last macrostep comes before `done`**, with the configuration the session ended in (its
+  final state). It used to come after `done`, with an empty configuration. Code that read an empty
+  `configuration` in a `macrostep` listener as "the session has ended" listens to `done` instead,
+  or checks `session.status` there. `steps()` now yields that last macrostep too. A `cancel()` or
+  `dispose()` from a listener of that last macrostep ends the session as it would have ended
+  (reached its final state: not cancelled, with its `<donedata>`).
+
+### Fixed
+
+- **`dispose()` of a session that was never started** dispatches `done`, as every
+  other way a session ends does. Before, it ended without one.
+- **`dispose()` from a `macrostep` listener** ends the session at once, running its `<onexit>`
+  handlers before the data model is released. Before, they ran after it: with the sandboxed data
+  model each one failed with `error.execution`.
+
 ## [0.5.1] - 2026-11-25
 
 Two fixes seen on the tinyactors website: labels that promised a form and opened none, and the

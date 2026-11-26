@@ -42,7 +42,13 @@ export class MicrostepEvent extends SessionEvent {
   }
 }
 
-/** The session is stable again (a macrostep finished); `event` is the external event that started it, if any. */
+/**
+ * The session is stable again (a macrostep finished); `event` is the external event that started it, if any.
+ *
+ * The macrostep that ends the session (a top-level final state, or `cancel()` during the step)
+ * is reported too, with the configuration it ended in, and always before the `done` event: no
+ * session event follows `done`.
+ */
 export class MacrostepEvent extends SessionEvent {
   /** The external event that started the macrostep; `undefined` for the initial one. */
   readonly event?: SCXMLEvent;
@@ -129,7 +135,10 @@ export class ChildSessionEvent extends SessionEvent {
   }
 }
 
-/** The session terminated; `data` is the top-level final state's donedata, if any. */
+/**
+ * The session terminated; `data` is the top-level final state's donedata, if any. It is the last
+ * event a session dispatches, once: also for a session disposed before it started.
+ */
 export class DoneEvent extends SessionEvent {
   /** The top-level final state's `<donedata>`, or `undefined` (always `undefined` after a cancel). */
   readonly data: unknown;
